@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useAuthStore } from '../../stores/authStore';
+import { setDemoMode } from '../../services/demoMode';
 
 const storageMap = new Map<string, string>();
 const localStorageMock = {
@@ -52,6 +53,7 @@ describe('Demo PRO Mode & Dashboard Proposal Logic', () => {
   });
 
   it('restores persisted tier upon bootstrap in demo mode', async () => {
+    setDemoMode(true);
     localStorage.setItem('smartschedule-demo-mode', 'true');
     localStorage.setItem('smartschedule-demo-tier', 'PRO');
 

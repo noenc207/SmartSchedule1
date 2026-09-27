@@ -12,4 +12,9 @@ export default defineConfig({
       },
     },
   },
+  // @ts-expect-error vitest options
+  test: {
+    exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**'],
+  },
 });
+

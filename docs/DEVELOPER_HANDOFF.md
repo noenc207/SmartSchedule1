@@ -1,101 +1,156 @@
-# SmartSchedule — Final Engineering Developer Handoff Report
+# Developer Handoff
 
-## 1. Executive Summary & Verification Classification
+Welcome to the SmartSchedule project! This document contains comprehensive information to help you understand, build, and extend the SmartSchedule system.
 
-```text
-STATUS: 🟡 STAGING VERIFIED WITH LIMITATIONS
-```
+## 1. Project Understanding Overview
 
-- **Scope Verified**: All application tiers, Spring Boot 3.3.4, PostgreSQL 16, Flyway V1-V15 schema migrations, Hikari connection pool, Nginx live reverse proxy, rate limiting, anti-spoofing forwarded headers, 24-hour timetable views, CP-SAT solver contracts, and Playwright 22/22 end-to-end user workflows have been verified on the native host environment.
-- **Identified Limitation**: Container runtime execution on a dedicated Linux Docker host has not yet been physically executed in this Windows-based verification phase. The Docker Compose definitions, Dockerfiles, and Linux deployment runbooks are prepared and validated for syntax, but awaiting physical host staging execution.
+SmartSchedule is an intelligent scheduling application built with a modern microservices-inspired architecture.
 
----
+### Technology Stack
+*   **Backend:** Spring Boot 3.4.4 (Java 21)
+*   **Frontend:** React 19 (TypeScript 5.8, Vite 6.2)
+*   **Database:** PostgreSQL 16
+*   **Algorithm Engine:** Python 3.11 FastAPI with OR-Tools CP-SAT
+*   **Reverse Proxy:** Nginx 1.27
 
-## 2. Environment Verification Matrix
+### Backend Architecture
+The backend is structured under `com.smartschedule`, utilizing a feature-based modular approach with the following packages:
+`auth`, `availability`, `calendar`, `category`, `common`, `config`, `event`, `location`, `notification`, `plan`, `rescheduling`, `schedule`, `scheduling`, `task`, `user`.
+It comprises 106 Java source files, 17 JPA entities, 17 repositories, and 15 REST controllers.
 
-| Component / Workflow | Status | Evidence / Verification Method |
-| :--- | :--- | :--- |
-| **Spring Boot 3.3.4 Runtime** | ✅ Verified | Runs under JDK 21 with active profile `prod`. |
-| **PostgreSQL 16 Persistence** | ✅ Verified | Connected via HikariCP (25 max connections, 10 min idle). |
-| **Flyway Migrations (V1–V15)** | ✅ Verified | Clean execution from V1 baseline to V15 foreign key constraints. |
-| **24-Hour Calendar Grid** | ✅ Verified | Grid view `00:00:00 - 24:00:00` with text-only period toggles. |
-| **1-Click Full Stack Launcher** | ✅ Verified | `run_full_project.ps1` starts all 3 tiers with health validation. |
-| **Nginx Reverse Proxy** | ✅ Verified | Live reverse proxy routing, SPA fallback (`/index.html`). |
-| **Rate Limiting** | ✅ Verified | Nginx `limit_req_zone` (10 r/s, burst 20). |
-| **Anti-Spoofing Headers** | ✅ Verified | Sanitized `X-Forwarded-For` and `X-Real-IP`. |
-| **Playwright E2E Suite** | ✅ Verified | 22 out of 22 user scenarios passed through reverse proxy. |
-| **User Data Isolation** | ✅ Verified | Strict user tenancy enforced in repositories and services. |
-| **Optimistic Locking** | ✅ Verified | Concurrency collision protection via `@Version` columns. |
-| **Zero Demo Fallback** | ✅ Verified | Fail-closed security; no mock fallbacks in `prod` profile. |
-| **Frontend Production Build**| ✅ Verified | Vite production bundle compiled cleanly in 16.7s. |
-| **Frontend Secret Scan** | ✅ Verified | Zero leaked API keys or credentials in tracked sources. |
-| **Native Backup & Restore** | ✅ Verified | Successful dump generation and table restoration. |
-| **Docker Engine on Linux** | 🟡 Pending | Transfer bundle prepared; awaiting execution on Linux staging. |
+### Frontend Architecture
+The frontend leverages a feature-based directory structure:
+`auth`, `calendar`, `collaboration`, `dashboard`, `landing`, `notifications`, `rescheduling`, `schedules`, `scheduling`, `settings`, `sharing`, `tasks`.
+Key libraries include FullCalendar, Three.js/React Three Fiber (R3F), Framer Motion, Zustand (state management), Axios (API client), Lucide React (icons), Tailwind CSS (styling), and Zod (validation).
 
----
+### Database Schema
+The database uses Flyway migrations (V1 through V15):
+*   **Tables:** `users`, `schedules`, `tasks`, `events`, `availabilities`, `categories`, `refresh_tokens`, `schedule_members`, `share_links`, `notifications`, `activity_logs`, `user_locations`, `locations`, `campus_edges`, `mobility_acknowledgements`, `event_occurrence_exceptions`, `scheduling_preferences`.
+*   **Migrations History:** V1 (Initial schema) to V15 (Production indexing).
 
-## 3. Architecture & Service Boundaries
-
-```text
-[ End User Browser ]
-        │
-        │ HTTP / HTTPS (Port 80 / 443)
-        ▼
-[ Nginx Reverse Proxy (Frontend Container / Service) ]
-   ├── Port 80 / 443 Public
-   ├── Rate Limiting (10 req/s, Burst 20)
-   ├── Serves React 19 SPA (Vite Production Build)
-   └── Proxies /api/v1/ to Backend
-        │
-        │ Internal Docker Bridge (smartschedule-network)
-        ▼
-[ Spring Boot API (smartschedule-backend) ]
-   ├── Port 8080 (BIND TO 127.0.0.1 OR INTERNAL BRIDGE ONLY)
-   ├── Profile: prod
-   ├── Hikari Connection Pool (Size: 25)
-   ├── Flyway Database Migrations (V1 to V15)
-   └── Orchestrates CP-SAT Solver & Physical Mobility
-        │
-        ├── SQL (Port 5432 - Internal Bridge Only)
-        ▼
-[ PostgreSQL 16 (smartschedule-postgres) ]
-   └── Persistent Volume: postgres-data
-```
+### Staging Status
+🟡 **STAGING VERIFIED WITH LIMITATIONS** — Linux Docker runtime not physically executed.
 
 ---
 
-## 4. Account & Security Policies
+## 2. How to Run Locally
 
-### Standard Accounts
-- **Public Beta User**: `user@smartschedul.com` / `Password123!`
-- **Feature Tier**: `ALL_PRO` (Enabled via `SMARTSCHEDULE_PLAN_MODE=ALL_PRO` to provide full capabilities to beta testers).
-- **Registration Gate**: New accounts require the invitation token `SMART-STAGE-825881097B854931`.
+### 1-Click Script
+For convenience, you can run the provided 1-click startup script (e.g., `start.sh` or `start.bat` located in the root directory) which initializes PostgreSQL, builds the backend, installs frontend dependencies, and starts all services.
 
-### Data Isolation & Access Control
-- All entity queries (`Task`, `Event`, `Schedule`, `TimeBlock`) filter explicitly on authenticated `userId`.
-- No cross-tenant access is permitted.
-- Passwords are encrypted with BCrypt (12 rounds).
-- JWT tokens expire in 15 minutes; HttpOnly refresh cookies rotate upon each renewal.
+### Manual Execution
+1.  **Database:** Ensure PostgreSQL 16 is running on your machine.
+2.  **Algorithm Engine:**
+    *   Navigate to the Python engine directory.
+    *   Install requirements: `pip install -r requirements.txt`
+    *   Run FastAPI server: `uvicorn main:app --reload`
+3.  **Backend:**
+    *   Navigate to the backend directory.
+    *   Run with Maven: `./mvnw spring-boot:run`
+4.  **Frontend:**
+    *   Navigate to the frontend directory.
+    *   Install dependencies: `npm install`
+    *   Start development server: `npm run dev`
 
 ---
 
-## 5. Next Engineering Steps for Staging / Production Host
+## 3. How to Run Tests
 
-1. **Transfer Staging Bundle**:
-   ```bash
-   scp staging-transfer-bundle.zip deployer@staging-host.example.com:/opt/smartschedule/
-   ```
-2. **Extract & Prepare**:
-   ```bash
-   unzip /opt/smartschedule/staging-transfer-bundle.zip -d /opt/smartschedule/app/
-   cd /opt/smartschedule/app/
-   chmod +x scripts/*.sh
-   ```
-3. **Execute Linux Staging Runbook**:
-   ```bash
-   bash scripts/deploy_linux_staging.sh
-   ```
-4. **Configure Production SSL**:
-   - Reference [deployment/nginx-production-ssl.conf.template](../deployment/nginx-production-ssl.conf.template).
-   - Install Certbot / Let's Encrypt certificates.
-   - Reload Nginx.
+*   **Backend (Java):** Run Maven tests using `./mvnw test`. This executes unit and integration tests.
+*   **Frontend (Unit/Integration):** Run Vitest using `npm run test` in the frontend directory.
+*   **Frontend (E2E):** Run Playwright end-to-end tests using `npx playwright test`.
+*   **Algorithm Engine (Python):** Run pytest using `pytest` in the engine directory.
+
+---
+
+## 4. How to Deploy
+
+### Docker Compose
+Deploying the entire stack is streamlined with Docker Compose.
+1.  Ensure Docker and Docker Compose are installed.
+2.  Run `docker-compose up -d --build` from the root directory to spin up the PostgreSQL database, Spring Boot backend, Python algorithm engine, and frontend (served via Nginx).
+
+### Manual VPS Deployment
+1.  Provision a Linux VPS.
+2.  Install PostgreSQL 16, Java 21, Python 3.11, Node.js, and Nginx.
+3.  Clone the repository and set up environment variables.
+4.  Build the backend JAR and deploy it as a systemd service.
+5.  Deploy the Python FastAPI application using Gunicorn/Uvicorn.
+6.  Build the frontend (`npm run build`) and configure Nginx to serve the static files and reverse-proxy API requests to the backend.
+
+---
+
+## 5. How to Modify the Scheduler
+
+The intelligent scheduling system is decoupled into a Java orchestrator and a Python solver.
+
+*   **Flow (generate → validate → apply):** The backend collects constraints (tasks, availability, preferences) and generates a scheduling request. It calls the Python engine, which validates the constraints and generates a schedule. The backend then applies the validated schedule to the database.
+*   **Algorithm-Engine Microservice:** A Python FastAPI service that implements constraint programming using Google OR-Tools CP-SAT.
+*   **AlgorithmClient.java:** The Java client responsible for making HTTP requests to the Python microservice and deserializing the schedule response.
+
+To modify constraints or scoring, update the Python engine logic. To change what data is considered, update the Java request generation logic.
+
+---
+
+## 6. How to Modify the Frontend
+
+*   **Feature-Based Structure:** Code is organized by domain features (e.g., `src/features/calendar`, `src/features/auth`). Components, hooks, and types specific to a feature reside in its directory.
+*   **Stores (Zustand):** Global state is managed by Zustand stores (e.g., `useAuthStore`, `useScheduleStore`). Modify these to add new global state.
+*   **API Layer (Axios):** API calls are centralized, often using custom hooks or a dedicated API client file. Ensure API functions map correctly to backend DTOs.
+*   **Routes:** Defined using standard React routing. Add new pages by mapping a route path to a feature's entry component.
+
+---
+
+## 7. How to Add a New API Endpoint
+
+Follow the layered architecture pattern:
+1.  **DTOs:** Create Request and Response Data Transfer Objects (Records are preferred in Java 21) in the relevant feature module.
+2.  **Repository:** If new data access is needed, update or create a Spring Data JPA Repository.
+3.  **Service:** Implement the business logic in a `@Service` class, injecting the repository.
+4.  **Controller:** Create a `@RestController` class. Map the HTTP method (e.g., `@GetMapping`, `@PostMapping`), validate the request body using `@Valid`, and call the service.
+
+---
+
+## 8. How to Add a Database Migration
+
+We use Flyway for schema management.
+*   **Sequential Versioning:** Name your file sequentially (e.g., if the latest is V15, the next must be `V16__Description.sql`).
+*   **Immutability:** **NEVER** edit an existing, previously applied migration file. This will cause Flyway checksum validation to fail on startup.
+*   **Idempotency:** Use `IF NOT EXISTS` for tables, columns, and indexes where possible to prevent errors on multiple runs.
+
+---
+
+## 9. How to Change the 3D Landing Scene
+
+The 3D landing page utilizes React Three Fiber (R3F).
+*   **MascotModel.tsx:** Handles the logic and rendering of the primary 3D mascot.
+*   **HeroScene.tsx / ClosingScene.tsx:** Define the composition of the scene, lighting, camera angles, and animations using Framer Motion 3D.
+*   **Assets:** The 3D models are GLB format, stored in `public/models/`.
+
+---
+
+## 10. How to Add a 3D Asset
+
+1.  Obtain or export your 3D model in **GLB** format.
+2.  Place the `.glb` file in the `public/models/` directory.
+3.  In your React component, import the asset using R3F's `useGLTF` hook.
+4.  Wrap the component containing the 3D asset in a React `<Suspense>` boundary to handle loading states smoothly.
+
+---
+
+## 11. How to Release
+
+1.  **Build Backend:** Run `./mvnw clean package -DskipTests` to generate the executable `.jar` file.
+2.  **Build Frontend:** Navigate to the frontend directory and run `npm run build` to generate the production bundle.
+3.  **Package Bundle:** Archive the necessary release artifacts (JAR, frontend dist, docker-compose.yml).
+4.  **Transfer:** Upload the package to the target server via SCP/SFTP.
+5.  **Deploy:** Execute the deployment script or restart the Docker/systemd services to apply the new version.
+
+---
+
+## 12. Troubleshooting Common Issues
+
+*   **502 Bad Gateway:** Usually means Nginx is running, but the backend Spring Boot app or Python Engine is down or not responding. Check the respective service logs.
+*   **Flyway Checksum Mismatch:** Occurs if an already applied migration file was modified. Revert the file to its original state or, if on development, drop the schema and recreate it.
+*   **Connection Refused:** Ensure the requested service (PostgreSQL, Backend, Engine) is actually running and listening on the expected port.
+*   **Rate Limiting:** If requests are being blocked, check the Nginx rate limiting configuration or the application-level API gateway limits and adjust if necessary for testing.
