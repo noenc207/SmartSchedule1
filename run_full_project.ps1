@@ -79,6 +79,7 @@ if ($isBackendRunning) {
 `$env:SMARTSCHEDULE_JWT_SECRET = "super-secret-jwt-key-for-staging-at-least-32-chars-long!"
 `$env:SMARTSCHEDULE_CORS_ALLOWED_ORIGINS = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://localhost"
 `$env:SMARTSCHEDULE_REGISTRATION_KEY = "SMART-STAGE-825881097B854931"
+`$env:SMARTSCHEDULE_PLAN_MODE = "ALL_PRO"
 `$env:SMARTSCHEDULE_SECURE_COOKIE = "false"
 `$env:DB_POOL_MAX_SIZE = "25"
 `$env:DB_POOL_MIN_IDLE = "10"
