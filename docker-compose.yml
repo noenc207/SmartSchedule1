@@ -1,0 +1,63 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-smartschedule}
+      POSTGRES_USER: ${POSTGRES_USER:-smartschedule}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-smartschedule}
+    expose:
+      - "5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/smartschedule}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-smartschedule}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-smartschedule}
+      SMARTSCHEDULE_JWT_SECRET: ${SMARTSCHEDULE_JWT_SECRET:-dev-only-secret-change-this-before-production-please-32-bytes}
+      SMARTSCHEDULE_SECURE_COOKIE: ${SMARTSCHEDULE_SECURE_COOKIE:-false}
+      SMARTSCHEDULE_CORS_ALLOWED_ORIGINS: ${SMARTSCHEDULE_CORS_ALLOWED_ORIGINS:-http://localhost,http://localhost:5173}
+      SMARTSCHEDULE_PLAN_MODE: ${SMARTSCHEDULE_PLAN_MODE:-ALL_PRO}
+      SMARTSCHEDULE_REGISTRATION_KEY: ${SMARTSCHEDULE_REGISTRATION_KEY:?SMARTSCHEDULE_REGISTRATION_KEY must be set}
+      SMARTSCHEDULE_RATE_LIMIT_ENABLED: ${SMARTSCHEDULE_RATE_LIMIT_ENABLED:-true}
+      SMARTSCHEDULE_RATE_LIMIT_REGISTER_PER_MIN: ${SMARTSCHEDULE_RATE_LIMIT_REGISTER_PER_MIN:-5}
+      SMARTSCHEDULE_RATE_LIMIT_LOGIN_PER_MIN: ${SMARTSCHEDULE_RATE_LIMIT_LOGIN_PER_MIN:-15}
+      SMARTSCHEDULE_RATE_LIMIT_REFRESH_PER_MIN: ${SMARTSCHEDULE_RATE_LIMIT_REFRESH_PER_MIN:-30}
+    expose:
+      - "8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api/v1}
+        VITE_API_MODE: ${VITE_API_MODE:-real}
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "5173:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  postgres-data:

@@ -1,0 +1,33 @@
+server:
+  forward-headers-strategy: framework
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:25}
+      minimum-idle: ${DB_POOL_MIN_IDLE:10}
+      connection-timeout: ${DB_CONNECTION_TIMEOUT:30000}
+      idle-timeout: ${DB_IDLE_TIMEOUT:600000}
+      max-lifetime: ${DB_MAX_LIFETIME:1800000}
+      pool-name: SmartScheduleHikariProdPool
+  jpa:
+    hibernate:
+      ddl-auto: validate
+smartschedule:
+  cors:
+    allowed-origins: ${SMARTSCHEDULE_CORS_ALLOWED_ORIGINS}
+  auth:
+    jwt-secret: ${SMARTSCHEDULE_JWT_SECRET}
+    secure-cookie: true
+    registration-key: ${SMARTSCHEDULE_REGISTRATION_KEY}
+  plan:
+    mode: ${SMARTSCHEDULE_PLAN_MODE:ALL_PRO}
+  rate-limit:
+    enabled: ${SMARTSCHEDULE_RATE_LIMIT_ENABLED:true}
+    register-per-minute: ${SMARTSCHEDULE_RATE_LIMIT_REGISTER_PER_MIN:5}
+    login-per-minute: ${SMARTSCHEDULE_RATE_LIMIT_LOGIN_PER_MIN:15}
+    refresh-per-minute: ${SMARTSCHEDULE_RATE_LIMIT_REFRESH_PER_MIN:30}
+  jobs:
+    reminder-delay-ms: ${SMARTSCHEDULE_REMINDER_DELAY_MS:60000}

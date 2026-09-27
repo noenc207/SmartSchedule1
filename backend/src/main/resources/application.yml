@@ -1,0 +1,44 @@
+spring:
+  application:
+    name: smartschedule-api
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/smartschedule}
+    username: ${SPRING_DATASOURCE_USERNAME:smartschedule}
+    password: ${SPRING_DATASOURCE_PASSWORD:smartschedule}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:20}}
+      minimum-idle: ${DB_POOL_MIN_IDLE:${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:5}}
+      connection-timeout: ${DB_CONNECTION_TIMEOUT:${SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT:30000}}
+      idle-timeout: ${DB_IDLE_TIMEOUT:600000}
+      max-lifetime: ${DB_MAX_LIFETIME:1800000}
+      pool-name: SmartScheduleHikariPool
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+server:
+  port: ${SERVER_PORT:8080}
+  error:
+    include-message: never
+smartschedule:
+  cors:
+    allowed-origins: ${SMARTSCHEDULE_CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  auth:
+    jwt-secret: ${SMARTSCHEDULE_JWT_SECRET:dev-only-secret-change-this-before-production-please-32-bytes}
+    access-token-ttl: ${SMARTSCHEDULE_ACCESS_TOKEN_TTL:PT15M}
+    refresh-token-ttl: ${SMARTSCHEDULE_REFRESH_TOKEN_TTL:P30D}
+    refresh-cookie-name: ${SMARTSCHEDULE_REFRESH_COOKIE_NAME:smartschedule_refresh}
+    secure-cookie: ${SMARTSCHEDULE_SECURE_COOKIE:false}
+    registration-key: ${SMARTSCHEDULE_REGISTRATION_KEY:SMART-DEPLOY-2026}
+  plan:
+    mode: ${SMARTSCHEDULE_PLAN_MODE:ALL_PRO}
+  rate-limit:
+    enabled: ${SMARTSCHEDULE_RATE_LIMIT_ENABLED:true}
+    register-per-minute: ${SMARTSCHEDULE_RATE_LIMIT_REGISTER_PER_MIN:5}
+    login-per-minute: ${SMARTSCHEDULE_RATE_LIMIT_LOGIN_PER_MIN:15}
+    refresh-per-minute: ${SMARTSCHEDULE_RATE_LIMIT_REFRESH_PER_MIN:30}
+  jobs:
+    reminder-delay-ms: ${SMARTSCHEDULE_REMINDER_DELAY_MS:60000}

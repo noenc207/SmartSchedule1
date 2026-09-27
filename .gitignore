@@ -1,0 +1,54 @@
+# Dependencies
+frontend/node_modules/
+backend/target/
+algorithm-engine/node_modules/
+algorithm-engine/target/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Build artifacts
+frontend/dist/
+frontend/tsconfig.tsbuildinfo
+*.class
+*.jar
+*.war
+
+# Environment & Credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+
+# Logs & Runtime
+*.log
+runtime-logs/
+logs/
+
+# Backups & Dumps
+backups/
+*.dump
+*.sql
+*.tar
+*.gz
+*.zip
+
+# Test Results & Reports
+test-results/
+playwright-report/
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# OS Generated
+Thumbs.db
+Desktop.ini
+.DS_Store

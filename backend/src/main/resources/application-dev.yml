@@ -1,0 +1,7 @@
+spring:
+  config:
+    activate:
+      on-profile: dev
+smartschedule:
+  auth:
+    secure-cookie: false

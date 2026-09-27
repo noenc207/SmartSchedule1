@@ -1,0 +1,6 @@
+import type { RecurrenceRule } from '../../../types/domain';
+
+export function RecurrenceEditor({ value, onChange }: { value: RecurrenceRule | null; onChange: (value: RecurrenceRule | null) => void }) {
+  const rule = value ?? { frequency: 'DAILY' as const, interval: 1, byWeekdays: [1], until: null, count: null };
+  return <div className="recurrence-editor"><label className="field"><span>Repeat</span><select value={value?.frequency ?? 'NONE'} onChange={(e) => onChange(e.target.value === 'NONE' ? null : { ...rule, frequency: e.target.value as RecurrenceRule['frequency'] })}><option value="NONE">Does not repeat</option><option value="DAILY">Daily</option><option value="WEEKLY">Weekly</option><option value="MONTHLY">Monthly</option></select></label>{value && <><label className="field"><span>Every</span><input type="number" min="1" value={rule.interval} onChange={(e) => onChange({ ...rule, interval: Number(e.target.value) })} /></label>{rule.frequency === 'WEEKLY' && <div className="weekday-picker">{[1, 2, 3, 4, 5, 6, 7].map((day) => <label key={day}><input type="checkbox" checked={rule.byWeekdays.includes(day)} onChange={(e) => onChange({ ...rule, byWeekdays: e.target.checked ? [...rule.byWeekdays, day].sort() : rule.byWeekdays.filter((item) => item !== day) })} />{day}</label>)}</div>}</>}</div>;
+}
