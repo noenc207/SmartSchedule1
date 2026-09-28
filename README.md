@@ -245,6 +245,18 @@ SmartSchedule addresses these combined constraints through a deterministic const
 - **Read/unread tracking** — mark individual or all notifications as read
 - **Reminder jobs** — `ReminderJob` background service triggered by configurable delay
 
+### Browser Extension — Universal Schedule Importer
+
+- **Manifest V3 Extension** — Chrome & Edge extension (`extension/`) for extracting student timetables
+- **Zero Credential Collection** — Never inspects passwords, cookies, or session tokens; reads only visible timetable DOM
+- **Dynamic Rule Engine** — Decoupled JSON rules with versioning, checksum validation, and remote refresh from backend
+- **Supported Portals** — Verified FPT Academic Portal (FAP) adapter + verified Edusoft adapter with fixture integration tests
+- **Universal Schema Normalization** — Converts portal DOM into canonical `UniversalScheduleItem` with timezone normalization (`Asia/Ho_Chi_Minh`)
+- **Idempotent Import** — Generates deterministic event fingerprints to prevent duplicates on re-import
+- **In-Browser Preview & Conflict Detection** — Interactive popup preview with warning badges, subject count, and schedule selection
+- **Backend Import API** — `POST /api/v1/schedules/{id}/import/portal` with atomic transaction, conflict resolution, and `schedule_imports` audit trail
+
+
 ### Landing Page & 3D
 
 - **3D hero scene** — `HeroScene.tsx` using React Three Fiber (`@react-three/fiber` 9.7) and Three.js (`three` 0.186)
@@ -1166,3 +1178,6 @@ See [docs/DEVELOPER_HANDOFF.md](docs/DEVELOPER_HANDOFF.md) for the complete deve
 | Staging Report | [docs/STAGING_DEPLOYMENT_REPORT.md](docs/STAGING_DEPLOYMENT_REPORT.md) | Verification evidence and test results |
 | Concurrency Guide | [docs/CONCURRENCY.md](docs/CONCURRENCY.md) | Optimistic locking and connection pool analysis |
 | Backup & Restore | [docs/BACKUP_AND_RESTORE.md](docs/BACKUP_AND_RESTORE.md) | Database backup and disaster recovery |
+| Browser Extension | [docs/BROWSER_EXTENSION.md](docs/BROWSER_EXTENSION.md) | Universal Schedule Importer architecture & guide |
+| Rule Authoring | [docs/EXTENSION_RULE_AUTHORING.md](docs/EXTENSION_RULE_AUTHORING.md) | Step-by-step guide to adding new university adapters |
+| Extension Privacy | [docs/EXTENSION_PRIVACY.md](docs/EXTENSION_PRIVACY.md) | Security invariants, data handling & privacy policy |

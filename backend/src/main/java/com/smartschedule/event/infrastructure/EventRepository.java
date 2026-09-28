@@ -18,4 +18,6 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
     @Query("select e from Event e where e.schedule.id = :scheduleId and e.sourceTaskId = :taskId and e.generatedPlanId is not null order by e.startsAt")
     List<Event> findAllByScheduleIdAndSourceTaskId(@Param("scheduleId") UUID scheduleId, @Param("taskId") UUID taskId);
     List<Event> findAllBySourceTaskId(UUID sourceTaskId);
+    Optional<Event> findByScheduleIdAndExternalId(UUID scheduleId, String externalId);
+    List<Event> findAllByScheduleIdAndExternalIdIn(UUID scheduleId, Collection<String> externalIds);
 }

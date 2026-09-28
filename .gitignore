@@ -1,5 +1,6 @@
 # Dependencies
 frontend/node_modules/
+extension/node_modules/
 backend/target/
 algorithm-engine/node_modules/
 algorithm-engine/target/
@@ -11,6 +12,7 @@ __pycache__/
 # Build artifacts
 frontend/dist/
 frontend/tsconfig.tsbuildinfo
+extension/dist/
 *.class
 *.jar
 *.war
@@ -32,6 +34,7 @@ logs/
 backups/
 *.dump
 *.sql
+!backend/src/main/resources/db/migration/*.sql
 *.tar
 *.gz
 *.zip

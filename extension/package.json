@@ -1,0 +1,29 @@
+{
+  "name": "smartschedule-extension",
+  "version": "1.0.0",
+  "description": "SmartSchedule Browser Extension - Universal Schedule Importer & Dynamic Rule Engine",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite build --watch --mode development",
+    "build": "tsc && vite build",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "lucide-react": "^1.47.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.308",
+    "@types/node": "^22.13.9",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "@vitejs/plugin-react": "^4.4.1",
+    "jsdom": "^26.0.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.3",
+    "vitest": "^3.0.8"
+  }
+}

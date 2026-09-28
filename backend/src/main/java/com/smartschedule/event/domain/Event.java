@@ -27,6 +27,8 @@ public class Event {
     @Column(nullable = false) private boolean locked;
     @Column(name = "generated_plan_id") private UUID generatedPlanId;
     @Column(name = "source_task_id") private UUID sourceTaskId;
+    @Column(name = "external_id", length = 255) private String externalId;
+    @Column(length = 64) private String source;
     @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt;
     @Column(name = "updated_at", nullable = false) private Instant updatedAt;
     protected Event() {}
@@ -66,6 +68,10 @@ public class Event {
     public UUID getGeneratedPlanId() { return generatedPlanId; } public UUID getSourceTaskId() { return sourceTaskId; }
     public void setSourceTaskId(UUID sourceTaskId) { this.sourceTaskId = sourceTaskId; }
     public void setLocationId(UUID locationId) { this.locationId = locationId; }
+    public String getExternalId() { return externalId; }
+    public void setExternalId(String externalId) { this.externalId = externalId; }
+    public String getSource() { return source; }
+    public void setSource(String source) { this.source = source; }
     public void update(Category category, String title, String description, Instant startsAt, Instant endsAt, String location, String priority,
                        String status, String recurrenceRule, Integer reminderMinutes, String notes, boolean fixed, boolean locked) {
         update(category, this.sourceTaskId, title, description, startsAt, endsAt, location, this.locationId, priority, status, recurrenceRule, reminderMinutes, notes, fixed, locked);

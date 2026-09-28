@@ -1,0 +1,24 @@
+[
+  {
+    "title": "Cơ sở dữ liệu",
+    "courseCode": "IT001",
+    "startTime": "2026-09-28T07:30:00+07:00",
+    "endTime": "2026-09-28T09:30:00+07:00",
+    "location": "A1.101",
+    "teacher": "NguyenVanA",
+    "group": "CLC01",
+    "source": "EDUSOFT",
+    "status": "CONFIRMED"
+  },
+  {
+    "title": "Cấu trúc dữ liệu và giải thuật",
+    "courseCode": "IT002",
+    "startTime": "2026-09-29T13:00:00+07:00",
+    "endTime": "2026-09-29T15:00:00+07:00",
+    "location": "B2.203",
+    "teacher": "TranThiB",
+    "group": "CLC01",
+    "source": "EDUSOFT",
+    "status": "CONFIRMED"
+  }
+]

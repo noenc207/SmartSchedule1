@@ -1,0 +1,46 @@
+[
+  {
+    "title": "Dự án Phát triển Phần mềm",
+    "courseCode": "SWP391",
+    "startTime": "2026-09-28T07:30:00+07:00",
+    "endTime": "2026-09-28T09:00:00+07:00",
+    "location": "BE-301",
+    "teacher": "HuongLT",
+    "group": "SE1701",
+    "source": "FAP",
+    "status": "CONFIRMED"
+  },
+  {
+    "title": "Lập trình Cơ bản với C#",
+    "courseCode": "PRN211",
+    "startTime": "2026-09-28T09:15:00+07:00",
+    "endTime": "2026-09-28T10:45:00+07:00",
+    "location": "AL-L402",
+    "teacher": "NamDH",
+    "group": "SE1701",
+    "source": "FAP",
+    "status": "CONFIRMED"
+  },
+  {
+    "title": "Nhập môn Kỹ thuật Phần mềm",
+    "courseCode": "SWE201",
+    "startTime": "2026-09-29T13:30:00+07:00",
+    "endTime": "2026-09-29T15:00:00+07:00",
+    "location": "DE-205",
+    "teacher": "ThuanTV",
+    "group": "SE1701",
+    "source": "FAP",
+    "status": "CONFIRMED"
+  },
+  {
+    "title": "Triết học Mác - Lênin",
+    "courseCode": "MLN122",
+    "startTime": "2026-09-30T15:15:00+07:00",
+    "endTime": "2026-09-30T16:45:00+07:00",
+    "location": "P.104",
+    "teacher": "AnhPT",
+    "group": "SE1701",
+    "source": "FAP",
+    "status": "CONFIRMED"
+  }
+]

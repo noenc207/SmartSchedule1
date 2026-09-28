@@ -1,0 +1,167 @@
+import type { ExtractionRule } from './types';
+import { computeRuleChecksum } from './checksum';
+
+export const FAP_DEFAULT_RULE: ExtractionRule = {
+  id: 'fpt-fap',
+  name: 'FPT Academic Portal (FAP)',
+  provider: 'FAP',
+  version: 1,
+  enabled: true,
+  priority: 100,
+  domains: ['fap.fpt.edu.vn', '*.fpt.edu.vn', 'localhost', '127.0.0.1'],
+  pathMatch: 'Schedule|Report|ScheduleOfWeek',
+  waitFor: 'table',
+  mode: 'table-rows',
+  rowSelector: 'table.schedule-table tbody tr, table#ctl00_mainContent_divSelect table tr:not(:first-child), table.table-bordered tbody tr:not(:first-child), table tbody tr.session-row',
+  fields: {
+    title: {
+      selector: '.subject-name, td.subject, a[href*="Subject"], td:nth-child(3)',
+      source: 'text',
+      optional: false,
+      trim: true,
+    },
+    courseCode: {
+      selector: '.course-code, td.code, a[href*="Course"], td:nth-child(2)',
+      source: 'text',
+      regex: '([A-Z]{2,4}\\d{3,4}[A-Z]?)',
+      regexGroup: 1,
+      optional: true,
+      trim: true,
+    },
+    date: {
+      selector: '.session-date, td.date, td:nth-child(1)',
+      source: 'text',
+      regex: '(\\d{1,2}[/-]\\d{1,2}[/-]\\d{4})',
+      regexGroup: 1,
+      optional: false,
+      trim: true,
+    },
+    timeRange: {
+      selector: '.session-time, td.time, td.slot, td:nth-child(4)',
+      source: 'text',
+      regex: '(\\d{1,2}[:h]\\d{2}\\s*[-–—to]+\\s*\\d{1,2}[:h]\\d{2})',
+      regexGroup: 1,
+      optional: true,
+      trim: true,
+    },
+    startTime: {
+      selector: '.start-time, td.start',
+      source: 'text',
+      optional: true,
+      trim: true,
+    },
+    endTime: {
+      selector: '.end-time, td.end',
+      source: 'text',
+      optional: true,
+      trim: true,
+    },
+    location: {
+      selector: '.session-room, td.room, td:nth-child(5)',
+      source: 'text',
+      regex: '(?:Phòng|Room)?\\s*([A-Za-z0-9_.-]+)',
+      regexGroup: 1,
+      optional: true,
+      trim: true,
+    },
+    teacher: {
+      selector: '.session-teacher, td.lecturer, td:nth-child(6)',
+      source: 'text',
+      regex: '(?:GV|Lecturer|Teacher)?:?\\s*([A-Za-z0-9_.-]+)',
+      regexGroup: 1,
+      optional: true,
+      trim: true,
+    },
+    group: {
+      selector: '.session-class, td.class, td:nth-child(7)',
+      source: 'text',
+      optional: true,
+      trim: true,
+    },
+    slot: {
+      selector: '.session-slot, td.slot-num',
+      source: 'text',
+      regex: '(?:Slot|Ca)\\s*(\\d+)',
+      regexGroup: 1,
+      optional: true,
+      trim: true,
+    },
+  },
+  dateFormat: 'DD/MM/YYYY',
+  timeFormat: 'HH:mm',
+  timezone: 'Asia/Ho_Chi_Minh',
+};
+FAP_DEFAULT_RULE.checksum = computeRuleChecksum(FAP_DEFAULT_RULE);
+
+export const EDUSOFT_DEFAULT_RULE: ExtractionRule = {
+  id: 'edusoft-portal',
+  name: 'Edusoft University Portal',
+  provider: 'EDUSOFT',
+  version: 1,
+  enabled: true,
+  priority: 90,
+  domains: ['edusoftweb.hcmiu.edu.vn', '*.edusoft.vn', 'daotao.vnu.edu.vn'],
+  pathMatch: 'ThoiKhoaBieu|Schedule',
+  waitFor: 'table.grid',
+  mode: 'table-rows',
+  rowSelector: 'table.grid tbody tr, table#tblThoiKhoaBieu tbody tr',
+  fields: {
+    title: {
+      selector: 'td.col-mon, td:nth-child(3)',
+      source: 'text',
+      optional: false,
+      trim: true,
+    },
+    courseCode: {
+      selector: 'td.col-mamon, td:nth-child(2)',
+      source: 'text',
+      regex: '([A-Z0-9]+)',
+      regexGroup: 1,
+      optional: true,
+      trim: true,
+    },
+    date: {
+      selector: 'td.col-ngay, td:nth-child(4)',
+      source: 'text',
+      regex: '(\\d{1,2}[/-]\\d{1,2}[/-]\\d{4})',
+      regexGroup: 1,
+      optional: false,
+      trim: true,
+    },
+    timeRange: {
+      selector: 'td.col-gio, td:nth-child(5)',
+      source: 'text',
+      regex: '(\\d{1,2}[:h]\\d{2}\\s*[-–—]+\\s*\\d{1,2}[:h]\\d{2})',
+      regexGroup: 1,
+      optional: true,
+      trim: true,
+    },
+    location: {
+      selector: 'td.col-phong, td:nth-child(6)',
+      source: 'text',
+      optional: true,
+      trim: true,
+    },
+    teacher: {
+      selector: 'td.col-gv, td:nth-child(7)',
+      source: 'text',
+      optional: true,
+      trim: true,
+    },
+    group: {
+      selector: 'td.col-nhom, td:nth-child(8)',
+      source: 'text',
+      optional: true,
+      trim: true,
+    },
+  },
+  dateFormat: 'DD/MM/YYYY',
+  timeFormat: 'HH:mm',
+  timezone: 'Asia/Ho_Chi_Minh',
+};
+EDUSOFT_DEFAULT_RULE.checksum = computeRuleChecksum(EDUSOFT_DEFAULT_RULE);
+
+export const DEFAULT_RULES: ExtractionRule[] = [
+  FAP_DEFAULT_RULE,
+  EDUSOFT_DEFAULT_RULE,
+];
