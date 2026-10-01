@@ -8256,387 +8256,14 @@ h3 { margin-bottom: 0; font-size: 16px; letter-spacing: -.02em; }
 }
 
 /* ==========================================================================
-   Compact Time & Date Controller (Granular Hour/Minute + Zero Icons + Gradients)
+   Redesigned Event Form (Production-Ready Vietnamese Calendar UI)
+   - Consistent DD/MM/YYYY formatting everywhere
+   - Unified start & end time selection
+   - Smart duration management with subtle tertiary quick pills
+   - Clear visual hierarchy & prominent orange CTA
+   - Mobile-first touch targets and sticky action footer
    ========================================================================== */
 
-.compact-time-controller {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  background: var(--surface-sunken, #f8fafc);
-  border: 1px solid var(--border-subtle, #e2e8f0);
-  border-radius: 14px;
-  padding: 14px;
-  margin-top: 6px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
-}
-
-.time-ctrl-date-row {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.time-ctrl-date-main {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.time-ctrl-label-group {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.time-ctrl-label {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted, #64748b);
-}
-
-.time-ctrl-date-readable {
-  font-size: 12px;
-  font-weight: 700;
-  color: #ea580c;
-  background: linear-gradient(135deg, rgba(234, 88, 12, 0.12) 0%, rgba(217, 70, 239, 0.12) 100%);
-  padding: 2px 8px;
-  border-radius: 6px;
-  border: 1px solid rgba(234, 88, 12, 0.2);
-}
-
-.time-ctrl-date-input-wrap {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-/* Zero native calendar icons */
-.clean-date-input {
-  flex: 1;
-  min-width: 140px;
-  padding: 7px 10px;
-  font-size: 13px;
-  font-weight: 600;
-  font-family: inherit;
-  color: var(--text, #1e293b);
-  background: var(--surface, #ffffff);
-  border: 1px solid var(--border, #cbd5e1);
-  border-radius: 8px;
-  outline: none;
-  transition: all 120ms ease;
-  cursor: pointer;
-}
-
-.clean-date-input::-webkit-calendar-picker-indicator {
-  display: none !important;
-  -webkit-appearance: none;
-}
-
-.clean-date-input:focus {
-  border-color: #ea580c;
-  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.15);
-}
-
-.date-quick-chips {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.date-chip-btn {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text, #334155);
-  background: var(--surface, #ffffff);
-  border: 1px solid var(--border, #cbd5e1);
-  padding: 5px 10px;
-  border-radius: 999px;
-  cursor: pointer;
-  transition: all 120ms ease;
-  white-space: nowrap;
-}
-
-.date-chip-btn:hover {
-  background: linear-gradient(135deg, #ea580c 0%, #ec4899 100%);
-  color: #ffffff;
-  border-color: transparent;
-  transform: translateY(-1px);
-}
-
-.time-ctrl-toggles {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  font-size: 12px;
-  color: var(--text-muted, #475569);
-  padding-top: 2px;
-}
-
-.time-ctrl-checkbox {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  font-weight: 600;
-  user-select: none;
-}
-
-.time-ctrl-checkbox input[type="checkbox"] {
-  cursor: pointer;
-  accent-color: #ea580c;
-  width: 15px;
-  height: 15px;
-}
-
-.time-ctrl-end-date-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 8px 10px;
-  background: var(--surface, #ffffff);
-  border: 1px dashed var(--border, #cbd5e1);
-  border-radius: 8px;
-}
-
-/* 2-Column Clock Grid for Granular Start/End */
-.time-ctrl-clock-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-@media (max-width: 480px) {
-  .time-ctrl-clock-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.time-block-column {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  background: var(--surface, #ffffff);
-  border: 1px solid var(--border, #cbd5e1);
-  border-radius: 10px;
-  padding: 10px;
-  transition: border-color 120ms ease;
-}
-
-.time-block-column:focus-within {
-  border-color: #ea580c;
-  box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.12);
-}
-
-.time-block-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.time-block-tag {
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--text-muted, #64748b);
-}
-
-.time-block-digital {
-  font-size: 15px;
-  font-weight: 800;
-  font-family: ui-monospace, monospace;
-  background: linear-gradient(135deg, #ea580c 0%, #d946ef 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.time-unit-controls {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-}
-
-.time-unit-item {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.time-unit-caption {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  color: var(--text-faint, #94a3b8);
-}
-
-.time-unit-select {
-  width: 100%;
-  padding: 6px 4px;
-  font-size: 12px;
-  font-weight: 700;
-  font-family: inherit;
-  color: var(--text, #1e293b);
-  background: var(--surface-sunken, #f1f5f9);
-  border: 1px solid var(--border, #cbd5e1);
-  border-radius: 6px;
-  outline: none;
-  cursor: pointer;
-}
-
-.time-unit-select:focus {
-  border-color: #ea580c;
-  background: var(--surface, #ffffff);
-}
-
-.minute-control-pair {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-}
-
-.minute-exact-input {
-  width: 44px;
-  padding: 6px 2px;
-  font-size: 12px;
-  font-weight: 800;
-  text-align: center;
-  font-family: ui-monospace, monospace;
-  color: var(--text, #1e293b);
-  background: var(--surface-sunken, #f1f5f9);
-  border: 1px solid var(--border, #cbd5e1);
-  border-radius: 6px;
-  outline: none;
-}
-
-.minute-exact-input:focus {
-  border-color: #ea580c;
-  background: var(--surface, #ffffff);
-}
-
-.minute-preset-dropdown {
-  flex: 1;
-  min-width: 0;
-  padding: 6px 2px;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-muted, #475569);
-  background: var(--surface-sunken, #f1f5f9);
-  border: 1px solid var(--border, #cbd5e1);
-  border-radius: 6px;
-  outline: none;
-  cursor: pointer;
-}
-
-.minute-preset-dropdown:focus {
-  border-color: #ea580c;
-}
-
-/* Duration Banner & Quick Addition Pills */
-.time-ctrl-duration-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding-top: 10px;
-  border-top: 1px dashed var(--border, #cbd5e1);
-}
-
-.duration-info-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.duration-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-muted, #64748b);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.duration-badge {
-  font-size: 12px;
-  font-weight: 800;
-  color: #ea580c;
-  background: linear-gradient(135deg, rgba(234, 88, 12, 0.1) 0%, rgba(236, 72, 153, 0.1) 100%);
-  padding: 3px 9px;
-  border-radius: 999px;
-  border: 1px solid rgba(234, 88, 12, 0.25);
-}
-
-.duration-badge.invalid {
-  color: #dc2626;
-  background: rgba(220, 38, 38, 0.1);
-  border-color: rgba(220, 38, 38, 0.3);
-}
-
-.quick-duration-pill-list {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  flex-wrap: wrap;
-}
-
-.quick-pill-hint {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-faint, #94a3b8);
-  margin-right: 2px;
-}
-
-.duration-pill-btn {
-  font-size: 11px;
-  font-weight: 700;
-  color: #ea580c;
-  background: var(--surface, #ffffff);
-  border: 1px solid rgba(234, 88, 12, 0.25);
-  border-radius: 999px;
-  padding: 3px 8px;
-  cursor: pointer;
-  transition: all 120ms ease;
-  white-space: nowrap;
-}
-
-.duration-pill-btn:hover {
-  background: linear-gradient(135deg, #ea580c 0%, #ec4899 100%);
-  color: #ffffff;
-  border-color: transparent;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(234, 88, 12, 0.25);
-}
-
-.duration-pill-btn.active {
-  background: linear-gradient(135deg, #ea580c 0%, #ec4899 100%);
-  color: #ffffff;
-  border-color: transparent;
-  box-shadow: 0 2px 6px rgba(234, 88, 12, 0.35);
-  font-weight: 800;
-}
-
-/* Drag Grip Bar (Zero icon drag indicator) */
-.drag-grip-bar {
-  display: inline-block;
-  width: 4px;
-  height: 15px;
-  background: repeating-linear-gradient(
-    to bottom,
-    var(--color-primary-500, #ea580c) 0px,
-    var(--color-primary-500, #ea580c) 2px,
-    transparent 2px,
-    transparent 4px
-  );
-  border-radius: 2px;
-  flex-shrink: 0;
-  margin-right: 4px;
-}
-
-/* Event form polish */
 .redesigned-event-form {
   position: relative;
   display: flex;
@@ -8656,14 +8283,596 @@ h3 { margin-bottom: 0; font-size: 16px; letter-spacing: -.02em; }
   }
 }
 
+/* 9. Header thu gọn & 8. Nút đóng dạng Icon (✕) */
+.compact-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle, #e2e8f0);
+}
+
+.panel-heading-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.panel-heading-text .eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent, #2563eb);
+  margin-bottom: 2px;
+}
+
+.form-heading-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text, #0f172a);
+  margin: 0 0 4px 0;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.form-heading-desc {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-muted, #64748b);
+  margin: 0;
+}
+
+.icon-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #cbd5e1);
+  background: var(--surface, #ffffff);
+  color: var(--text-muted, #64748b);
+  cursor: pointer;
+  transition: all 120ms ease;
+  flex-shrink: 0;
+}
+
+.icon-close-btn:hover {
+  background: var(--surface-muted, #f1f5f9);
+  color: var(--text, #0f172a);
+  border-color: #94a3b8;
+}
+
+/* 4. Form Field Group & Title Validation */
+.form-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.field-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text, #1e293b);
+}
+
+.required-star {
+  color: #ef4444;
+  font-weight: 700;
+  margin-left: 2px;
+}
+
+.field-char-counter {
+  font-size: 11px;
+  color: var(--text-faint, #94a3b8);
+  font-variant-numeric: tabular-nums;
+}
+
+.form-text-input {
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text, #0f172a);
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border-strong, #cbd5e1);
+  border-radius: 10px;
+  outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.form-text-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.form-text-input.input-error {
+  border-color: #ef4444 !important;
+  background-color: #fff8f8;
+}
+
+.field-error-text {
+  font-size: 12px;
+  color: #dc2626;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.field-inline-error {
+  padding: 8px 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  color: #dc2626;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Container cho toàn bộ điều khiển thời gian */
+.compact-time-controller {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--surface-sunken, #f8fafc);
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.02);
+}
+
+/* 1. Sửa lỗi ngày tháng & Vietnamese Date Picker */
+.date-selection-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.date-field-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.date-field-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.field-title {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted, #64748b);
+}
+
+.date-quick-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.date-chip-btn {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text, #334155);
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, #cbd5e1);
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 120ms ease;
+  white-space: nowrap;
+}
+
+.date-chip-btn:hover {
+  background: var(--surface-muted, #f1f5f9);
+  color: var(--text, #0f172a);
+}
+
+.date-chip-btn.active {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #3b82f6;
+  font-weight: 700;
+}
+
+.vn-datepicker-weekday-badge {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #1d4ed8;
+  background: #eff6ff;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid #bfdbfe;
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+}
+
+.vn-date-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 42px;
+  padding: 8px 12px;
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, #cbd5e1);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.vn-date-input-container:hover {
+  border-color: #94a3b8;
+}
+
+.vn-date-input-container:focus-within {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.vn-date-input-container.has-error {
+  border-color: #ef4444 !important;
+  background-color: #fff8f8;
+}
+
+.vn-date-formatted-val {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text, #0f172a);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.vn-date-calendar-icon {
+  color: var(--text-muted, #64748b);
+  display: flex;
+  align-items: center;
+}
+
+.vn-date-native-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 2;
+}
+
+/* 6. Nhiều ngày layout */
+.multi-date-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 480px) {
+  .multi-date-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.event-date-toggles {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 12.5px;
+  padding-top: 4px;
+}
+
+.custom-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-muted, #475569);
+  user-select: none;
+}
+
+.custom-toggle-label input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: #ea580c;
+  width: 16px;
+  height: 16px;
+}
+
+/* 5. Cả ngày Card */
+.all-day-status-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  margin: 4px 0;
+}
+
+.all-day-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.all-day-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12.5px;
+  color: #1e40af;
+}
+
+.all-day-text strong {
+  font-weight: 700;
+}
+
+/* 2. Sửa phần chọn giờ: Bắt đầu & Kết thúc */
+.time-selection-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.time-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.time-field-label {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted, #64748b);
+}
+
+.time-input-wrap {
+  position: relative;
+}
+
+.time-digital-input {
+  width: 100%;
+  min-height: 42px;
+  padding: 6px 12px;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: ui-monospace, monospace;
+  color: var(--text, #0f172a);
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border-strong, #cbd5e1);
+  border-radius: 10px;
+  outline: none;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+
+.time-digital-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.time-digital-input.has-error {
+  border-color: #ef4444 !important;
+  background-color: #fff8f8;
+}
+
+/* 3. Duration Control Section & Quick Pills */
+.duration-control-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border, #cbd5e1);
+}
+
+.duration-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.duration-section-label {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted, #64748b);
+}
+
+.duration-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: #ea580c;
+  background: #fff7ed;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid #fed7aa;
+}
+
+.duration-badge.invalid {
+  color: #dc2626;
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.quick-duration-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.quick-chips-prefix {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-faint, #94a3b8);
+  margin-right: 2px;
+}
+
+.duration-chip-btn {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted, #475569);
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, #cbd5e1);
+  border-radius: 999px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 120ms ease;
+  white-space: nowrap;
+}
+
+.duration-chip-btn:hover {
+  background: var(--surface-muted, #f1f5f9);
+  color: var(--text, #0f172a);
+  border-color: #94a3b8;
+}
+
+/* Selected pill: Clear soft-blue tint, NOT competing with orange Save CTA */
+.duration-chip-btn.active {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #3b82f6;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(59, 130, 246, 0.2);
+}
+
+/* 10. Tùy chọn nâng cao dạng Accordion */
+.advanced-accordion-wrapper {
+  margin-top: 4px;
+}
+
+.form-advanced-accordion-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 40px;
+  padding: 8px 12px;
+  background: var(--surface-muted, #f8fafc);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text, #1e293b);
+  transition: all 120ms ease;
+}
+
+.form-advanced-accordion-btn:hover {
+  background: var(--surface-subtle, #f1f5f9);
+  border-color: #cbd5e1;
+}
+
+.form-advanced-accordion-btn.open {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom-color: transparent;
+  background: var(--surface-muted, #f8fafc);
+}
+
+.accordion-label-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.accordion-icon {
+  color: var(--text-muted, #64748b);
+}
+
+.accordion-title {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.accordion-dot {
+  color: #ea580c;
+  font-size: 10px;
+}
+
+.accordion-chevron {
+  color: var(--text-muted, #64748b);
+  display: flex;
+  align-items: center;
+}
+
+.form-secondary-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  background: var(--surface-muted, #f8fafc);
+  border: 1px solid var(--border, #e2e8f0);
+  border-top: none;
+  border-radius: 0 0 10px 10px;
+  animation: fadeInForm 120ms ease-out;
+}
+
+/* 8 & 11 & 12. Sticky Action Footer */
 .form-sticky-footer {
+  position: sticky;
+  bottom: 0;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
-  padding-top: 14px;
-  margin-top: 6px;
-  border-top: 1px solid var(--border-subtle, #e2e8f0);
+  padding: 12px 16px;
+  background: var(--surface, #ffffff);
+  border-top: 1px solid var(--border, #e2e8f0);
+  margin-top: 10px;
+  z-index: 10;
+}
+
+.form-sticky-footer .primary-button {
+  background: #ea580c;
+  color: #ffffff;
+  border: none;
+  min-height: 42px;
+  padding: 8px 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 120ms ease;
+  box-shadow: 0 2px 8px rgba(234, 88, 12, 0.25);
+}
+
+.form-sticky-footer .primary-button:hover:not(:disabled) {
+  background: #c2410c;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.35);
+}
+
+.form-sticky-footer .primary-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.form-sticky-footer .secondary-button {
+  min-height: 42px;
+  padding: 8px 16px;
+  font-size: 13.5px;
+  font-weight: 600;
+  border-radius: 10px;
 }
 
 /* Ambient Mobility & Campus Routing Styles (Zero-Icon, FPT Quy Nhon AI Campus) */
