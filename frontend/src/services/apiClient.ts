@@ -2,7 +2,11 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { isDemoMode } from './demoMode';
 import { demoAdapter } from './demoBackend';
 
-const rawApiUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+const rawApiUrl =
+  import.meta.env.VITEAPIURL ||
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.VITE_API_BASE_URL ||
+  'http://localhost:8080';
 const apiBaseUrl = rawApiUrl.endsWith('/api/v1')
   ? rawApiUrl
   : `${rawApiUrl.replace(/\/+$/, '')}/api/v1`;
@@ -84,7 +88,7 @@ export function getApiErrorMessage(error: unknown): string {
     if (error.response?.status === 422) return 'Dữ liệu gửi lên không hợp lệ.';
     if (error.response?.status && error.response.status >= 500) return 'Lỗi máy chủ nội bộ. Vui lòng thử lại sau.';
     if (error.message === 'Network Error') {
-      const serverUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+      const serverUrl = import.meta.env.VITEAPIURL || import.meta.env.VITE_API_URL || 'http://localhost:8080';
       return `Không thể kết nối đến máy chủ backend (${serverUrl}).`;
     }
     return error.message || 'Đã xảy ra lỗi không xác định.';

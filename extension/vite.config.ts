@@ -4,6 +4,7 @@ import { resolve } from 'path';
 import { copyFileSync, existsSync, mkdirSync } from 'fs';
 
 export default defineConfig({
+  envPrefix: ['VITE_', 'VITE'],
   plugins: [
     react(),
     {

@@ -1,4 +1,6 @@
-const rawExtensionApiUrl = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || 'http://localhost:8080';
+const rawExtensionApiUrl =
+  (typeof import.meta !== 'undefined' && (import.meta.env?.VITEAPIURL || import.meta.env?.VITE_API_URL)) ||
+  'http://localhost:8080';
 export const DEFAULT_SMARTSCHEDULE_API_URL = rawExtensionApiUrl.endsWith('/api/v1')
   ? rawExtensionApiUrl
   : `${rawExtensionApiUrl.replace(/\/+$/, '')}/api/v1`;
