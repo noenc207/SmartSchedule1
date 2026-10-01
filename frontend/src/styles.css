@@ -2369,9 +2369,396 @@ h3 { margin-bottom: 0; font-size: 16px; letter-spacing: -.02em; }
   font-weight: 600;
 }
 
-/* Task Workspace Card */
+/* ==========================================================================
+   Compact Task Accordion List & Single-Row Item
+   - Accordion Pattern for Category Groups (Default open first group)
+   - 3-Column Single-Row Flexbox Layout:
+     * Col 1 (Left): Checkbox + Color Dot + Title
+     * Col 2 (Center): Small borderless pastel Badges (Category, Priority, Deadline)
+     * Col 3 (Right): Duration + Action Icon Buttons (CalendarPlus, MoreHorizontal)
+   - Reduced visual noise: thin dividers, no heavy card borders, optional zebra striping
+   - Optimized spacing: 40-42px row height for high information density
+   ========================================================================== */
+
+.compact-task-accordion-container {
+  width: 100%;
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.compact-accordion-meta-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px;
+  font-size: 12px;
+  color: var(--text-muted, #64748b);
+}
+
+.compact-accordion-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.compact-accordion-quick-toggles {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.meta-sep {
+  color: var(--text-faint, #cbd5e1);
+}
+
+.compact-accordion-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.compact-accordion-group {
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  transition: border-color var(--duration-fast, 150ms);
+}
+
+.compact-accordion-group.expanded {
+  border-color: var(--border, #cbd5e1);
+}
+
+.compact-accordion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 40px;
+  padding: 8px 14px;
+  background: var(--surface-muted, #f8fafc);
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--duration-fast, 150ms);
+  border-bottom: 1px solid transparent;
+}
+
+.compact-accordion-group.expanded .compact-accordion-header {
+  border-bottom-color: var(--border-subtle, #e2e8f0);
+}
+
+.compact-accordion-header:hover {
+  background: var(--surface-hover, #f1f5f9);
+}
+
+.accordion-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.accordion-chevron-icon {
+  color: var(--text-muted, #64748b);
+  display: flex;
+  align-items: center;
+  transition: transform var(--duration-fast, 150ms);
+}
+
+.group-color-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.group-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text, #1e293b);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-count-pill {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted, #64748b);
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  padding: 1px 7px;
+  border-radius: 999px;
+  margin-left: 2px;
+}
+
+.accordion-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.group-duration-text {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-soft, #64748b);
+}
+
+.compact-accordion-body {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+/* ==========================================================================
+   Compact Single-Row Task Item (Row Layout)
+   ========================================================================== */
+
+.compact-task-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 42px;
+  padding: 6px 14px;
+  background: var(--surface, #ffffff);
+  border-bottom: 1px solid var(--border-subtle, #f1f5f9);
+  transition: background var(--duration-fast, 150ms);
+  user-select: none;
+}
+
+.compact-task-row:last-child {
+  border-bottom: none;
+}
+
+.compact-task-row:hover {
+  background: var(--surface-hover, #f8fafc);
+}
+
+.compact-task-row.zebra-bg {
+  background: rgba(248, 250, 252, 0.45);
+}
+
+.compact-task-row.selected {
+  background: color-mix(in srgb, var(--accent, #ea580c) 6%, var(--surface, #ffffff));
+}
+
+/* Cột 1 (Trái): Checkbox + Color Dot + Tiêu đề tác vụ */
+.compact-task-col-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.compact-task-checkbox-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.compact-task-checkbox {
+  width: 15px;
+  height: 15px;
+  accent-color: #ea580c;
+  cursor: pointer;
+}
+
+.compact-task-color-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 0;
+  padding: 0;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: transform var(--duration-fast, 150ms);
+}
+
+.compact-task-color-dot:hover {
+  transform: scale(1.35);
+}
+
+.compact-task-title-wrap {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.compact-task-title-text {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text, #1e293b);
+  cursor: pointer;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compact-task-title-text:hover {
+  color: var(--accent, #ea580c);
+}
+
+.compact-task-title-text.completed {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+
+.compact-task-title-input {
+  width: 100%;
+  padding: 2px 6px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid #ea580c;
+  border-radius: 4px;
+  outline: none;
+  background: var(--surface, #ffffff);
+  color: var(--text, #0f172a);
+}
+
+/* Cột 2 (Giữa): Các huy hiệu (Badge/Tag) nhỏ, không viền hoặc nền nhạt */
+.compact-task-col-center {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.compact-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all var(--duration-fast, 150ms);
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.badge-icon {
+  flex-shrink: 0;
+}
+
+.compact-badge.category-tag {
+  border: none;
+  font-weight: 700;
+}
+
+.compact-badge.priority-tag.priority-high {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.compact-badge.priority-tag.priority-medium {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.compact-badge.priority-tag.priority-low {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.compact-badge.deadline-tag {
+  background: #f8fafc;
+  color: var(--text-muted, #64748b);
+}
+
+.compact-badge.deadline-tag.risk-high {
+  background: #fef2f2;
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.compact-badge.deadline-tag.no-deadline {
+  opacity: 0.6;
+}
+
+.compact-badge.split-tag {
+  background: #f0fdf4;
+  color: #16a34a;
+  font-size: 10px;
+}
+
+/* Cột 3 (Phải): Thời lượng & Nút thao tác (Icon button thay vì text) */
+.compact-task-col-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.compact-badge.duration-tag {
+  background: var(--surface-muted, #f1f5f9);
+  color: var(--text, #334155);
+}
+
+.scheduled-indicator {
+  font-size: 10px;
+  color: var(--text-faint, #94a3b8);
+  margin-left: 2px;
+}
+
+.compact-icon-btn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted, #64748b);
+  cursor: pointer;
+  transition: all var(--duration-fast, 150ms);
+}
+
+.compact-icon-btn:hover:not(:disabled) {
+  background: var(--surface-muted, #f1f5f9);
+  color: var(--text, #0f172a);
+  border-color: var(--border-subtle, #e2e8f0);
+}
+
+.compact-icon-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.schedule-icon-btn:hover:not(:disabled) {
+  color: #ea580c;
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
+@media (max-width: 600px) {
+  .compact-task-row {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 10px;
+  }
+
+  .compact-task-col-center {
+    order: 3;
+    width: 100%;
+    margin-left: 25px;
+  }
+}
+
+/* Legacy fallback classes */
 .task-workspace-list {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
   margin-top: 10px;
 }

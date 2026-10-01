@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { CalendarPlus, MoreHorizontal, Clock, Tag, AlertCircle, Calendar } from 'lucide-react';
 import type { Task, Category, EventItem } from '../../../types/domain';
 import {
   getTaskScheduledMinutes,
@@ -12,12 +13,13 @@ import { resolveTaskColor } from '../../calendar/utils/colorPalette';
 import { ColorPickerPopover } from './ColorPickerPopover';
 import { QuickSchedulePopover } from './QuickSchedulePopover';
 
-interface TaskCardProps {
+export interface TaskCardProps {
   task: Task;
   category?: Category;
   events: EventItem[];
   isSelected: boolean;
   isSplitEnabled: boolean;
+  isZebra?: boolean;
   onToggleSelect: (taskId: string) => void;
   onToggleSplit: (taskId: string) => void;
   onUpdateTask: (taskId: string, updates: Partial<Task>) => Promise<void>;
@@ -41,6 +43,7 @@ export function TaskCard({
   events,
   isSelected,
   isSplitEnabled,
+  isZebra = false,
   onToggleSelect,
   onToggleSplit,
   onUpdateTask,
@@ -67,6 +70,7 @@ export function TaskCard({
   const titleInputRef = useRef<HTMLInputElement>(null);
   const colorDotRef = useRef<HTMLButtonElement>(null);
   const scheduleBtnRef = useRef<HTMLButtonElement>(null);
+  const moreBtnRef = useRef<HTMLButtonElement>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -80,7 +84,12 @@ export function TaskCard({
   useEffect(() => {
     if (!showMoreMenu) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+      if (
+        moreMenuRef.current &&
+        !moreMenuRef.current.contains(e.target as Node) &&
+        moreBtnRef.current &&
+        !moreBtnRef.current.contains(e.target as Node)
+      ) {
         setShowMoreMenu(false);
       }
     };
@@ -136,10 +145,7 @@ export function TaskCard({
 
   return (
     <div
-      className={`task-workspace-card ${isSelected ? 'selected' : ''} state-${schedulingState.toLowerCase()}`}
-      style={{
-        borderLeftColor: isSelected ? 'var(--accent)' : activeColor,
-      }}
+      className={`compact-task-row ${isSelected ? 'selected' : ''} ${isZebra ? 'zebra-bg' : ''} state-${schedulingState.toLowerCase()}`}
       draggable
       onDragStart={(e) => {
         e.dataTransfer.setData(
@@ -153,15 +159,15 @@ export function TaskCard({
         );
       }}
     >
-      <div className="task-card-main-row">
-        {/* Selection checkbox (Smart Schedule generation selection) */}
-        <label className="task-card-checkbox-label">
+      {/* CỘT 1 (TRÁI): Checkbox + Color Dot + Tiêu đề tác vụ */}
+      <div className="compact-task-col-left">
+        <label className="compact-task-checkbox-label">
           <input
             type="checkbox"
-            className="task-card-checkbox"
+            className="compact-task-checkbox"
             checked={isSelected}
             onChange={() => onToggleSelect(task.id)}
-            aria-label={`Select ${task.title} for smart scheduling`}
+            aria-label={`Chọn tác vụ ${task.title}`}
           />
         </label>
 
@@ -169,279 +175,263 @@ export function TaskCard({
         <button
           ref={colorDotRef}
           type="button"
-          className="task-card-color-dot"
+          className="compact-task-color-dot"
           style={{ backgroundColor: activeColor }}
           onClick={() => setShowColorPicker(true)}
-          title={hasCustomColor ? 'Custom color (click to change or reset)' : `Category color (${category?.name ?? 'Default'})`}
-          aria-label="Change task color"
+          title={hasCustomColor ? 'Màu tùy chỉnh (nhấp để đổi)' : `Màu danh mục (${category?.name ?? 'Mặc định'})`}
+          aria-label="Đổi màu tác vụ"
         />
 
         {/* Title / Inline edit */}
-        <div className="task-card-title-col">
+        <div className="compact-task-title-wrap">
           {editingTitle ? (
             <input
               ref={titleInputRef}
               type="text"
-              className="task-card-title-input"
+              className="compact-task-title-input"
               value={titleDraft}
               onChange={(e) => setTitleDraft(e.target.value)}
               onBlur={() => void handleSaveTitle()}
               onKeyDown={handleTitleKeyDown}
             />
           ) : (
-            <div className="task-card-title-display-row">
-              <span
-                className="task-card-title-text"
-                onClick={() => setEditingTitle(true)}
-                title="Click to edit title"
-                style={{
-                  textDecoration: task.status === 'COMPLETED' ? 'line-through' : 'none',
-                  opacity: task.status === 'COMPLETED' ? 0.65 : 1,
-                }}
-              >
-                {task.status === 'COMPLETED' ? `✓ ${task.title}` : task.title}
-              </span>
-              {category && (
-                <span className="task-category-pill" style={{ color: activeColor }}>
-                  {category.name}
-                </span>
+            <span
+              className={`compact-task-title-text ${task.status === 'COMPLETED' ? 'completed' : ''}`}
+              onClick={() => setEditingTitle(true)}
+              title="Nhấp để đổi tên tác vụ"
+            >
+              {task.status === 'COMPLETED' ? `✓ ${task.title}` : task.title}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* CỘT 2 (GIỮA): Các huy hiệu (Badge/Tag) nhỏ, không viền, nền nhạt */}
+      <div className="compact-task-col-center">
+        {/* Category Badge */}
+        {category && (
+          <span
+            className="compact-badge category-tag"
+            style={{
+              backgroundColor: `${activeColor}14`,
+              color: activeColor,
+            }}
+            title={`Danh mục: ${category.name}`}
+          >
+            {category.name}
+          </span>
+        )}
+
+        {/* Priority Badge */}
+        <div className="meta-dropdown-wrap">
+          <button
+            type="button"
+            className={`compact-badge priority-tag priority-${task.priority.toLowerCase()}`}
+            onClick={() => setShowPriorityPicker((v) => !v)}
+            title="Mức ưu tiên (nhấp để đổi)"
+          >
+            <span>{task.priority === 'HIGH' ? 'Cao' : task.priority === 'MEDIUM' ? 'Vừa' : 'Thấp'}</span>
+          </button>
+          {showPriorityPicker && (
+            <div className="meta-compact-menu">
+              {(['LOW', 'MEDIUM', 'HIGH'] as const).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  className={`meta-menu-item priority-${p.toLowerCase()} ${task.priority === p ? 'active' : ''}`}
+                  onClick={() => void handleSelectPriority(p)}
+                >
+                  {p === 'HIGH' ? 'Cao' : p === 'MEDIUM' ? 'Vừa' : 'Thấp'}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Deadline Badge */}
+        <div className="meta-dropdown-wrap">
+          <button
+            type="button"
+            className={`compact-badge deadline-tag risk-${deadlineRisk} ${!task.deadline ? 'no-deadline' : ''}`}
+            onClick={() => setShowDatePicker((v) => !v)}
+            title="Hạn chót (nhấp để đổi)"
+          >
+            <Calendar size={11} className="badge-icon" />
+            <span>{task.deadline ? formatDeadline(task.deadline) : 'Không hạn'}</span>
+          </button>
+          {showDatePicker && (
+            <div className="meta-date-picker-menu">
+              <input
+                type="date"
+                className="meta-date-input"
+                defaultValue={task.deadline ? task.deadline.slice(0, 10) : ''}
+                onChange={(e) => void handleSelectDeadline(e.target.value)}
+              />
+              {task.deadline && (
+                <button
+                  type="button"
+                  className="text-button compact-btn"
+                  onClick={() => void handleSelectDeadline('')}
+                >
+                  Xóa hạn chót
+                </button>
               )}
             </div>
           )}
-
-          {/* Metadata badges row */}
-          <div className="task-card-meta-row">
-            {/* Duration picker badge */}
-            <div className="meta-dropdown-wrap">
-              <button
-                type="button"
-                className="task-meta-badge duration-badge"
-                onClick={() => setShowDurationPicker((v) => !v)}
-                title="Đổi thời lượng"
-              >
-                <span>{formatMinutes(task.estimatedDurationMinutes)}</span>
-              </button>
-              {showDurationPicker && (
-                <div className="meta-compact-menu">
-                  {DURATION_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      className={`meta-menu-item ${task.estimatedDurationMinutes === opt.value ? 'active' : ''}`}
-                      onClick={() => void handleSelectDuration(opt.value)}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <span className="meta-dot">·</span>
-
-            {/* Priority badge */}
-            <div className="meta-dropdown-wrap">
-              <button
-                type="button"
-                className={`task-meta-badge priority-badge priority-${task.priority.toLowerCase()}`}
-                onClick={() => setShowPriorityPicker((v) => !v)}
-                title="Đổi mức ưu tiên"
-              >
-                <span>{task.priority === 'HIGH' ? 'Cao' : task.priority === 'MEDIUM' ? 'Vừa' : 'Thấp'}</span>
-              </button>
-              {showPriorityPicker && (
-                <div className="meta-compact-menu">
-                  {(['LOW', 'MEDIUM', 'HIGH'] as const).map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      className={`meta-menu-item priority-${p.toLowerCase()} ${task.priority === p ? 'active' : ''}`}
-                      onClick={() => void handleSelectPriority(p)}
-                    >
-                      {p === 'HIGH' ? 'Cao' : p === 'MEDIUM' ? 'Vừa' : 'Thấp'}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <span className="meta-dot">·</span>
-
-            {/* Deadline badge */}
-            <div className="meta-dropdown-wrap">
-              <button
-                type="button"
-                className={`task-meta-badge deadline-badge risk-${deadlineRisk}`}
-                onClick={() => setShowDatePicker((v) => !v)}
-                title="Đổi hạn chót"
-              >
-                <span>{task.deadline ? `Hạn ${formatDeadline(task.deadline)}` : 'Không hạn'}</span>
-              </button>
-              {showDatePicker && (
-                <div className="meta-date-picker-menu">
-                  <input
-                    type="date"
-                    className="meta-date-input"
-                    defaultValue={task.deadline ? task.deadline.slice(0, 10) : ''}
-                    onChange={(e) => void handleSelectDeadline(e.target.value)}
-                  />
-                  {task.deadline && (
-                    <button
-                      type="button"
-                      className="text-button compact-btn"
-                      onClick={() => void handleSelectDeadline('')}
-                    >
-                      Xóa hạn chót
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
         </div>
 
-        {/* Action buttons: Quick Schedule (+) & More (⋮) */}
-        <div className="task-card-actions-col">
-          {/* Quick Schedule button (+) */}
+        {/* Split session badge (if enabled) */}
+        {isSplitEnabled && (
+          <span className="compact-badge split-tag" title="Cho phép chia nhỏ thành nhiều ca học">
+            Chia ca
+          </span>
+        )}
+      </div>
+
+      {/* CỘT 3 (PHẢI): Thời lượng & Nút thao tác (Icon button thay vì text) */}
+      <div className="compact-task-col-right">
+        {/* Duration badge */}
+        <div className="meta-dropdown-wrap">
           <button
-            ref={scheduleBtnRef}
             type="button"
-            className="task-quick-schedule-btn"
-            title="Lên lịch tác vụ"
-            aria-label={`Lên lịch ${task.title}`}
-            onClick={() => setShowSchedulePopover((v) => !v)}
-            disabled={remainingMinutes <= 0}
+            className="compact-badge duration-tag"
+            onClick={() => setShowDurationPicker((v) => !v)}
+            title="Đổi thời lượng dự kiến"
           >
-            + Xếp
+            <Clock size={11} className="badge-icon" />
+            <span>{formatMinutes(task.estimatedDurationMinutes)}</span>
+            {scheduledMinutes > 0 && (
+              <span className="scheduled-indicator" title={`Đã lên lịch ${scheduledMinutes}m`}>
+                ({scheduledMinutes}m)
+              </span>
+            )}
+          </button>
+          {showDurationPicker && (
+            <div className="meta-compact-menu">
+              {DURATION_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className={`meta-menu-item ${task.estimatedDurationMinutes === opt.value ? 'active' : ''}`}
+                  onClick={() => void handleSelectDuration(opt.value)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Action Icon Button: Quick Schedule (CalendarPlus) */}
+        <button
+          ref={scheduleBtnRef}
+          type="button"
+          className="compact-icon-btn schedule-icon-btn"
+          title="Lên lịch tác vụ vào khung giờ trống"
+          aria-label={`Lên lịch ${task.title}`}
+          onClick={() => setShowSchedulePopover((v) => !v)}
+          disabled={remainingMinutes <= 0}
+        >
+          <CalendarPlus size={15} />
+        </button>
+
+        {/* Action Icon Button: More options (···) */}
+        <div className="more-menu-wrap" ref={moreMenuRef}>
+          <button
+            ref={moreBtnRef}
+            type="button"
+            className="compact-icon-btn more-icon-btn"
+            onClick={() => setShowMoreMenu((v) => !v)}
+            aria-label="Tùy chọn tác vụ"
+            title="Tùy chọn khác"
+          >
+            <MoreHorizontal size={15} />
           </button>
 
-          {/* More menu button (···) */}
-          <div className="more-menu-wrap" ref={moreMenuRef}>
-            <button
-              type="button"
-              className="task-more-menu-btn"
-              onClick={() => setShowMoreMenu((v) => !v)}
-              aria-label="Tùy chọn tác vụ"
-            >
-              ···
-            </button>
-
-            {showMoreMenu && (
-              <div className="task-dropdown-menu">
-                <button
-                  type="button"
-                  className="dropdown-item"
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    setShowSchedulePopover(true);
-                  }}
-                  disabled={remainingMinutes <= 0}
-                >
-                  <span>+ Lên lịch nhanh</span>
-                </button>
-                <button
-                  type="button"
-                  className="dropdown-item"
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    setEditingTitle(true);
-                  }}
-                >
-                  <span>Đổi tên</span>
-                </button>
-                <button
-                  type="button"
-                  className="dropdown-item"
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    setShowColorPicker(true);
-                  }}
-                >
-                  <span>Đổi màu</span>
-                </button>
-                <button
-                  type="button"
-                  className="dropdown-item"
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    onToggleSplit(task.id);
-                  }}
-                >
-                  <span>{isSplitEnabled ? 'Tắt chia nhỏ ca' : 'Bật chia nhỏ ca'}</span>
-                </button>
-                <button
-                  type="button"
-                  className="dropdown-item"
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    void onDuplicateTask(task);
-                  }}
-                >
-                  <span>Nhân bản</span>
-                </button>
-                <div className="dropdown-divider" />
-                <button
-                  type="button"
-                  className="dropdown-item danger"
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    void onDeleteTask(task.id);
-                  }}
-                >
-                  <span>Xóa tác vụ</span>
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Footer bar: Split into sessions toggle + Scheduling state indicator */}
-      <div className="task-card-footer-row">
-        {/* Split session toggle */}
-        <label
-          className="task-split-toggle-control"
-          title="Cho phép SmartSchedule chia nhỏ tác vụ thành nhiều ca học phù hợp"
-        >
-          <input
-            type="checkbox"
-            className="split-checkbox"
-            checked={isSplitEnabled}
-            onChange={() => onToggleSplit(task.id)}
-          />
-          <span className="split-toggle-label">Chia nhỏ ca</span>
-          <span className={`split-status-tag ${isSplitEnabled ? 'on' : 'off'}`}>
-            {isSplitEnabled ? 'BẬT' : 'TẮT'}
-          </span>
-        </label>
-
-        {/* Scheduling status derived canonically from actual sessions */}
-        <div className="task-scheduling-state-tag">
-          {schedulingState === 'UNSCHEDULED' && (
-            <span className="state-badge unscheduled">Chưa xếp lịch</span>
-          )}
-          {schedulingState === 'PARTIAL' && (
-            <span className="state-badge partial">
-              <b>{formatMinutes(scheduledMinutes)}</b> đã xếp · <b>{formatMinutes(remainingMinutes)}</b> còn lại
-            </span>
-          )}
-          {schedulingState === 'SCHEDULED' && (
-            <span className="state-badge scheduled">
-              Đã xếp đủ {formatMinutes(scheduledMinutes)}
-            </span>
+          {showMoreMenu && (
+            <div className="task-dropdown-menu">
+              <button
+                type="button"
+                className="dropdown-item"
+                onClick={() => {
+                  setShowMoreMenu(false);
+                  setShowSchedulePopover(true);
+                }}
+                disabled={remainingMinutes <= 0}
+              >
+                <span>+ Lên lịch nhanh</span>
+              </button>
+              <button
+                type="button"
+                className="dropdown-item"
+                onClick={() => {
+                  setShowMoreMenu(false);
+                  setEditingTitle(true);
+                }}
+              >
+                <span>Đổi tên</span>
+              </button>
+              <button
+                type="button"
+                className="dropdown-item"
+                onClick={() => {
+                  setShowMoreMenu(false);
+                  setShowColorPicker(true);
+                }}
+              >
+                <span>Đổi màu</span>
+              </button>
+              <button
+                type="button"
+                className="dropdown-item"
+                onClick={() => {
+                  setShowMoreMenu(false);
+                  onToggleSplit(task.id);
+                }}
+              >
+                <span>{isSplitEnabled ? 'Tắt chia nhỏ ca' : 'Bật chia nhỏ ca'}</span>
+              </button>
+              <button
+                type="button"
+                className="dropdown-item"
+                onClick={() => {
+                  setShowMoreMenu(false);
+                  void onDuplicateTask(task);
+                }}
+              >
+                <span>Nhân bản</span>
+              </button>
+              <div className="dropdown-divider" />
+              <button
+                type="button"
+                className="dropdown-item danger"
+                onClick={() => {
+                  setShowMoreMenu(false);
+                  void onDeleteTask(task.id);
+                }}
+              >
+                <span>Xóa tác vụ</span>
+              </button>
+            </div>
           )}
         </div>
       </div>
 
-      {/* Popovers */}
+      {/* Floating Popovers */}
       {showColorPicker && (
         <ColorPickerPopover
           open={showColorPicker}
-          anchorRect={colorDotRef.current?.getBoundingClientRect()}
           currentColor={task.color}
           categoryColor={category?.color}
-          onSelectColor={(hex) => void onUpdateTask(task.id, { color: hex })}
-          onResetToCategory={() => void onUpdateTask(task.id, { color: null })}
+          anchorRect={colorDotRef.current?.getBoundingClientRect()}
+          onSelectColor={(color) => {
+            void onUpdateTask(task.id, { color });
+            setShowColorPicker(false);
+          }}
+          onResetToCategory={() => {
+            void onUpdateTask(task.id, { color: null });
+            setShowColorPicker(false);
+          }}
           onClose={() => setShowColorPicker(false)}
         />
       )}

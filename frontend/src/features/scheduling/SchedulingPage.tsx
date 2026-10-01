@@ -22,6 +22,7 @@ import {
 import { TaskWorkspaceHeader } from './components/TaskWorkspaceHeader';
 import { QuickAddComposer } from './components/QuickAddComposer';
 import { TaskCard } from './components/TaskCard';
+import { CompactTaskAccordionList } from './components/CompactTaskAccordionList';
 import { usePreferenceStore } from '../../stores/preferenceStore';
 import { useHistoryStore } from '../../stores/historyStore';
 import { filterAndSortTasks } from '../tasks/utils/taskFiltering';
@@ -714,24 +715,19 @@ export function SchedulingPage() {
                   </button>
                 </div>
               ) : (
-                <div className="task-workspace-list">
-                  {filteredTasks.map((task) => (
-                    <TaskCard
-                      key={task.id}
-                      task={task}
-                      category={categories.find((c) => c.id === task.categoryId)}
-                      events={events}
-                      isSelected={selected.includes(task.id)}
-                      isSplitEnabled={splitTasks[task.id] ?? false}
-                      onToggleSelect={handleToggleSelect}
-                      onToggleSplit={handleToggleSplit}
-                      onUpdateTask={handleUpdateTask}
-                      onDuplicateTask={handleDuplicateTask}
-                      onDeleteTask={handleDeleteTask}
-                      onScheduleSlot={handleScheduleSlot}
-                    />
-                  ))}
-                </div>
+                <CompactTaskAccordionList
+                  tasks={filteredTasks}
+                  categories={categories}
+                  events={events}
+                  selected={selected}
+                  splitTasks={splitTasks}
+                  onToggleSelect={handleToggleSelect}
+                  onToggleSplit={handleToggleSplit}
+                  onUpdateTask={handleUpdateTask}
+                  onDuplicateTask={handleDuplicateTask}
+                  onDeleteTask={handleDeleteTask}
+                  onScheduleSlot={handleScheduleSlot}
+                />
               )}
             </section>
 
