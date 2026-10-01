@@ -1,4 +1,7 @@
-export const DEFAULT_SMARTSCHEDULE_API_URL = 'http://localhost:8080/api/v1';
+const rawExtensionApiUrl = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || 'http://localhost:8080';
+export const DEFAULT_SMARTSCHEDULE_API_URL = rawExtensionApiUrl.endsWith('/api/v1')
+  ? rawExtensionApiUrl
+  : `${rawExtensionApiUrl.replace(/\/+$/, '')}/api/v1`;
 
 export const STORAGE_KEYS = {
   ACTIVE_SCHEDULE_ID: 'ss_active_schedule_id',

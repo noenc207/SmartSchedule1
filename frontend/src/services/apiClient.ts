@@ -2,8 +2,13 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { isDemoMode } from './demoMode';
 import { demoAdapter } from './demoBackend';
 
+const rawApiUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+const apiBaseUrl = rawApiUrl.endsWith('/api/v1')
+  ? rawApiUrl
+  : `${rawApiUrl.replace(/\/+$/, '')}/api/v1`;
+
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'http://localhost:8080/api/v1',
+  baseURL: apiBaseUrl,
   withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
 });
@@ -78,7 +83,10 @@ export function getApiErrorMessage(error: unknown): string {
     if (error.response?.status === 409) return 'Xung đột dữ liệu hoặc phiên bản lịch đã thay đổi.';
     if (error.response?.status === 422) return 'Dữ liệu gửi lên không hợp lệ.';
     if (error.response?.status && error.response.status >= 500) return 'Lỗi máy chủ nội bộ. Vui lòng thử lại sau.';
-    if (error.message === 'Network Error') return 'Không thể kết nối đến máy chủ backend (http://localhost:8080).';
+    if (error.message === 'Network Error') {
+      const serverUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+      return `Không thể kết nối đến máy chủ backend (${serverUrl}).`;
+    }
     return error.message || 'Đã xảy ra lỗi không xác định.';
   }
   if (error instanceof Error) return error.message;
