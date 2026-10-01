@@ -15,11 +15,13 @@ export function ProtectedRoute() {
 
 export function PublicOnlyRoute() {
   const { status } = useAuth();
+  const location = useLocation();
   if (status === 'INITIALIZING' || status === 'REFRESHING') {
     return <div className="route-loading">Loading…</div>;
   }
   if (status === 'AUTHENTICATED') {
-    return <Navigate to="/dashboard" replace />;
+    const from = (location.state as { from?: string } | null)?.from ?? '/dashboard';
+    return <Navigate to={from} replace />;
   }
   return <Outlet />;
 }

@@ -1,4 +1,4 @@
-import apiClient from './apiClient';
+import apiClient, { getStoredRefreshToken } from './apiClient';
 import type { AuthResponse, LoginInput, RegisterInput, User } from '../types/auth';
 
 export const authApi = {
@@ -10,15 +10,23 @@ export const authApi = {
     const { data } = await apiClient.post<AuthResponse>('/auth/register', input);
     return data;
   },
-  async refresh() {
-    const { data } = await apiClient.post<AuthResponse>('/auth/refresh', {});
+  async refresh(refreshToken?: string) {
+    const token = refreshToken || getStoredRefreshToken();
+    const { data } = await apiClient.post<AuthResponse>(
+      '/auth/refresh',
+      token ? { refreshToken: token } : {}
+    );
     return data;
   },
   async me() {
     const { data } = await apiClient.get<User>('/auth/me');
     return data;
   },
-  async logout() {
-    await apiClient.post('/auth/logout');
+  async logout(refreshToken?: string) {
+    const token = refreshToken || getStoredRefreshToken();
+    await apiClient.post(
+      '/auth/logout',
+      token ? { refreshToken: token } : {}
+    );
   },
 };

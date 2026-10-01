@@ -24,6 +24,10 @@ public final class AuthDtos {
             @NotBlank @Email @Size(max = 320) String email,
             @NotBlank String password) {}
 
+    public record RefreshRequest(String refreshToken) {}
+
+    public record LogoutRequest(String refreshToken) {}
+
     public record UserResponse(
             UUID id, String email, String displayName, String avatarUrl,
             boolean enabled, String timezone, String locale, Instant createdAt, String tier) {
@@ -33,5 +37,9 @@ public final class AuthDtos {
         }
     }
 
-    public record AuthResponse(String accessToken, long expiresIn, UserResponse user) {}
+    public record AuthResponse(String accessToken, long expiresIn, UserResponse user, String refreshToken) {
+        public AuthResponse(String accessToken, long expiresIn, UserResponse user) {
+            this(accessToken, expiresIn, user, null);
+        }
+    }
 }

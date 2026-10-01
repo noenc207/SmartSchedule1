@@ -17,24 +17,90 @@ const apiClient = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-let accessToken: string | null = null;
+export const SMARTSCHEDULE_ACCESS_TOKEN_KEY = 'smartschedule_access_token';
+export const SMARTSCHEDULE_REFRESH_TOKEN_KEY = 'smartschedule_refresh_token';
+export const SMARTSCHEDULE_USER_KEY = 'smartschedule_user';
+
+function getStorage(): Storage | null {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) return window.localStorage;
+    if (typeof localStorage !== 'undefined') return localStorage;
+  } catch {}
+  return null;
+}
+
+export function getStoredAccessToken(): string | null {
+  return getStorage()?.getItem(SMARTSCHEDULE_ACCESS_TOKEN_KEY) ?? null;
+}
+
+export function getStoredRefreshToken(): string | null {
+  return getStorage()?.getItem(SMARTSCHEDULE_REFRESH_TOKEN_KEY) ?? null;
+}
+
+export function setStoredTokens(token: string | null, refreshToken?: string | null) {
+  accessToken = token;
+  const storage = getStorage();
+  if (!storage) return;
+  try {
+    if (token) {
+      storage.setItem(SMARTSCHEDULE_ACCESS_TOKEN_KEY, token);
+    } else {
+      storage.removeItem(SMARTSCHEDULE_ACCESS_TOKEN_KEY);
+    }
+    if (refreshToken !== undefined) {
+      if (refreshToken) {
+        storage.setItem(SMARTSCHEDULE_REFRESH_TOKEN_KEY, refreshToken);
+      } else {
+        storage.removeItem(SMARTSCHEDULE_REFRESH_TOKEN_KEY);
+      }
+    }
+  } catch {
+    // localStorage might be unavailable/restricted in some environments
+  }
+}
+
+export function clearStoredTokens() {
+  accessToken = null;
+  const storage = getStorage();
+  if (!storage) return;
+  try {
+    storage.removeItem(SMARTSCHEDULE_ACCESS_TOKEN_KEY);
+    storage.removeItem(SMARTSCHEDULE_REFRESH_TOKEN_KEY);
+  } catch {
+    // ignore storage error
+  }
+}
+
+let accessToken: string | null = getStoredAccessToken();
 let refreshPromise: Promise<string | null> | null = null;
 
 export function setAccessToken(token: string | null) {
   accessToken = token;
+  const storage = getStorage();
+  if (!storage) return;
+  try {
+    if (token) {
+      storage.setItem(SMARTSCHEDULE_ACCESS_TOKEN_KEY, token);
+    } else {
+      storage.removeItem(SMARTSCHEDULE_ACCESS_TOKEN_KEY);
+    }
+  } catch {
+    // ignore storage error
+  }
 }
 
-async function refreshAccessToken(): Promise<string | null> {
+export async function refreshAccessToken(): Promise<string | null> {
   if (!refreshPromise) {
-    refreshPromise = axios.post<{ accessToken: string }>(
+    const storedRefresh = getStoredRefreshToken();
+    refreshPromise = axios.post<{ accessToken: string; refreshToken?: string }>(
       `${apiClient.defaults.baseURL}/auth/refresh`,
-      {},
+      storedRefresh ? { refreshToken: storedRefresh } : {},
       { withCredentials: true },
     ).then(({ data }) => {
-      setAccessToken(data.accessToken);
+      setStoredTokens(data.accessToken, data.refreshToken);
       return data.accessToken;
     }).catch(() => {
-      setAccessToken(null);
+      clearStoredTokens();
       return null;
     }).finally(() => {
       refreshPromise = null;

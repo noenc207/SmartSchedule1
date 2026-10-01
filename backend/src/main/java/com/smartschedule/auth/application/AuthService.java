@@ -131,7 +131,7 @@ public class AuthService {
         String refreshToken = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
         RefreshToken persistedRefreshToken = refreshTokens.save(new RefreshToken(user, tokenHasher.hash(refreshToken),
                 now.plus(properties.refreshTokenTtl()), userAgent, ipAddress));
-        return new Session(new AuthResponse(accessToken, jwtService.accessTokenExpiresInSeconds(), toResponse(user)),
+        return new Session(new AuthResponse(accessToken, jwtService.accessTokenExpiresInSeconds(), toResponse(user), refreshToken),
                 persistedRefreshToken, refreshToken);
     }
 

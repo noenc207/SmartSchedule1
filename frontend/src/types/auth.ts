@@ -16,6 +16,7 @@ export type AuthResponse = {
   accessToken: string;
   expiresIn: number;
   user: User;
+  refreshToken?: string;
 };
 
 export type LoginInput = {

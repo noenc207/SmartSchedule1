@@ -48,15 +48,23 @@ public class AuthController {
     }
 
     @PostMapping("/refresh")
-    public AuthDtos.AuthResponse refresh(HttpServletRequest request, HttpServletResponse response) {
-        AuthService.AuthSession session = authService.refresh(refreshCookie(request), userAgent(request), request.getRemoteAddr());
+    public AuthDtos.AuthResponse refresh(@RequestBody(required = false) AuthDtos.RefreshRequest body,
+                                         HttpServletRequest request, HttpServletResponse response) {
+        String token = (body != null && body.refreshToken() != null && !body.refreshToken().isBlank())
+                ? body.refreshToken()
+                : refreshCookie(request);
+        AuthService.AuthSession session = authService.refresh(token, userAgent(request), request.getRemoteAddr());
         setRefreshCookie(response, session.rawRefreshToken());
         return session.response();
     }
 
     @PostMapping("/logout")
-    public void logout(HttpServletRequest request, HttpServletResponse response) {
-        authService.logout(refreshCookie(request));
+    public void logout(@RequestBody(required = false) AuthDtos.LogoutRequest body,
+                       HttpServletRequest request, HttpServletResponse response) {
+        String token = (body != null && body.refreshToken() != null && !body.refreshToken().isBlank())
+                ? body.refreshToken()
+                : refreshCookie(request);
+        authService.logout(token);
         clearRefreshCookie(response);
     }
 
