@@ -2401,7 +2401,7 @@ export function CalendarPage() {
           </div>
           )}
 
-          {(editing || (!isMobile && taskPanelVisible) || (isMobile && mobileCalendarTab === 'assistant')) && (
+          {((!isMobile && taskPanelVisible) || (isMobile && mobileCalendarTab === 'assistant')) && (
             <aside className="calendar-side-column">
             {/* Mini Calendar Navigator */}
             {isMiniCalendarVisible && !whatIfActive && (
@@ -2487,18 +2487,6 @@ export function CalendarPage() {
                 }}
               />
             )}
-
-            {/* Redesigned Edit Drawer */}
-            {editing && (
-              <EventForm
-                form={form}
-                categories={categories}
-                timeZone={schedule?.timezone ?? 'Asia/Ho_Chi_Minh'}
-                onChange={update}
-                onSave={() => void save()}
-                onCancel={() => setEditing(false)}
-              />
-            )}
           </aside>
           )}
         </div>
@@ -2516,6 +2504,18 @@ export function CalendarPage() {
           onSave={(data) => void handleQuickCreateSave(data)}
           onMoreOptions={handleQuickCreateMore}
           onClose={() => setQuickCreate(null)}
+        />
+      )}
+
+      {/* Centered Event Form Modal */}
+      {editing && (
+        <EventForm
+          form={form}
+          categories={categories}
+          timeZone={schedule?.timezone ?? 'Asia/Ho_Chi_Minh'}
+          onChange={update}
+          onSave={() => void save()}
+          onCancel={() => setEditing(false)}
         />
       )}
 
