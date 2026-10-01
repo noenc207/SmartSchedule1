@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Check, Clock, Contrast, Edit3, HelpCircle, Palette, Plus, Sparkles, Trash2, X } from 'lucide-react';
 import { availabilityApi } from '../../services/availabilityApi';
 import { categoryApi } from '../../services/categoryApi';
@@ -21,6 +22,7 @@ import { OpenApiSection } from './components/OpenApiSection';
 const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 export function SettingsPage() {
+  const navigate = useNavigate();
   const { activeScheduleId } = useWorkspaceStore();
   const { user, updateUser, setTier } = useAuthStore();
   const {
@@ -643,7 +645,7 @@ export function SettingsPage() {
             style={{ color: '#ef4444', borderColor: '#fca5a5', cursor: 'pointer', padding: '6px 16px', borderRadius: '8px' }}
             onClick={async () => {
               await useAuthStore.getState().logout();
-              window.location.href = '/login';
+              navigate('/login', { replace: true });
             }}
             id="logout-btn"
           >
