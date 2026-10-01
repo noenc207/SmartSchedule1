@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import type { Category, RecurrenceRule, UserLocation } from '../../../types/domain';
 import type { EventInput } from '../../../services/eventApi';
 import { RecurrenceEditor } from './RecurrenceEditor';
@@ -126,26 +126,52 @@ export function EventForm({
     }
   }, [endDate, endHour, endMinute]);
 
+  const isTimeOrderInvalid = useMemo(() => {
+    try {
+      const s = new Date(`${startDate}T${startHour}:${startMinute}:00`).getTime();
+      const e = new Date(`${endDate}T${endHour}:${endMinute}:00`).getTime();
+      return !isNaN(s) && !isNaN(e) && e < s;
+    } catch {
+      return false;
+    }
+  }, [startDate, startHour, startMinute, endDate, endHour, endMinute]);
+
+  // Ref tracking last known valid positive duration (default 60 mins)
+  const lastDurationRef = useRef<number>(60);
+
   // Duration in minutes
   const durationMinutes = useMemo(() => {
     try {
       const s = new Date(`${startDate}T${startHour}:${startMinute}:00`).getTime();
       const e = new Date(`${endDate}T${endHour}:${endMinute}:00`).getTime();
-      if (isNaN(s) || isNaN(e) || e <= s) return 0;
+      if (isNaN(s) || isNaN(e) || e < s) return 0;
       return Math.round((e - s) / 60000);
     } catch {
       return 0;
     }
   }, [startDate, startHour, startMinute, endDate, endHour, endMinute]);
 
+  // Keep lastDurationRef updated whenever duration is strictly positive
+  useEffect(() => {
+    if (durationMinutes > 0) {
+      lastDurationRef.current = durationMinutes;
+    }
+  }, [durationMinutes]);
+
   const durationText = useMemo(() => {
-    if (durationMinutes <= 0) return 'Chưa hợp lệ (cần sau giờ bắt đầu)';
+    if (startDate === endDate && !multiDay && (parseInt(endHour, 10) < parseInt(startHour, 10) || (parseInt(endHour, 10) === parseInt(startHour, 10) && parseInt(endMinute, 10) < parseInt(startMinute, 10)))) {
+      return 'Chưa hợp lệ (cần sau giờ bắt đầu)';
+    }
+    if (durationMinutes <= 0) {
+      if (startHour === endHour && startMinute === endMinute) return '0 phút';
+      return 'Chưa hợp lệ (cần sau giờ bắt đầu)';
+    }
     const h = Math.floor(durationMinutes / 60);
     const m = durationMinutes % 60;
     if (h > 0 && m > 0) return `${h} giờ ${m} phút`;
     if (h > 0) return `${h} giờ`;
     return `${m} phút`;
-  }, [durationMinutes]);
+  }, [durationMinutes, startDate, endDate, multiDay, startHour, startMinute, endHour, endMinute]);
 
   // Date handlers
   const handleStartDateChange = (newDate: string) => {
@@ -154,12 +180,28 @@ export function EventForm({
     if (!multiDay) {
       const updatedEnd = toDateTimeString(newDate, endHour, endMinute);
       onChange('endsAt', updatedEnd);
+    } else {
+      if (newDate > endDate) {
+        onChange('endsAt', toDateTimeString(newDate, endHour, endMinute));
+      }
     }
   };
 
   const handleEndDateChange = (newDate: string) => {
-    const updatedEnd = toDateTimeString(newDate, endHour, endMinute);
-    onChange('endsAt', updatedEnd);
+    const validEndDate = newDate < startDate ? startDate : newDate;
+    if (validEndDate === startDate) {
+      const sh = parseInt(startHour, 10);
+      const sm = parseInt(startMinute, 10);
+      let eh = parseInt(endHour, 10);
+      let em = parseInt(endMinute, 10);
+      if (eh < sh || (eh === sh && em < sm)) {
+        eh = sh;
+        em = sm;
+      }
+      onChange('endsAt', toDateTimeString(validEndDate, String(eh).padStart(2, '0'), String(em).padStart(2, '0')));
+      return;
+    }
+    onChange('endsAt', toDateTimeString(validEndDate, endHour, endMinute));
   };
 
   const setToday = () => {
@@ -179,9 +221,9 @@ export function EventForm({
     handleStartDateChange(`${yyyy}-${mm}-${dd}`);
   };
 
-  // Start hour/minute changes automatically preserve duration so user never gets blocked by validation
+  // 2. Tự động tịnh tiến thời gian (Time Shifting)
   const handleStartHourChange = (newHour: string) => {
-    const currentDur = durationMinutes > 0 ? durationMinutes : 60;
+    const currentDur = durationMinutes > 0 ? durationMinutes : (lastDurationRef.current || 60);
     const newStartInstant = new Date(`${startDate}T${newHour}:${startMinute}:00`).getTime();
     const newEndInstant = new Date(newStartInstant + currentDur * 60000);
 
@@ -193,6 +235,9 @@ export function EventForm({
 
     onChange('startsAt', `${startDate}T${newHour}:${startMinute}`);
     onChange('endsAt', `${ey}-${em}-${ed}T${eh}:${emin}`);
+    if (`${ey}-${em}-${ed}` !== startDate) {
+      setMultiDay(true);
+    }
   };
 
   const handleStartMinuteChange = (val: string | number) => {
@@ -201,7 +246,7 @@ export function EventForm({
     cleanMin = Math.max(0, Math.min(59, cleanMin));
     const formattedMin = String(cleanMin).padStart(2, '0');
 
-    const currentDur = durationMinutes > 0 ? durationMinutes : 60;
+    const currentDur = durationMinutes > 0 ? durationMinutes : (lastDurationRef.current || 60);
     const newStartInstant = new Date(`${startDate}T${startHour}:${formattedMin}:00`).getTime();
     const newEndInstant = new Date(newStartInstant + currentDur * 60000);
 
@@ -213,9 +258,33 @@ export function EventForm({
 
     onChange('startsAt', `${startDate}T${startHour}:${formattedMin}`);
     onChange('endsAt', `${ey}-${em}-${ed}T${eh}:${emin}`);
+    if (`${ey}-${em}-${ed}` !== startDate) {
+      setMultiDay(true);
+    }
   };
 
+  // 3. Ngăn chặn lỗi logic "Xuyên không" (Anti-Time Travel Logic)
   const handleEndHourChange = (newHour: string) => {
+    if (!multiDay || startDate === endDate) {
+      const sH = parseInt(startHour, 10);
+      const sM = parseInt(startMinute, 10);
+      let eH = parseInt(newHour, 10);
+      let eM = parseInt(endMinute, 10);
+
+      if (eH < sH) {
+        eH = sH;
+        if (eM < sM) {
+          eM = sM;
+        }
+      } else if (eH === sH && eM < sM) {
+        eM = sM;
+      }
+
+      const clampedHour = String(eH).padStart(2, '0');
+      const clampedMin = String(eM).padStart(2, '0');
+      onChange('endsAt', toDateTimeString(endDate, clampedHour, clampedMin));
+      return;
+    }
     onChange('endsAt', toDateTimeString(endDate, newHour, endMinute));
   };
 
@@ -223,10 +292,26 @@ export function EventForm({
     let cleanMin = typeof val === 'string' ? parseInt(val, 10) : val;
     if (isNaN(cleanMin)) cleanMin = 0;
     cleanMin = Math.max(0, Math.min(59, cleanMin));
+
+    if (!multiDay || startDate === endDate) {
+      const sH = parseInt(startHour, 10);
+      const sM = parseInt(startMinute, 10);
+      const eH = parseInt(endHour, 10);
+
+      if (eH === sH && cleanMin < sM) {
+        cleanMin = sM;
+      } else if (eH < sH) {
+        const clampedHour = String(sH).padStart(2, '0');
+        const clampedMin = String(Math.max(sM, cleanMin)).padStart(2, '0');
+        onChange('endsAt', toDateTimeString(endDate, clampedHour, clampedMin));
+        return;
+      }
+    }
     const formattedMin = String(cleanMin).padStart(2, '0');
     onChange('endsAt', toDateTimeString(endDate, endHour, formattedMin));
   };
 
+  // 1. Chiều ngược (Cộng nhanh tính ra giờ kết thúc)
   const applyQuickDuration = (minutesToAdd: number) => {
     const sTime = new Date(`${startDate}T${startHour}:${startMinute}:00`).getTime();
     const eTime = new Date(sTime + minutesToAdd * 60000);
@@ -237,6 +322,7 @@ export function EventForm({
     const eh = String(eTime.getHours()).padStart(2, '0');
     const emin = String(eTime.getMinutes()).padStart(2, '0');
 
+    lastDurationRef.current = minutesToAdd;
     onChange('endsAt', `${ey}-${em}-${ed}T${eh}:${emin}`);
     if (`${ey}-${em}-${ed}` !== startDate) {
       setMultiDay(true);
@@ -256,7 +342,24 @@ export function EventForm({
   const toggleMultiDay = (checked: boolean) => {
     setMultiDay(checked);
     if (!checked) {
-      onChange('endsAt', toDateTimeString(startDate, endHour, endMinute));
+      let eh = parseInt(endHour, 10);
+      let em = parseInt(endMinute, 10);
+      const sh = parseInt(startHour, 10);
+      const sm = parseInt(startMinute, 10);
+
+      if (eh < sh || (eh === sh && em < sm)) {
+        const curDur = lastDurationRef.current > 0 ? lastDurationRef.current : 60;
+        const sTime = new Date(`${startDate}T${startHour}:${startMinute}:00`).getTime();
+        const eTime = new Date(Math.min(
+          sTime + curDur * 60000,
+          new Date(`${startDate}T23:59:00`).getTime()
+        ));
+        const newEh = String(eTime.getHours()).padStart(2, '0');
+        const newEm = String(eTime.getMinutes()).padStart(2, '0');
+        onChange('endsAt', toDateTimeString(startDate, newEh, newEm));
+      } else {
+        onChange('endsAt', toDateTimeString(startDate, endHour, endMinute));
+      }
     }
   };
 
@@ -452,11 +555,14 @@ export function EventForm({
                       className="time-unit-select"
                       aria-label="Giờ kết thúc"
                     >
-                      {HOURS.map((h) => (
-                        <option key={h} value={h}>
-                          {h} giờ
-                        </option>
-                      ))}
+                      {HOURS.map((h) => {
+                        const isPastStart = (!multiDay || startDate === endDate) && parseInt(h, 10) < parseInt(startHour, 10);
+                        return (
+                          <option key={h} value={h} disabled={isPastStart}>
+                            {h} giờ {isPastStart ? '(Trước giờ bắt đầu)' : ''}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
 
@@ -465,7 +571,7 @@ export function EventForm({
                     <div className="minute-control-pair">
                       <input
                         type="number"
-                        min={0}
+                        min={(!multiDay || startDate === endDate) && parseInt(endHour, 10) === parseInt(startHour, 10) ? parseInt(startMinute, 10) : 0}
                         max={59}
                         value={parseInt(endMinute, 10) || 0}
                         onChange={(e) => handleEndMinuteChange(e.target.value)}
@@ -484,11 +590,14 @@ export function EventForm({
                         title="Mốc phút chuẩn"
                       >
                         <option value="custom" disabled hidden>Mốc</option>
-                        {MINUTE_PRESETS.map((m) => (
-                          <option key={m} value={m}>
-                            :{m}
-                          </option>
-                        ))}
+                        {MINUTE_PRESETS.map((m) => {
+                          const isPastStartMin = (!multiDay || startDate === endDate) && parseInt(endHour, 10) === parseInt(startHour, 10) && parseInt(m, 10) < parseInt(startMinute, 10);
+                          return (
+                            <option key={m} value={m} disabled={isPastStartMin}>
+                              :{m} {isPastStartMin ? '(Trước giờ BĐ)' : ''}
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
                   </div>
@@ -520,7 +629,7 @@ export function EventForm({
                   <button
                     type="button"
                     key={pill.label}
-                    className="duration-pill-btn"
+                    className={`duration-pill-btn ${durationMinutes === pill.mins ? 'active' : ''}`}
                     onClick={() => applyQuickDuration(pill.mins)}
                   >
                     {pill.label}
@@ -726,6 +835,12 @@ export function EventForm({
         </div>
       )}
 
+      {isTimeOrderInvalid && (
+        <div style={{ padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, color: '#dc2626', fontSize: 12, margin: '8px 0' }}>
+          ⚠️ Thời gian kết thúc không được sớm hơn thời gian bắt đầu (trừ khi bật &quot;Nhiều ngày&quot;).
+        </div>
+      )}
+
       {isPastTime && (
         <div style={{ padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, color: '#dc2626', fontSize: 12, margin: '8px 0' }}>
           ⚠️ Không thể đặt lịch vào ngày hoặc giờ đã qua. Vui lòng chọn thời gian trong tương lai.
@@ -737,7 +852,7 @@ export function EventForm({
         <button type="button" className="secondary-button" onClick={onCancel}>
           Hủy
         </button>
-        <button type="submit" className="primary-button" disabled={!form.title.trim() || isPastTime}>
+        <button type="submit" className="primary-button" disabled={!form.title.trim() || isPastTime || isTimeOrderInvalid}>
           Lưu sự kiện
         </button>
       </div>

@@ -8542,6 +8542,14 @@ h3 { margin-bottom: 0; font-size: 16px; letter-spacing: -.02em; }
   box-shadow: 0 2px 6px rgba(234, 88, 12, 0.25);
 }
 
+.duration-pill-btn.active {
+  background: linear-gradient(135deg, #ea580c 0%, #ec4899 100%);
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: 0 2px 6px rgba(234, 88, 12, 0.35);
+  font-weight: 800;
+}
+
 /* Drag Grip Bar (Zero icon drag indicator) */
 .drag-grip-bar {
   display: inline-block;
