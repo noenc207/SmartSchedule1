@@ -9,6 +9,7 @@ import com.smartschedule.ai.infrastructure.AiMessageRepository;
 import com.smartschedule.user.domain.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +31,7 @@ public class AiChatService {
     // In-memory sliding window rate limiter: User ID -> List of request timestamps (epoch ms)
     private final Map<UUID, List<Long>> rateLimits = new ConcurrentHashMap<>();
 
+    @Autowired
     public AiChatService(AiConversationRepository conversationRepository,
                          AiMessageRepository messageRepository,
                          AiContextService contextService,
@@ -42,14 +44,6 @@ public class AiChatService {
         this.actionService = actionService;
         this.aiProvider = aiProvider;
         this.properties = properties;
-    }
-
-    public AiChatService(AiConversationRepository conversationRepository,
-                         AiMessageRepository messageRepository,
-                         AiContextService contextService,
-                         AiProvider aiProvider,
-                         AiProperties properties) {
-        this(conversationRepository, messageRepository, contextService, null, aiProvider, properties);
     }
 
     @Transactional

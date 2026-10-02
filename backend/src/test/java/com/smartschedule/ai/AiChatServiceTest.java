@@ -30,6 +30,7 @@ class AiChatServiceTest {
     @Mock private AiConversationRepository conversationRepository;
     @Mock private AiMessageRepository messageRepository;
     @Mock private AiContextService contextService;
+    @Mock private AiActionService actionService;
     @Mock private AiProvider aiProvider;
 
     private AiChatService chatService;
@@ -39,7 +40,7 @@ class AiChatServiceTest {
     @BeforeEach
     void setUp() {
         properties = new AiProperties("mock-gemini-key", "gemini-1.5-flash", 1500, 1024, 20, 30);
-        chatService = new AiChatService(conversationRepository, messageRepository, contextService, aiProvider, properties);
+        chatService = new AiChatService(conversationRepository, messageRepository, contextService, actionService, aiProvider, properties);
         testUser = new User("student@fpt.edu.vn", "hashed", "Nguyen Van A");
     }
 
@@ -97,7 +98,7 @@ class AiChatServiceTest {
     @Test
     void testChat_rateLimitingEnforced() {
         AiProperties strictProperties = new AiProperties("mock-key", "gemini-1.5-flash", 1500, 1024, 2, 30);
-        AiChatService rateLimitedService = new AiChatService(conversationRepository, messageRepository, contextService, aiProvider, strictProperties);
+        AiChatService rateLimitedService = new AiChatService(conversationRepository, messageRepository, contextService, actionService, aiProvider, strictProperties);
 
         AiConversation conversation = new AiConversation(testUser, "Test");
         when(conversationRepository.findLatestByUserId(testUser.getId())).thenReturn(Optional.of(conversation));
