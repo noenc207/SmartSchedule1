@@ -13,15 +13,18 @@ Object.defineProperty(globalThis, 'localStorage', {
   writable: true,
 });
 
-import { isJwtExpired, useAuthStore } from '../../stores/authStore';
+import { isJwtExpired, useAuthStore, getInitialAuthState } from '../../stores/authStore';
 import {
   SMARTSCHEDULE_ACCESS_TOKEN_KEY,
   SMARTSCHEDULE_REFRESH_TOKEN_KEY,
   SMARTSCHEDULE_USER_KEY,
   getStoredAccessToken,
   getStoredRefreshToken,
+  getStoredUser,
   setStoredTokens,
+  setStoredUser,
   clearStoredTokens,
+  clearStoredUser,
 } from '../../services/apiClient';
 import { authApi } from '../../services/authApi';
 
@@ -37,7 +40,8 @@ describe('AuthSessionPersistence and F5 reload flow', () => {
   beforeEach(() => {
     storageMap.clear();
     clearStoredTokens();
-    useAuthStore.setState({ user: null, status: 'UNAUTHENTICATED', error: null });
+    clearStoredUser();
+    useAuthStore.setState({ user: null, status: 'UNAUTHENTICATED', authInitialized: true, error: null });
     vi.restoreAllMocks();
   });
 
@@ -76,6 +80,15 @@ describe('AuthSessionPersistence and F5 reload flow', () => {
       expect(getStoredAccessToken()).toBeNull();
       expect(getStoredRefreshToken()).toBeNull();
     });
+
+    it('sets and retrieves user profile in storage', () => {
+      const user = { id: 'u-1', email: 'test@example.com' };
+      setStoredUser(user);
+      expect(getStoredUser()).toEqual(user);
+
+      clearStoredUser();
+      expect(getStoredUser()).toBeNull();
+    });
   });
 
   describe('Login & Logout lifecycle', () => {
@@ -102,22 +115,25 @@ describe('AuthSessionPersistence and F5 reload flow', () => {
       await useAuthStore.getState().login({ email: 'test@example.com', password: 'password123' });
 
       expect(useAuthStore.getState().status).toBe('AUTHENTICATED');
+      expect(useAuthStore.getState().authInitialized).toBe(true);
       expect(useAuthStore.getState().user?.email).toBe('test@example.com');
       expect(getStoredRefreshToken()).toBe('mock-refresh-token-xyz');
       expect(storageMap.get(SMARTSCHEDULE_USER_KEY)).toBeTruthy();
       expect(JSON.parse(storageMap.get(SMARTSCHEDULE_USER_KEY)!).email).toBe('test@example.com');
     });
 
-    it('logout clears all tokens and user from localStorage', async () => {
+    it('logout clears all tokens and user from localStorage and calls authApi.logout', async () => {
       setStoredTokens('access-tok', 'refresh-tok');
       storageMap.set(SMARTSCHEDULE_USER_KEY, JSON.stringify({ id: '1' }));
       storageMap.set('smartschedule-demo-mode', 'true');
 
-      vi.spyOn(authApi, 'logout').mockResolvedValueOnce();
+      const logoutSpy = vi.spyOn(authApi, 'logout').mockResolvedValueOnce();
 
       await useAuthStore.getState().logout();
 
+      expect(logoutSpy).toHaveBeenCalledWith('refresh-tok');
       expect(useAuthStore.getState().status).toBe('UNAUTHENTICATED');
+      expect(useAuthStore.getState().authInitialized).toBe(true);
       expect(useAuthStore.getState().user).toBeNull();
       expect(getStoredAccessToken()).toBeNull();
       expect(getStoredRefreshToken()).toBeNull();
@@ -126,8 +142,8 @@ describe('AuthSessionPersistence and F5 reload flow', () => {
     });
   });
 
-  describe('Bootstrap session restoration (F5 simulation)', () => {
-    it('restores authenticated state with background /auth/me when unexpired access token exists', async () => {
+  describe('CASE 1: F5 reload with valid unexpired token', () => {
+    it('restores authenticated state with background /auth/me verification', async () => {
       const validToken = createMockJwt(3600);
       const storedUser = {
         id: 'u-1',
@@ -153,10 +169,13 @@ describe('AuthSessionPersistence and F5 reload flow', () => {
 
       expect(meSpy).toHaveBeenCalledTimes(1);
       expect(useAuthStore.getState().status).toBe('AUTHENTICATED');
+      expect(useAuthStore.getState().authInitialized).toBe(true);
       expect(useAuthStore.getState().user?.displayName).toBe('Updated From Server');
     });
+  });
 
-    it('refreshes session via refresh token when access token is expired on F5', async () => {
+  describe('CASE 2 & 3: Close tab / close browser and re-open with expired access token', () => {
+    it('automatically refreshes session via refresh token / cookie without kicking user to login', async () => {
       const expiredToken = createMockJwt(-100);
       const newUser = {
         id: 'u-2',
@@ -170,6 +189,7 @@ describe('AuthSessionPersistence and F5 reload flow', () => {
         tier: 'PRO' as const,
       };
 
+      // Simulated state after tab was closed for 30 minutes
       setStoredTokens(expiredToken, 'valid-refresh-token');
 
       const refreshSpy = vi.spyOn(authApi, 'refresh').mockResolvedValueOnce({
@@ -183,10 +203,13 @@ describe('AuthSessionPersistence and F5 reload flow', () => {
 
       expect(refreshSpy).toHaveBeenCalledWith('valid-refresh-token');
       expect(useAuthStore.getState().status).toBe('AUTHENTICATED');
+      expect(useAuthStore.getState().authInitialized).toBe(true);
       expect(useAuthStore.getState().user?.email).toBe('refreshed@fpt.edu.vn');
       expect(getStoredRefreshToken()).toBe('rotated-refresh-token');
     });
+  });
 
+  describe('CASE 5: Expired or revoked refresh token transitions to UNAUTHENTICATED', () => {
     it('sets UNAUTHENTICATED when refresh fails with invalid/expired refresh token', async () => {
       setStoredTokens(createMockJwt(-100), 'expired-refresh-token');
 
@@ -195,12 +218,15 @@ describe('AuthSessionPersistence and F5 reload flow', () => {
       await useAuthStore.getState().bootstrap();
 
       expect(useAuthStore.getState().status).toBe('UNAUTHENTICATED');
+      expect(useAuthStore.getState().authInitialized).toBe(true);
       expect(useAuthStore.getState().user).toBeNull();
       expect(getStoredAccessToken()).toBeNull();
       expect(getStoredRefreshToken()).toBeNull();
     });
+  });
 
-    it('deduplicates concurrent bootstrap calls into a single execution (StrictMode safety)', async () => {
+  describe('StrictMode & Concurrency protection', () => {
+    it('deduplicates concurrent bootstrap calls into a single execution', async () => {
       const validToken = createMockJwt(3600);
       setStoredTokens(validToken, 'refresh-tok');
 
@@ -227,6 +253,33 @@ describe('AuthSessionPersistence and F5 reload flow', () => {
       // authApi.me should be called EXACTLY once
       expect(meSpy).toHaveBeenCalledTimes(1);
       expect(useAuthStore.getState().status).toBe('AUTHENTICATED');
+      expect(useAuthStore.getState().authInitialized).toBe(true);
+    });
+  });
+
+  describe('Startup Initial State (getInitialAuthState)', () => {
+    it('starts with INITIALIZING and authInitialized=false when access token is missing or expired', () => {
+      // Missing token
+      const state1 = getInitialAuthState();
+      expect(state1.authInitialized).toBe(false);
+      expect(state1.status).toBe('INITIALIZING');
+
+      // Expired token
+      setStoredTokens(createMockJwt(-50), 'ref-1');
+      const state2 = getInitialAuthState();
+      expect(state2.authInitialized).toBe(false);
+      expect(state2.status).toBe('INITIALIZING');
+    });
+
+    it('starts with AUTHENTICATED and authInitialized=true when valid unexpired token and user exist', () => {
+      setStoredTokens(createMockJwt(3600), 'ref-1');
+      const user = { id: 'u-1', email: 'valid@example.com' };
+      setStoredUser(user);
+
+      const state = getInitialAuthState();
+      expect(state.authInitialized).toBe(true);
+      expect(state.status).toBe('AUTHENTICATED');
+      expect(state.user).toEqual(user);
     });
   });
 });

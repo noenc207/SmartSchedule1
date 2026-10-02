@@ -82,15 +82,17 @@ public class AuthController {
     }
 
     private void clearRefreshCookie(HttpServletResponse response) {
+        String sameSite = properties.secureCookie() ? "None" : "Lax";
         ResponseCookie cookie = ResponseCookie.from(properties.refreshCookieName(), "")
-                .httpOnly(true).secure(properties.secureCookie()).sameSite("Lax").path("/api/v1/auth")
+                .httpOnly(true).secure(properties.secureCookie()).sameSite(sameSite).path("/api/v1/auth")
                 .maxAge(Duration.ZERO).build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
     private void setRefreshCookie(HttpServletResponse response, String rawToken) {
+        String sameSite = properties.secureCookie() ? "None" : "Lax";
         ResponseCookie cookie = ResponseCookie.from(properties.refreshCookieName(), rawToken)
-                .httpOnly(true).secure(properties.secureCookie()).sameSite("Lax").path("/api/v1/auth")
+                .httpOnly(true).secure(properties.secureCookie()).sameSite(sameSite).path("/api/v1/auth")
                 .maxAge(properties.refreshTokenTtl()).build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }

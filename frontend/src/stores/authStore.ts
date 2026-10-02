@@ -4,10 +4,12 @@ import {
   setAccessToken,
   getStoredAccessToken,
   getStoredRefreshToken,
+  getStoredUser,
   setStoredTokens,
+  setStoredUser,
   clearStoredTokens,
+  clearStoredUser,
   getApiErrorMessage,
-  SMARTSCHEDULE_USER_KEY,
 } from '../services/apiClient';
 import { isDemoMode, setDemoMode } from '../services/demoMode';
 import type { AuthStatus, LoginInput, RegisterInput, User } from '../types/auth';
@@ -67,54 +69,41 @@ export function isJwtExpired(token: string | null): boolean {
 }
 
 /**
- * Restores synchronous authentication state on initial page load / F5.
- * This guarantees ProtectedRoute NEVER flashes login or redirects prematurely on refresh!
+ * Computes initial auth state on app startup.
+ * Guarantees that ProtectedRoute NEVER redirects to login or landing while session restoration is in progress!
  */
-export function getInitialAuthState(): { user: User | null; status: AuthStatus } {
+export function getInitialAuthState(): { user: User | null; status: AuthStatus; authInitialized: boolean } {
   const storage = getStorage();
   if (!storage) {
-    return { user: null, status: 'INITIALIZING' };
+    return { user: null, status: 'INITIALIZING', authInitialized: false };
   }
   if (isDemoMode()) {
     return {
       user: { ...DEMO_USER_PROFILE, tier: getInitialDemoTier() },
       status: 'AUTHENTICATED',
+      authInitialized: true,
     };
   }
 
   const token = getStoredAccessToken();
-  let user: User | null = null;
-  try {
-    const rawUser = storage.getItem(SMARTSCHEDULE_USER_KEY);
-    if (rawUser) {
-      user = JSON.parse(rawUser);
-    }
-  } catch {
-    user = null;
-  }
+  const cachedUser = getStoredUser<User>();
 
-  // 1. If we have an unexpired access token and stored user:
-  if (token && !isJwtExpired(token) && user) {
+  // 1. If we have an active, unexpired access token and cached user profile:
+  // Fast-path: immediately authenticated, with silent verification in bootstrap
+  if (token && !isJwtExpired(token) && cachedUser) {
     setAccessToken(token);
-    return { user, status: 'AUTHENTICATED' };
+    return { user: cachedUser, status: 'AUTHENTICATED', authInitialized: true };
   }
 
-  // 2. If we have a refresh token or an access token that might need refresh:
-  const refreshToken = getStoredRefreshToken();
-  if (refreshToken || token) {
-    if (user) {
-      return { user, status: 'INITIALIZING' };
-    }
-    return { user: null, status: 'INITIALIZING' };
-  }
-
-  // 3. No stored credentials at all:
-  return { user: null, status: 'UNAUTHENTICATED' };
+  // 2. Token is missing or expired, but refresh cookie / refresh token might exist:
+  // Must remain INITIALIZING with authInitialized = false until bootstrap() attempts refresh!
+  return { user: cachedUser, status: 'INITIALIZING', authInitialized: false };
 }
 
-type AuthState = {
+export type AuthState = {
   user: User | null;
   status: AuthStatus;
+  authInitialized: boolean;
   error: string | null;
   login: (input: LoginInput) => Promise<void>;
   demoLogin: () => void;
@@ -134,6 +123,7 @@ const initialAuth = getInitialAuthState();
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: initialAuth.user,
   status: initialAuth.status,
+  authInitialized: initialAuth.authInitialized,
   error: null,
 
   login: async (input) => {
@@ -145,9 +135,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       setStoredTokens(response.accessToken, response.refreshToken);
       const user = response.user ? { ...response.user, tier: response.user.tier || 'PRO' } : null;
       if (user) {
-        localStorage.setItem(SMARTSCHEDULE_USER_KEY, JSON.stringify(user));
+        setStoredUser(user);
       }
-      set({ user, status: 'AUTHENTICATED', error: null });
+      set({ user, status: 'AUTHENTICATED', authInitialized: true, error: null });
     } catch (error) {
       set({ error: getApiErrorMessage(error) });
       throw error;
@@ -160,10 +150,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     setStoredTokens('local-demo-token');
     const tier = getInitialDemoTier();
     const demoUser = { ...DEMO_USER_PROFILE, tier };
-    localStorage.setItem(SMARTSCHEDULE_USER_KEY, JSON.stringify(demoUser));
+    setStoredUser(demoUser);
     set({
       user: demoUser,
       status: 'AUTHENTICATED',
+      authInitialized: true,
       error: null,
     });
   },
@@ -172,8 +163,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     setDemoMode(false);
     localStorage.removeItem('smartschedule-demo-mode');
     clearStoredTokens();
-    localStorage.removeItem(SMARTSCHEDULE_USER_KEY);
-    set({ user: null, status: 'UNAUTHENTICATED', error: null });
+    clearStoredUser();
+    set({ user: null, status: 'UNAUTHENTICATED', authInitialized: true, error: null });
   },
 
   register: async (input) => {
@@ -185,9 +176,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       setStoredTokens(response.accessToken, response.refreshToken);
       const user = response.user ? { ...response.user, tier: response.user.tier || 'PRO' } : null;
       if (user) {
-        localStorage.setItem(SMARTSCHEDULE_USER_KEY, JSON.stringify(user));
+        setStoredUser(user);
       }
-      set({ user, status: 'AUTHENTICATED', error: null });
+      set({ user, status: 'AUTHENTICATED', authInitialized: true, error: null });
     } catch (error) {
       set({ error: getApiErrorMessage(error) });
       throw error;
@@ -199,7 +190,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       setAccessToken('local-demo-token');
       const tier = getInitialDemoTier();
       const demoUser = { ...DEMO_USER_PROFILE, tier };
-      set({ user: demoUser, status: 'AUTHENTICATED' });
+      set({ user: demoUser, status: 'AUTHENTICATED', authInitialized: true });
       return;
     }
 
@@ -213,61 +204,49 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         const storedToken = getStoredAccessToken();
         const storedRefresh = getStoredRefreshToken();
 
-        // 1. If we already have a valid unexpired access token:
+        // 1. If we have a valid unexpired access token:
         if (storedToken && !isJwtExpired(storedToken)) {
           setAccessToken(storedToken);
+          const cached = getStoredUser<User>();
+          if (cached) {
+            set({ user: cached });
+          }
+
           // In background, verify token validity with /auth/me and sync user profile
           try {
             const meUser = await authApi.me();
             const userWithTier = { ...meUser, tier: meUser.tier || 'PRO' };
-            localStorage.setItem(SMARTSCHEDULE_USER_KEY, JSON.stringify(userWithTier));
-            set({ user: userWithTier, status: 'AUTHENTICATED' });
+            setStoredUser(userWithTier);
+            set({ user: userWithTier, status: 'AUTHENTICATED', authInitialized: true, error: null });
             return;
           } catch (meError: any) {
-            // Only fall through to refresh if 401 Unauthorized (token invalid / revoked on server)
+            // Only if 401 Unauthorized (token was revoked on server), fall through to refresh
             if (meError?.response?.status !== 401) {
-              // Network error or offline: maintain existing authenticated state!
-              if (get().user) {
-                set({ status: 'AUTHENTICATED' });
+              // Network error or offline: maintain authenticated state!
+              if (cached || get().user) {
+                set({ status: 'AUTHENTICATED', authInitialized: true, error: null });
+                return;
               }
-              return;
             }
           }
         }
 
-        // 2. Access token is missing, expired, or rejected with 401: Refresh session
-        if (storedRefresh || storedToken) {
-          try {
-            const response = await authApi.refresh(storedRefresh || undefined);
-            setStoredTokens(response.accessToken, response.refreshToken);
-            const userWithTier = response.user ? { ...response.user, tier: response.user.tier || 'PRO' } : null;
-            if (userWithTier) {
-              localStorage.setItem(SMARTSCHEDULE_USER_KEY, JSON.stringify(userWithTier));
-            }
-            set({ user: userWithTier, status: 'AUTHENTICATED', error: null });
-            return;
-          } catch {
-            // Refresh failed (refresh token expired or revoked): cleanly reset to unauthenticated
-            clearStoredTokens();
-            localStorage.removeItem(SMARTSCHEDULE_USER_KEY);
-            set({ user: null, status: 'UNAUTHENTICATED' });
-            return;
-          }
-        }
-
-        // 3. No stored tokens: attempt cookie-only refresh (e.g. HttpOnly cookie from same-origin)
+        // 2. Token is missing or expired, or /me returned 401: Refresh session
+        // Can refresh via stored refresh token OR via HttpOnly cookie (withCredentials: true)
         try {
-          const response = await authApi.refresh();
+          const response = await authApi.refresh(storedRefresh || undefined);
           setStoredTokens(response.accessToken, response.refreshToken);
           const userWithTier = response.user ? { ...response.user, tier: response.user.tier || 'PRO' } : null;
           if (userWithTier) {
-            localStorage.setItem(SMARTSCHEDULE_USER_KEY, JSON.stringify(userWithTier));
+            setStoredUser(userWithTier);
           }
-          set({ user: userWithTier, status: 'AUTHENTICATED', error: null });
+          set({ user: userWithTier, status: 'AUTHENTICATED', authInitialized: true, error: null });
+          return;
         } catch {
+          // Both access token and refresh token / cookie failed (or were revoked / expired)
           clearStoredTokens();
-          localStorage.removeItem(SMARTSCHEDULE_USER_KEY);
-          set({ user: null, status: 'UNAUTHENTICATED' });
+          clearStoredUser();
+          set({ user: null, status: 'UNAUTHENTICATED', authInitialized: true });
         }
       } finally {
         bootstrapPromise = null;
@@ -279,9 +258,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   logout: async () => {
     const refreshToken = getStoredRefreshToken();
+    setDemoMode(false);
     localStorage.removeItem('smartschedule-demo-mode');
     clearStoredTokens();
-    localStorage.removeItem(SMARTSCHEDULE_USER_KEY);
+    clearStoredUser();
     try {
       if (refreshToken) {
         await authApi.logout(refreshToken);
@@ -291,7 +271,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch {
       // Ignore network errors during logout
     } finally {
-      set({ user: null, status: 'UNAUTHENTICATED', error: null });
+      set({ user: null, status: 'UNAUTHENTICATED', authInitialized: true, error: null });
     }
   },
 
@@ -299,24 +279,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set((state) => {
       const nextUser = state.user ? { ...state.user, ...updated } : null;
       if (nextUser) {
-        try {
-          localStorage.setItem(SMARTSCHEDULE_USER_KEY, JSON.stringify(nextUser));
-        } catch {}
+        setStoredUser(nextUser);
       }
       return { user: nextUser };
     });
   },
 
   setTier: (tier: 'FREE' | 'PRO') => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('smartschedule-demo-tier', tier);
+    const storage = getStorage();
+    if (storage) {
+      storage.setItem('smartschedule-demo-tier', tier);
     }
     set((state) => {
       const nextUser = state.user ? { ...state.user, tier } : null;
       if (nextUser) {
-        try {
-          localStorage.setItem(SMARTSCHEDULE_USER_KEY, JSON.stringify(nextUser));
-        } catch {}
+        setStoredUser(nextUser);
       }
       return { user: nextUser };
     });
@@ -328,10 +305,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 if (typeof window !== 'undefined') {
   window.addEventListener('smartschedule:auth-expired', () => {
     clearStoredTokens();
-    localStorage.removeItem(SMARTSCHEDULE_USER_KEY);
+    clearStoredUser();
     useAuthStore.setState({
       user: null,
       status: 'UNAUTHENTICATED',
+      authInitialized: true,
       error: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
     });
   });

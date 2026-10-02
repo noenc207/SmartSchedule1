@@ -71,6 +71,41 @@ export function clearStoredTokens() {
   }
 }
 
+export function getStoredUser<T = any>(): T | null {
+  const storage = getStorage();
+  if (!storage) return null;
+  try {
+    const raw = storage.getItem(SMARTSCHEDULE_USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredUser(user: any): void {
+  const storage = getStorage();
+  if (!storage) return;
+  try {
+    if (user) {
+      storage.setItem(SMARTSCHEDULE_USER_KEY, JSON.stringify(user));
+    } else {
+      storage.removeItem(SMARTSCHEDULE_USER_KEY);
+    }
+  } catch {
+    // ignore storage error
+  }
+}
+
+export function clearStoredUser(): void {
+  const storage = getStorage();
+  if (!storage) return;
+  try {
+    storage.removeItem(SMARTSCHEDULE_USER_KEY);
+  } catch {
+    // ignore storage error
+  }
+}
+
 let accessToken: string | null = getStoredAccessToken();
 let refreshPromise: Promise<string | null> | null = null;
 

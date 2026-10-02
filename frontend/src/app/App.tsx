@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, Component, type ErrorInfo, type ReactNode } from 'react';
 import { NavLink, Navigate, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { LoginPage, RegisterPage } from '../features/auth/AuthPages';
-import { ProtectedRoute, PublicOnlyRoute } from '../routes/AuthRoutes';
+import { ProtectedRoute, PublicOnlyRoute, RootIndexRoute } from '../routes/AuthRoutes';
 import { useAuth } from '../hooks/useAuth';
 import { useAuthStore } from '../stores/authStore';
 import { SchedulesPage } from '../features/schedules/SchedulesPage';
@@ -386,7 +386,8 @@ export default function App() {
         <Route path="/shared/:token" element={<PublicSchedulePage />} />
         <Route path="/smart-plan" element={<Navigate to="/scheduling" replace />} />
         <Route path="/app/calendar" element={<Navigate to="/calendar" replace />} />
-        <Route path="/" element={<LandingPage />} />
+        <Route path="/landing" element={<LandingPage />} />
+        <Route path="/" element={<RootIndexRoute />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
       <ToastContainer />
