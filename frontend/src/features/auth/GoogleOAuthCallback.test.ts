@@ -34,6 +34,7 @@ describe('Google OAuth Integration', () => {
   it('2. Correctly validates genuine Google Cloud Client IDs and rejects placeholders', () => {
     // Valid Google Cloud client IDs
     expect(isRealGoogleClientId('104928374829-d83j4k2m9n1b0v8c7x6z5a4s3d2f1g0h.apps.googleusercontent.com')).toBe(true);
+    expect(isRealGoogleClientId('231472661796-1iegvpdu3jj9s845cbm46imktk73u5ss.apps.googleusercontent.com')).toBe(true);
     expect(isRealGoogleClientId('999999999999-abcdef123456789.apps.googleusercontent.com')).toBe(true);
 
     // Invalid / placeholder / dummy client IDs

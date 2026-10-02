@@ -22,7 +22,7 @@ smartschedule:
     jwt-secret: ${SMARTSCHEDULE_JWT_SECRET}
     secure-cookie: true
     registration-key: ${SMARTSCHEDULE_REGISTRATION_KEY}
-    google-client-id: ${SMARTSCHEDULE_GOOGLE_CLIENT_ID:}
+    google-client-id: ${SMARTSCHEDULE_GOOGLE_CLIENT_ID:231472661796-1iegvpdu3jj9s845cbm46imktk73u5ss.apps.googleusercontent.com}
   plan:
     mode: ${SMARTSCHEDULE_PLAN_MODE:ALL_PRO}
   rate-limit:
