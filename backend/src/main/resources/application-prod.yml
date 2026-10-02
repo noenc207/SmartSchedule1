@@ -38,7 +38,7 @@ smartschedule:
     reminder-delay-ms: ${SMARTSCHEDULE_REMINDER_DELAY_MS:60000}
   ai:
     gemini-api-key: ${GEMINI_API_KEY:}
-    gemini-model: ${GEMINI_MODEL:gemini-1.5-flash}
+    gemini-model: ${GEMINI_MODEL:gemini-3.8-flash}
     max-message-length: ${AI_MAX_MESSAGE_LENGTH:1500}
     max-output-tokens: ${AI_MAX_OUTPUT_TOKENS:1024}
     requests-per-minute: ${AI_REQUESTS_PER_MINUTE:20}
