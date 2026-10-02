@@ -46,6 +46,32 @@ export function LoginPage() {
   const form = useForm<LoginInput>({ resolver: zodResolver(loginSchema), defaultValues: { email: '', password: '' } });
   useEffect(() => clearError(), [clearError]);
 
+  // 1. Check state from OAuth redirect flow
+  useEffect(() => {
+    const state = location.state as { pendingGoogleAuth?: any; error?: string } | null;
+    if (state?.pendingGoogleAuth) {
+      setPendingGoogleAuth(state.pendingGoogleAuth);
+    }
+    if (state?.error) {
+      setSocialNotice(state.error);
+    }
+  }, [location.state]);
+
+  // 2. Check direct URL hash for #id_token=... (if redirect arrived at /login)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash.includes('id_token=')) {
+      const hash = window.location.hash.startsWith('#')
+        ? window.location.hash.substring(1)
+        : window.location.hash;
+      const params = new URLSearchParams(hash);
+      const idToken = params.get('id_token');
+      if (idToken) {
+        window.history.replaceState(null, '', window.location.pathname);
+        void handleGoogleToken(idToken);
+      }
+    }
+  }, []);
+
   const onSubmit = async (values: LoginInput) => {
     try {
       await login(values);

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface SocialAuthButtonsProps {
   onGoogleToken: (idToken: string) => void;
@@ -8,48 +8,118 @@ interface SocialAuthButtonsProps {
 
 export function SocialAuthButtons({ onGoogleToken, isLoading, onNotice }: SocialAuthButtonsProps) {
   const [socialLoading, setSocialLoading] = useState<string | null>(null);
+  const popupRef = useRef<Window | null>(null);
+  const pollTimerRef = useRef<number | null>(null);
 
-  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  const rawClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  // Use configured Client ID or fallback to standard client ID for local dev
+  const clientId = (rawClientId && rawClientId.trim().length > 0)
+    ? rawClientId.trim()
+    : 'smartschedule-preview-client.apps.googleusercontent.com';
+
+  useEffect(() => {
+    // Listen for postMessage from the popup window callback
+    const handleMessage = (event: MessageEvent) => {
+      if (typeof window !== 'undefined' && event.origin !== window.location.origin) return;
+
+      if (event.data?.type === 'GOOGLE_OAUTH_RESPONSE') {
+        if (pollTimerRef.current) {
+          window.clearInterval(pollTimerRef.current);
+          pollTimerRef.current = null;
+        }
+        setSocialLoading(null);
+
+        if (event.data.error) {
+          if (onNotice) {
+            onNotice(`Google sign-in was cancelled or encountered an error.`);
+          }
+        } else if (event.data.idToken) {
+          onGoogleToken(event.data.idToken);
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      if (pollTimerRef.current) {
+        window.clearInterval(pollTimerRef.current);
+      }
+    };
+  }, [onGoogleToken, onNotice]);
 
   const handleGoogleClick = () => {
     if (isLoading || socialLoading) return;
     setSocialLoading('google');
 
-    // 1. If Google Identity Services is available and clientId is configured
-    if (clientId && typeof window !== 'undefined' && (window as any).google?.accounts?.id) {
-      const google = (window as any).google;
-      try {
-        google.accounts.id.initialize({
-          client_id: clientId,
-          callback: (response: { credential: string }) => {
-            setSocialLoading(null);
-            if (response?.credential) {
-              onGoogleToken(response.credential);
-            }
-          },
-        });
-        google.accounts.id.prompt((notification: any) => {
-          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            setSocialLoading(null);
-          }
-        });
-        return;
-      } catch (err) {
-        console.warn('Google Identity Services prompt failed:', err);
-      }
+    if (onNotice) onNotice('');
+
+    // Compute standard redirect URI to official callback route
+    const redirectUri = `${window.location.origin}/auth/google/callback`;
+    const nonce = Math.random().toString(36).substring(2) + Date.now().toString(36);
+    const state = Math.random().toString(36).substring(2);
+
+    try {
+      sessionStorage.setItem('smartschedule_google_nonce', nonce);
+      sessionStorage.setItem('smartschedule_google_state', state);
+    } catch {
+      /* ignore storage errors */
     }
 
-    // 2. In dev/test/demo mode (or when clientId is not yet configured):
-    // Directly initiate Google OAuth identity without rendering any fake in-app picker
-    setTimeout(() => {
-      setSocialLoading(null);
-      // Allows configurable test email in dev, defaulting to standard university student Google email
-      const devEmail = (typeof localStorage !== 'undefined' && localStorage.getItem('smartschedule_google_mock_email'))
-        || 'student.fpt@gmail.com';
-      const sub = 'google-sub-' + Math.abs(hashCode(devEmail));
-      const token = `mock-google-token:${sub}:${devEmail}:FPT Student:https://lh3.googleusercontent.com/a/default`;
-      onGoogleToken(token);
-    }, 400);
+    // Official Google OAuth 2.0 authorization endpoint with prompt=select_account
+    // This strictly directs to https://accounts.google.com/... and enforces Google's real Account Chooser
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: 'id_token',
+      scope: 'openid email profile',
+      prompt: 'select_account',
+      nonce,
+      state,
+    });
+
+    const googleOAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+
+    // On mobile devices, redirect directly in current window for superior mobile UX
+    const isMobile = typeof window !== 'undefined' && window.innerWidth <= 640;
+    if (isMobile) {
+      window.location.href = googleOAuthUrl;
+      return;
+    }
+
+    // On desktop, open a focused, centered popup to accounts.google.com
+    const width = 500;
+    const height = 620;
+    const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - width) / 2));
+    const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - height) / 2));
+
+    const popup = window.open(
+      googleOAuthUrl,
+      'google_account_chooser',
+      `width=${width},height=${height},left=${left},top=${top},status=no,toolbar=no,menubar=no,location=yes,resizable=yes`
+    );
+
+    popupRef.current = popup;
+
+    // If popup was blocked by browser, seamlessly fallback to redirect
+    if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+      window.location.href = googleOAuthUrl;
+      return;
+    }
+
+    popup.focus();
+
+    // Poll to detect if user manually closes the popup window without completing auth
+    if (pollTimerRef.current) window.clearInterval(pollTimerRef.current);
+    pollTimerRef.current = window.setInterval(() => {
+      if (popup.closed) {
+        if (pollTimerRef.current) {
+          window.clearInterval(pollTimerRef.current);
+          pollTimerRef.current = null;
+        }
+        setSocialLoading(null);
+      }
+    }, 600);
   };
 
   const handleUnsupported = (provider: string) => {
@@ -79,7 +149,7 @@ export function SocialAuthButtons({ onGoogleToken, isLoading, onNotice }: Social
             <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
           </svg>
         )}
-        <span>{socialLoading === 'google' ? 'Connecting to Google…' : 'Continue with Google'}</span>
+        <span>{socialLoading === 'google' ? 'Đang mở Google Account Chooser…' : 'Continue with Google'}</span>
       </button>
 
       <button
@@ -109,14 +179,4 @@ export function SocialAuthButtons({ onGoogleToken, isLoading, onNotice }: Social
       </button>
     </div>
   );
-}
-
-function hashCode(str: string): number {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash |= 0;
-  }
-  return hash;
 }

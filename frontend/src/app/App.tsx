@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, Component, type ErrorInfo, type ReactNode } from 'react';
 import { NavLink, Navigate, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { LoginPage, RegisterPage } from '../features/auth/AuthPages';
+import { GoogleOAuthCallback } from '../features/auth/GoogleOAuthCallback';
 import { ProtectedRoute, PublicOnlyRoute, RootIndexRoute } from '../routes/AuthRoutes';
 import { useAuth } from '../hooks/useAuth';
 import { useAuthStore } from '../stores/authStore';
@@ -368,6 +369,7 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
         </Route>
+        <Route path="/auth/google/callback" element={<GoogleOAuthCallback />} />
         <Route element={<ProtectedRoute />}>
           <Route element={<Shell />}>
             <Route path="/dashboard" element={<RouteErrorBoundary><DashboardPage /></RouteErrorBoundary>} />
