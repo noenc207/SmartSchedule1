@@ -29,9 +29,11 @@ export function SocialAuthButtons({ onGoogleToken, isLoading, onNotice }: Social
   const popupRef = useRef<Window | null>(null);
   const pollTimerRef = useRef<number | null>(null);
 
-  // Single canonical source for Google Client ID
+  // Single canonical source for Google Client ID with official project fallback
   const rawClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-  const clientId = rawClientId ? rawClientId.trim() : '';
+  const clientId = (rawClientId && rawClientId.trim().length > 0)
+    ? rawClientId.trim()
+    : '231472661796-1iegvpdu3jj9s845cbm46imktk73u5ss.apps.googleusercontent.com';
 
   useEffect(() => {
     // Listen for postMessage from the popup window callback
