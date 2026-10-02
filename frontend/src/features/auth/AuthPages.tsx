@@ -7,8 +7,8 @@ import { useAuth } from '../../hooks/useAuth';
 import type { LoginInput, RegisterInput } from '../../types/auth';
 import { BrandLogo } from '../../components/BrandLogo';
 import { isDemoMode, isRealMode } from '../../services/demoMode';
-import { GoogleSignInButton } from './GoogleSignInButton';
-import { GoogleRegistrationModal } from './GoogleRegistrationModal';
+import { SocialAuthButtons } from './SocialAuthButtons';
+import { GoogleRegistrationView } from './GoogleRegistrationView';
 import { getApiErrorMessage } from '../../services/apiClient';
 
 export const loginSchema = z.object({
@@ -34,6 +34,7 @@ export function LoginPage() {
   const { login, googleAuth, demoLogin, error, clearError } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [socialNotice, setSocialNotice] = useState<string | null>(null);
   const [pendingGoogleAuth, setPendingGoogleAuth] = useState<{
     idToken: string;
     email: string;
@@ -57,12 +58,15 @@ export function LoginPage() {
   const handleGoogleToken = async (idToken: string) => {
     setGoogleLoading(true);
     setKeyModalError(null);
+    setSocialNotice(null);
     clearError();
     try {
       const res = await googleAuth({ idToken });
       if (res.status === 'AUTHENTICATED') {
+        // CASE B: Existing account -> directly enter Dashboard!
         navigate((location.state as { from?: string } | null)?.from ?? '/dashboard', { replace: true });
       } else if (res.status === 'KEY_REQUIRED') {
+        // CASE A: New account -> transition to Registration Key card
         setPendingGoogleAuth({
           idToken,
           email: res.email || '',
@@ -71,7 +75,7 @@ export function LoginPage() {
         });
       }
     } catch {
-      /* error is set in authStore */
+      /* error is handled in authStore */
     } finally {
       setGoogleLoading(false);
     }
@@ -88,7 +92,7 @@ export function LoginPage() {
       });
       if (res.status === 'AUTHENTICATED') {
         setPendingGoogleAuth(null);
-        navigate((location.state as { from?: string } | null)?.from ?? '/dashboard', { replace: true });
+        navigate('/dashboard', { replace: true });
       }
     } catch (err: any) {
       setKeyModalError(getApiErrorMessage(err));
@@ -97,12 +101,46 @@ export function LoginPage() {
     }
   };
 
+  // If new Google user detected, show the dedicated Create Account screen
+  if (pendingGoogleAuth) {
+    return (
+      <AuthLayout
+        title="Create your SmartSchedule account"
+        subtitle="Registration Key is required only for your first registration."
+      >
+        <GoogleRegistrationView
+          email={pendingGoogleAuth.email}
+          displayName={pendingGoogleAuth.displayName}
+          avatarUrl={pendingGoogleAuth.avatarUrl}
+          isLoading={googleLoading}
+          error={keyModalError}
+          onSubmit={handleKeySubmit}
+          onBack={() => {
+            setPendingGoogleAuth(null);
+            setKeyModalError(null);
+            clearError();
+          }}
+        />
+      </AuthLayout>
+    );
+  }
+
   return (
     <AuthLayout title="Welcome back" subtitle="Sign in to turn your academic commitments into a realistic study plan.">
-      <GoogleSignInButton onTokenReceived={handleGoogleToken} isLoading={googleLoading} />
+      {socialNotice && (
+        <div className="social-notice" role="alert">
+          {socialNotice}
+        </div>
+      )}
+
+      <SocialAuthButtons
+        onGoogleToken={handleGoogleToken}
+        isLoading={googleLoading}
+        onNotice={(msg) => setSocialNotice(msg)}
+      />
 
       <div className="auth-divider">
-        <span>or sign in with email</span>
+        <span>or continue with email</span>
       </div>
 
       <form className="auth-form" onSubmit={form.handleSubmit(onSubmit)} noValidate>
@@ -132,17 +170,6 @@ export function LoginPage() {
       )}
 
       <p className="auth-switch">New to SmartSchedule? <Link to="/register">Create an account</Link></p>
-
-      <GoogleRegistrationModal
-        isOpen={Boolean(pendingGoogleAuth)}
-        email={pendingGoogleAuth?.email || ''}
-        displayName={pendingGoogleAuth?.displayName}
-        avatarUrl={pendingGoogleAuth?.avatarUrl}
-        isLoading={googleLoading}
-        error={keyModalError}
-        onSubmit={handleKeySubmit}
-        onClose={() => setPendingGoogleAuth(null)}
-      />
     </AuthLayout>
   );
 }
@@ -153,6 +180,7 @@ export function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showActivationKey, setShowActivationKey] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [socialNotice, setSocialNotice] = useState<string | null>(null);
   const [pendingGoogleAuth, setPendingGoogleAuth] = useState<{
     idToken: string;
     email: string;
@@ -179,6 +207,7 @@ export function RegisterPage() {
   const handleGoogleToken = async (idToken: string) => {
     setGoogleLoading(true);
     setKeyModalError(null);
+    setSocialNotice(null);
     clearError();
     try {
       const res = await googleAuth({ idToken });
@@ -193,7 +222,7 @@ export function RegisterPage() {
         });
       }
     } catch {
-      /* error is set in authStore */
+      /* error is handled in authStore */
     } finally {
       setGoogleLoading(false);
     }
@@ -219,9 +248,42 @@ export function RegisterPage() {
     }
   };
 
+  if (pendingGoogleAuth) {
+    return (
+      <AuthLayout
+        title="Create your SmartSchedule account"
+        subtitle="Registration Key is required only for your first registration."
+      >
+        <GoogleRegistrationView
+          email={pendingGoogleAuth.email}
+          displayName={pendingGoogleAuth.displayName}
+          avatarUrl={pendingGoogleAuth.avatarUrl}
+          isLoading={googleLoading}
+          error={keyModalError}
+          onSubmit={handleKeySubmit}
+          onBack={() => {
+            setPendingGoogleAuth(null);
+            setKeyModalError(null);
+            clearError();
+          }}
+        />
+      </AuthLayout>
+    );
+  }
+
   return (
     <AuthLayout title="Create your workspace" subtitle="Start with your university timetable, then let the engine find the time.">
-      <GoogleSignInButton onTokenReceived={handleGoogleToken} isLoading={googleLoading} />
+      {socialNotice && (
+        <div className="social-notice" role="alert">
+          {socialNotice}
+        </div>
+      )}
+
+      <SocialAuthButtons
+        onGoogleToken={handleGoogleToken}
+        isLoading={googleLoading}
+        onNotice={(msg) => setSocialNotice(msg)}
+      />
 
       <div className="auth-divider">
         <span>or register with email</span>
@@ -262,17 +324,6 @@ export function RegisterPage() {
         </button>
       </form>
       <p className="auth-switch">Already have an account? <Link to="/login">Sign in</Link></p>
-
-      <GoogleRegistrationModal
-        isOpen={Boolean(pendingGoogleAuth)}
-        email={pendingGoogleAuth?.email || ''}
-        displayName={pendingGoogleAuth?.displayName}
-        avatarUrl={pendingGoogleAuth?.avatarUrl}
-        isLoading={googleLoading}
-        error={keyModalError}
-        onSubmit={handleKeySubmit}
-        onClose={() => setPendingGoogleAuth(null)}
-      />
     </AuthLayout>
   );
 }

@@ -17438,45 +17438,103 @@ body {
 }
 
 /* ==========================================================================
-   Google Quick Sign-Up & Registration Key Modal Styles
+   Modern SaaS Social Auth & Google Registration View Styles
    ========================================================================== */
 
-.google-sign-in-btn {
+.social-auth-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.social-auth-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 12px;
   width: 100%;
-  padding: 11px 16px;
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.social-google-btn {
   background: #ffffff;
   color: #1f2937;
   border: 1px solid #d1d5db;
-  border-radius: 9px;
-  font-size: 14.5px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.google-sign-in-btn:hover:not(:disabled) {
+.social-google-btn:hover:not(:disabled) {
   background: #f9fafb;
   border-color: #9ca3af;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.07);
   transform: translateY(-0.5px);
 }
 
-.google-sign-in-btn:active:not(:disabled) {
-  transform: translateY(0);
+.social-facebook-btn {
+  background: #ffffff;
+  color: #1877f2;
+  border: 1px solid #e2e8f0;
 }
 
-.google-sign-in-btn:disabled {
-  opacity: 0.6;
+.social-facebook-btn:hover:not(:disabled) {
+  background: #f0f7ff;
+  border-color: #93c5fd;
+  transform: translateY(-0.5px);
+}
+
+.social-github-btn {
+  background: #ffffff;
+  color: #24292f;
+  border: 1px solid #e2e8f0;
+}
+
+.social-github-btn:hover:not(:disabled) {
+  background: #f6f8fa;
+  border-color: #d0d7de;
+  transform: translateY(-0.5px);
+}
+
+.social-auth-btn:disabled {
+  opacity: 0.55;
   cursor: not-allowed;
+  transform: none;
 }
 
-.google-icon {
+.social-icon {
   flex-shrink: 0;
+}
+
+.social-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(0, 0, 0, 0.15);
+  border-top-color: #1a73e8;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.social-notice {
+  padding: 10px 14px;
+  background: #fefce8;
+  border: 1px solid #fef08a;
+  border-radius: 9px;
+  color: #854d0e;
+  font-size: 13px;
+  line-height: 1.4;
+  margin-bottom: 16px;
+  animation: fadeIn 0.2s ease-out;
 }
 
 .auth-divider {
@@ -17498,83 +17556,15 @@ body {
   background: var(--border);
 }
 
-.google-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  background: rgba(15, 23, 42, 0.55);
-  backdrop-filter: blur(5px);
-  animation: fadeIn 0.2s ease-out;
+/* ==========================================================================
+   Google Quick Registration View (New Account - No Modal)
+   ========================================================================== */
+
+.google-register-view {
+  animation: fadeIn 0.25s ease-out;
 }
 
-.google-modal-card {
-  width: 100%;
-  max-width: 480px;
-  background: #ffffff;
-  border: 1px solid rgba(226, 232, 240, 0.9);
-  border-radius: 16px;
-  padding: 30px;
-  box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.25);
-  animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.google-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 18px;
-}
-
-.google-modal-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  background: #f0fdf4;
-  color: #16a34a;
-}
-
-.google-modal-close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: transparent;
-  border: none;
-  color: #64748b;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.google-modal-close:hover {
-  background: #f1f5f9;
-  color: #0f172a;
-}
-
-.google-modal-copy h2 {
-  font-size: 21px;
-  font-weight: 700;
-  color: #0f172a;
-  letter-spacing: -0.02em;
-  margin-bottom: 6px;
-}
-
-.google-modal-subtitle {
-  font-size: 13.5px;
-  color: #64748b;
-  line-height: 1.5;
-  margin-bottom: 20px;
-}
-
-.google-account-summary {
+.google-account-banner {
   display: flex;
   align-items: center;
   gap: 14px;
@@ -17582,10 +17572,10 @@ body {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
-  margin-bottom: 20px;
+  margin-bottom: 22px;
 }
 
-.google-avatar-img {
+.google-account-avatar {
   width: 42px;
   height: 42px;
   border-radius: 50%;
@@ -17593,20 +17583,21 @@ body {
   border: 1.5px solid #cbd5e1;
 }
 
-.google-avatar-placeholder {
+.google-account-avatar-placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  background: #e2e8f0;
-  color: #334155;
+  background: #e0e7ff;
+  color: #3730a3;
   font-weight: 700;
   font-size: 18px;
+  flex-shrink: 0;
 }
 
-.google-account-details {
+.google-account-info {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -17616,30 +17607,48 @@ body {
 .google-account-label {
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   font-weight: 700;
   color: #64748b;
 }
 
+.google-account-email-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
 .google-account-email {
-  font-size: 14px;
+  font-size: 14.5px;
   font-weight: 600;
   color: #0f172a;
   word-break: break-all;
 }
 
+.google-verified-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: #dcfce7;
+  color: #15803d;
+  flex-shrink: 0;
+}
+
 .google-account-name {
-  font-size: 12.5px;
+  font-size: 12px;
   color: #64748b;
 }
 
-.google-key-form {
+.google-register-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
 }
 
-.google-key-notice {
+.google-notice-box {
   display: flex;
   align-items: flex-start;
   gap: 8px;
@@ -17653,83 +17662,51 @@ body {
   border-radius: 8px;
 }
 
-.google-key-notice .notice-icon {
+.google-notice-box .notice-icon {
   flex-shrink: 0;
   color: #2563eb;
   margin-top: 2px;
 }
 
-.google-modal-actions {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-  margin-top: 8px;
-}
-
-.google-account-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 18px;
-}
-
-.google-account-option {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.back-to-login-link {
+  display: block;
   width: 100%;
-  padding: 10px 14px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  text-align: left;
+  padding: 8px 0;
+  background: transparent;
+  border: none;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: color 0.15s ease;
 }
 
-.google-account-option:hover {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
-}
-
-.google-account-avatar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: #e8f0fe;
-  color: #1a73e8;
-  font-weight: 700;
-  font-size: 14px;
-  flex-shrink: 0;
-}
-
-.google-account-text {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.google-account-text strong {
-  font-size: 13.5px;
+.back-to-login-link:hover {
   color: #0f172a;
 }
 
-.google-account-text span {
-  font-size: 12px;
-  color: #64748b;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+/* Mobile Optimizations */
+@media (max-width: 640px) {
+  .auth-page {
+    padding: 16px 12px;
+    align-items: flex-start;
+  }
+  .auth-card {
+    width: 100%;
+    padding: 24px 18px;
+    border-radius: 14px;
+    box-shadow: none;
+  }
+  .social-auth-btn {
+    min-height: 46px;
+    font-size: 14.5px;
+  }
+  .google-account-email {
+    font-size: 13.5px;
+  }
 }
 
-.google-custom-email-form {
-  padding-top: 12px;
-  border-top: 1px dashed #e2e8f0;
-}
 
 
 
