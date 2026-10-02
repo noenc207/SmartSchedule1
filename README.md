@@ -39,6 +39,7 @@ Suggest → Explain → Review → User Decides → Confirm → Apply
 - [Collaboration](#collaboration)
 - [3D Landing Page](#3d-landing-page)
 - [Authentication & Security](#authentication--security)
+- [SmartSchedule AI Assistant (Gemini Function Calling)](#smartschedule-ai-assistant-gemini-function-calling)
 - [Performance & Testing](#performance--testing)
 - [Deployment](#deployment)
 - [Repository Structure](#repository-structure)
@@ -256,6 +257,26 @@ SmartSchedule addresses these combined constraints through a deterministic const
 - **In-Browser Preview & Conflict Detection** — Interactive popup preview with warning badges, subject count, and schedule selection
 - **Backend Import API** — `POST /api/v1/schedules/{id}/import/portal` with atomic transaction, conflict resolution, and `schedule_imports` audit trail
 
+### SmartSchedule AI Assistant & Tool Calling
+
+- **Floating Mascot Widget** — Omnipresent assistant (`AIChatWidget.tsx`, `AIChatBubble.tsx`) accessible on any screen without route switching or dedicated tabs
+- **Draggable Bubble with Physics & Snap** — Smooth pointer/touch dragging with automatic viewport boundary constraints and `localStorage` position persistence
+- **Real-Time Streaming SSE** — Server-Sent Events streaming via `POST /api/v1/ai/chat/stream` powered by Google Gemini 1.5 Flash through Spring Boot backend (zero client-side API key leakage)
+- **Deterministic Read Tools (Real DB Data)**:
+  - `get_today_schedule()` — Live timetable retrieval for today in user timezone (`Asia/Ho_Chi_Minh`)
+  - `get_upcoming_schedule(days)` — Multi-day forward schedule retrieval
+  - `find_free_time(duration_minutes, date)` — High-precision free window calculator within active study hours (07:00–22:00)
+  - `check_schedule_conflict(start_time, end_time, exclude_event_id)` — Pre-flight collision checker against committed schedule events
+  - `get_schedule_details(event_id_or_title)` — Event metadata & location lookup
+- **Human-in-the-Loop Write Tools (Zero Auto-Mutation)**:
+  - `create_schedule(title, start_time, end_time, description, location, category)`
+  - `reschedule_event(event_id, new_start_time, new_end_time)`
+  - `update_schedule(event_id, title, start_time, end_time, description, location)`
+  - `delete_schedule(event_id, title)`
+- **Interactive Confirmation Cards (`AIActionCard.tsx`)** — 6-state lifecycle (`PROPOSED`, `CONFIRMED`, `EXECUTING`, `SUCCESS`, `FAILED`, `CANCELLED`) with 15-minute TTL, double-click protection, and real-time toast feedback
+- **Collision Detection & Alternative Finder** — Highlights schedule collisions in an amber/red warning banner and provides 1-click alternative search ("Tìm giờ khác")
+- **Context Injection (`ClientContextDto`)** — Transmits active screen pathname, selected calendar date, and focused event ID to the AI model
+- **One-Click Quick Actions** — Pre-engineered prompts including `[ Tối ưu ngày hôm nay ]` (Optimize my day), `[ Lịch học hôm nay ]`, and `[ Tìm giờ rảnh ]`
 
 ### Landing Page & 3D
 
@@ -308,6 +329,10 @@ SmartSchedule addresses these combined constraints through a deterministic const
 | Framer Motion Animations | ✅ | `AnimatedSection.tsx`, sections | — | — |
 | Dashboard Analytics | ✅ | `DashboardPage.tsx`, cards | Health/Pool endpoints | — |
 | Natural Language Task Input | ✅ | `NlpTaskInput.tsx` | — | — |
+| AI Floating Chat Widget | ✅ | `AIChatWidget.tsx`, `AIChatBubble.tsx` | `AiController.java` | — |
+| Gemini Streaming SSE Chat | ✅ | `aiChatStore.ts`, `AIChatPanel.tsx` | `AiChatService.java`, `GeminiProvider.java` | Google Gemini 1.5 |
+| AI Deterministic Read Tools | ✅ | `AIChatMessages.tsx` | `AiContextService.java` | Google Gemini 1.5 |
+| AI Action Cards (Write Tools + Conflict) | ✅ | `AIActionCard.tsx` | `AiActionService.java` | Google Gemini 1.5 |
 | Optimistic Locking | ✅ | — | `@Version` on entities | — |
 | Docker Compose Deployment | 🟡 | `Dockerfile` | `Dockerfile` | `Dockerfile` |
 | HTTPS / SSL | 🟡 | — | — | — |
@@ -554,12 +579,13 @@ All backend communication flows through `services/apiClient.ts` (Axios instance 
 | Validation | Jakarta Bean Validation | Managed |
 | Build | Maven | 3.9+ |
 
-### Domain Architecture (106 Java Source Files)
+### Domain Architecture (115+ Java Source Files)
 
 The backend follows a strict **modular monolith** pattern with domain-driven package structure:
 
 ```text
 com.smartschedule/
+├── ai/                Google Gemini 1.5 Assistant, function calling, action execution
 ├── auth/              Authentication, JWT, refresh tokens, rate limiting
 ├── availability/      Weekly recurring availability windows
 ├── calendar/          ICS import/export interoperability
@@ -621,7 +647,7 @@ erDiagram
     MOBILITY_ACKNOWLEDGEMENT }o--|| USER : "acknowledged by"
 ```
 
-### Tables (17 JPA Entities)
+### Tables (20 JPA Entities)
 
 | Table | Entity | Key Fields |
 | :--- | :--- | :--- |
@@ -642,6 +668,9 @@ erDiagram
 | `mobility_acknowledgements` | `MobilityAcknowledgement` | id, user_id, event_id, acknowledged_at |
 | `event_occurrence_exceptions` | `EventOccurrenceException` | id, event_id, original_start, overridden_start, cancelled |
 | `scheduling_preferences` | `SchedulingPreferences` | id, schedule_id, preferred_start_time, preferred_end_time, chronotype |
+| `ai_conversations` | `AiConversation` | id, user_id, title, created_at, updated_at |
+| `ai_messages` | `AiMessage` | id, conversation_id, role, content, created_at |
+| `ai_actions` | `AiAction` | id, user_id, conversation_id, tool, status, summary, parameters_json, has_conflict, conflict_details, target_event_id, result_details, error_message, expires_at, confirmed_at, executed_at, created_at |
 
 ### Flyway Migration History
 
@@ -661,6 +690,11 @@ erDiagram
 | V13 | User tier & algorithm | User tier column, algorithm engine fields |
 | V14 | Default tier PRO | Default ALL_PRO for beta deployment |
 | V15 | Production indexing | 13 performance indexes for FK lock prevention and query optimization |
+| V16 | Extension & rules | portal extraction rules and import history tables |
+| V17 | Registration keys & Google OAuth | dynamic registration keys, google_id column, multi-tenant auth |
+| V18 | Social Auth providers | github_id, facebook_id columns and provider indexes |
+| V19 | AI Chat history | ai_conversations, ai_messages tables and conversation indexing |
+| V20 | AI Proposed Actions | ai_actions table for human-in-the-loop tool calling, conflict auditing, and status lifecycle |
 
 ---
 
@@ -865,6 +899,97 @@ flowchart LR
 
 ---
 
+## SmartSchedule AI Assistant (Gemini Function Calling)
+
+SmartSchedule embeds an action-capable, conversational academic assistant powered by **Google Gemini 1.5 Flash**. The assistant appears globally as a floating 3D mascot chat bubble (`AIChatWidget.tsx`) accessible on any screen, requiring no dedicated route or separate page.
+
+### Human-in-the-Loop Architecture
+
+The AI assistant operates under a strict **Human-in-the-Loop** model: **the AI never automatically mutates the calendar database**. When the user asks the assistant to create, update, reschedule, or delete an event, the backend validates constraints, checks for calendar collisions, logs a proposal in `ai_actions`, and renders an interactive **Confirmation Card** for the user to explicitly accept or decline.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User / Student
+    participant Chat as Floating Chat Widget
+    participant Backend as Spring Boot AI Engine
+    participant Gemini as Google Gemini 1.5 API
+    participant DB as PostgreSQL (ai_actions, events)
+
+    User->>Chat: "Reschedule team meeting to tomorrow 2 PM"
+    Chat->>Backend: POST /api/v1/ai/chat/stream + Client Context
+    Backend->>Gemini: Stream Chat + 9 Tool Declarations
+    Gemini-->>Backend: ToolCall: reschedule_event(event_id=..., new_start=..., new_end=...)
+    Backend->>DB: Check Schedule Collisions
+    Backend->>DB: INSERT into ai_actions (Status: PROPOSED, TTL: 15 min)
+    Backend-->>Chat: SSE stream chunk + ProposedActionDto
+    Chat-->>User: Render Interactive Confirmation Card (AIActionCard)
+
+    alt User clicks [ Confirm ]
+        User->>Chat: Click [ Confirm ]
+        Chat->>Backend: POST /api/v1/ai/actions/{actionId}/confirm
+        Backend->>DB: Atomic status transition PROPOSED -> EXECUTING -> SUCCESS
+        Backend->>DB: Execute Event Mutation in Calendar
+        Backend-->>Chat: ActionConfirmResponse (status: SUCCESS)
+        Chat->>User: Toast Alert + Card: "✓ Completed" + Auto-refresh Calendar
+    else User clicks [ Cancel ]
+        User->>Chat: Click [ Cancel ]
+        Chat->>Backend: POST /api/v1/ai/actions/{actionId}/cancel
+        Backend->>DB: Status -> CANCELLED
+        Chat->>User: Card: "Cancelled"
+    end
+```
+
+### Tool Catalog
+
+The AI assistant is equipped with 9 deterministic function declarations:
+
+#### 1. Read Tools (Deterministic Database Inspection)
+
+| Tool | Parameters | Purpose |
+| :--- | :--- | :--- |
+| `get_today_schedule()` | — | Fetches all scheduled classes, workshops, and tasks for today in the user's timezone |
+| `get_upcoming_schedule()` | `days` (integer, default: 7) | Retrieves the agenda for the upcoming week or specified span |
+| `find_free_time()` | `duration_minutes` (int), `date` (ISO date) | Scans 07:00–22:00 to compute available gaps long enough for study or focus work |
+| `check_schedule_conflict()` | `start_time` (ISO), `end_time` (ISO), `exclude_event_id` | Verifies whether a candidate time window overlaps existing calendar events |
+| `get_schedule_details()` | `event_id_or_title` (string) | Looks up full event metadata, room location, and description |
+
+#### 2. Write Tools (Proposed Action Generation)
+
+| Tool | Action Type | Confirmation Required? |
+| :--- | :--- | :---: |
+| `create_schedule()` | Create new calendar event | **Yes** (Generates `PROPOSED` action) |
+| `reschedule_event()` | Move existing event to new time slot | **Yes** (Generates `PROPOSED` action) |
+| `update_schedule()` | Modify title, time, location, or description | **Yes** (Generates `PROPOSED` action) |
+| `delete_schedule()` | Delete existing event | **Yes** (Generates `PROPOSED` action) |
+
+### Interactive Confirmation Card (`AIActionCard.tsx`)
+
+Every write action triggers a rich card embedded within the message bubble with six lifecycle states:
+
+- **`PROPOSED`**: Action is pending user verification. Displays event title, formatted date & time, location, and action buttons (`[ Xác nhận ]` & `[ Hủy ]`). Monitored by a 15-minute TTL countdown.
+- **`CONFIRMED` / `EXECUTING`**: User clicked confirm. The UI enters a loading state with spinner and disables all buttons to prevent double-click duplicate mutations.
+- **`SUCCESS`**: The transaction was applied to PostgreSQL. Green indicator rendered, toast notification dispatched, and `smartschedule:calendar-refresh` event fired to reload the active calendar view instantly.
+- **`FAILED`**: The backend rejected execution (e.g. database error, concurrent modification). Red error message displayed.
+- **`CANCELLED`**: User clicked cancel or revoked the proposal. Gray badge rendered; no database changes made.
+
+### Collision Detection & Alternative Slots
+
+Before proposing a `create_schedule` or `reschedule_event`, the backend automatically scans the user's active calendar:
+- If a collision is detected, `hasConflict` is set to `true`, and `conflictDetails` lists the conflicting event title and hours (e.g. `⚠️ Trùng lịch với: Hội thảo AI (14:00 - 15:30)`).
+- The confirmation card renders a high-visibility warning banner and offers:
+  1. `[ Vẫn tạo / Vẫn dời ]` — Force creation despite the conflict
+  2. `[ Tìm giờ khác ]` — Prompts the AI to automatically run `find_free_time` for non-conflicting slots
+  3. `[ Hủy ]` — Abort the action
+
+### Context Awareness & Security
+
+- **Server-Side Identity Enforcement**: The client never passes `userId` to the AI API. The backend strictly resolves the authenticated user from the Spring Security JWT session.
+- **Client Context (`ClientContextDto`)**: The frontend passes current screen pathname (e.g. `/calendar`), active date on the calendar, selected event, and local browser timezone (`Asia/Ho_Chi_Minh`).
+- **Audit Log & Idempotency**: All proposed actions are persisted in the `ai_actions` table with `expires_at = now() + 15 min`. State transitions are checked atomically (`canExecute()`) to prevent race conditions.
+
+---
+
 ## Performance & Testing
 
 ### Verified Evidence (from Staging Deployment Report)
@@ -950,15 +1075,15 @@ SmartSchedule/
 │   ├── Dockerfile                 Python 3.11-slim container
 │   └── requirements.txt          FastAPI, OR-Tools, Pydantic, pytest
 ├── backend/                       Spring Boot 3.4.4 / Java 21
-│   ├── src/main/java/             106 Java source files across 15 domain modules
-│   ├── src/main/resources/        Configuration, Flyway migrations (V1–V15)
-│   ├── src/test/                  JUnit test suite
+│   ├── src/main/java/             115+ Java source files across 16 domain modules
+│   ├── src/main/resources/        Configuration, Flyway migrations (V1–V20)
+│   ├── src/test/                  JUnit test suite (74+ tests)
 │   ├── Dockerfile                 Multi-stage Maven build → JRE 21 runtime
 │   └── pom.xml                   Maven configuration
 ├── frontend/                      React 19 / TypeScript 5.8 / Vite 6.2
-│   ├── src/features/             12 feature modules
-│   ├── src/services/             18 API service modules
-│   ├── src/stores/               4 Zustand state stores
+│   ├── src/features/             13 feature modules (including ai/)
+│   ├── src/services/             19 API service modules
+│   ├── src/stores/               5 Zustand state stores (including aiChatStore.ts)
 │   ├── src/hooks/                Custom React hooks
 │   ├── public/                   Static assets (3D models, banners, logos)
 │   ├── e2e/                      Playwright end-to-end tests
@@ -1004,6 +1129,9 @@ Key environment variables (see [docs/ENVIRONMENT_CONFIGURATION.md](docs/ENVIRONM
 | `SMARTSCHEDULE_PLAN_MODE` | `ALL_PRO` | `ALL_PRO` for beta, `STANDARD` for tiered access |
 | `SMARTSCHEDULE_CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | Allowed CORS origins |
 | `SMARTSCHEDULE_SECURE_COOKIE` | `true` | HTTPS-only refresh cookies |
+| `GEMINI_API_KEY` | — | Google Gemini API key (**secret**, required for AI assistant) |
+| `GEMINI_MODEL` | `gemini-1.5-flash` | Gemini model variant |
+| `GEMINI_RATE_LIMIT_PER_MINUTE` | `20` | Per-user chat request rate limit |
 | `VITE_API_BASE_URL` | `/api/v1` | Frontend API base path |
 | `VITE_API_MODE` | `real` | `real` for production, bypasses demo fallback |
 
@@ -1120,6 +1248,9 @@ k6 run load-tests/proxy_baseline.js
 - ✅ 3D landing page with scroll-driven storytelling
 - ✅ Dashboard analytics with KPI cards and workload charts
 - ✅ Natural language task input parser
+- ✅ SmartSchedule AI Assistant & Tool Calling (Google Gemini 1.5, 9 Function Calling tools with Human-in-the-Loop Confirmation Cards & Conflict Detection)
+- ✅ Universal Schedule Importer Browser Extension (Chrome/Edge Manifest V3, zero-credential timetable extraction)
+- ✅ Multi-provider Social OAuth (Google, GitHub, Facebook with cross-origin PostMessage preview support)
 - ✅ Docker Compose packaging for all three tiers
 - ✅ Comprehensive test suite (Playwright, Vitest, pytest, k6)
 
@@ -1129,7 +1260,6 @@ k6 run load-tests/proxy_baseline.js
 - ⬜ Mobile native application (React Native)
 - ⬜ Multi-campus routing with real-time transit data
 - ⬜ Calendar synchronization with Google Calendar / Outlook
-- ⬜ AI-powered natural language scheduling ("Schedule my study sessions this week")
 - ⬜ Recurring task templates
 - ⬜ Academic semester templates
 - ⬜ Public API documentation (OpenAPI / Swagger)
