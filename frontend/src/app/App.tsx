@@ -3,6 +3,7 @@ import { NavLink, Navigate, Outlet, Route, Routes, useLocation, useNavigate } fr
 import { LoginPage, RegisterPage } from '../features/auth/AuthPages';
 import { GoogleOAuthCallback } from '../features/auth/GoogleOAuthCallback';
 import { SocialOAuthCallback } from '../features/auth/SocialOAuthCallback';
+import { AIChatWidget } from '../features/ai/AIChatWidget';
 import { ProtectedRoute, PublicOnlyRoute, RootIndexRoute } from '../routes/AuthRoutes';
 import { useAuth } from '../hooks/useAuth';
 import { useAuthStore } from '../stores/authStore';
@@ -396,6 +397,7 @@ export default function App() {
         <Route path="/" element={<RootIndexRoute />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
+      <AIChatWidget />
       <ToastContainer />
     </>
   );
