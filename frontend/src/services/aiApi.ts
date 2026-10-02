@@ -12,6 +12,7 @@ export interface ConversationDto {
   title: string;
   createdAt: string;
   updatedAt: string;
+  messageCount?: number;
 }
 
 export interface ChatResponseDto {
