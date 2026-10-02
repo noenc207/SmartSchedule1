@@ -12,7 +12,16 @@ import {
   getApiErrorMessage,
 } from '../services/apiClient';
 import { isDemoMode, setDemoMode } from '../services/demoMode';
-import type { AuthStatus, GoogleAuthInput, GoogleAuthResponse, LoginInput, RegisterInput, User } from '../types/auth';
+import type {
+  AuthStatus,
+  GoogleAuthInput,
+  GoogleAuthResponse,
+  LoginInput,
+  RegisterInput,
+  SocialAuthInput,
+  SocialAuthResponse,
+  User,
+} from '../types/auth';
 
 function getStorage(): Storage | null {
   try {
@@ -107,6 +116,8 @@ export type AuthState = {
   error: string | null;
   login: (input: LoginInput) => Promise<void>;
   googleAuth: (input: GoogleAuthInput) => Promise<GoogleAuthResponse>;
+  githubAuth: (input: SocialAuthInput) => Promise<SocialAuthResponse>;
+  facebookAuth: (input: SocialAuthInput) => Promise<SocialAuthResponse>;
   demoLogin: () => void;
   exitDemoMode: () => void;
   register: (input: RegisterInput) => Promise<void>;
@@ -133,6 +144,50 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       setDemoMode(false);
       localStorage.removeItem('smartschedule-demo-mode');
       const response = await authApi.googleAuth(input);
+      if (response.status === 'AUTHENTICATED' && response.accessToken) {
+        setStoredTokens(response.accessToken, response.refreshToken);
+        const user = response.user ? { ...response.user, tier: response.user.tier || 'PRO' } : null;
+        if (user) {
+          setStoredUser(user);
+        }
+        set({ user, status: 'AUTHENTICATED', authInitialized: true, error: null });
+      }
+      return response;
+    } catch (error) {
+      const msg = getApiErrorMessage(error);
+      set({ error: msg });
+      throw error;
+    }
+  },
+
+  githubAuth: async (input) => {
+    set({ error: null });
+    try {
+      setDemoMode(false);
+      localStorage.removeItem('smartschedule-demo-mode');
+      const response = await authApi.githubAuth(input);
+      if (response.status === 'AUTHENTICATED' && response.accessToken) {
+        setStoredTokens(response.accessToken, response.refreshToken);
+        const user = response.user ? { ...response.user, tier: response.user.tier || 'PRO' } : null;
+        if (user) {
+          setStoredUser(user);
+        }
+        set({ user, status: 'AUTHENTICATED', authInitialized: true, error: null });
+      }
+      return response;
+    } catch (error) {
+      const msg = getApiErrorMessage(error);
+      set({ error: msg });
+      throw error;
+    }
+  },
+
+  facebookAuth: async (input) => {
+    set({ error: null });
+    try {
+      setDemoMode(false);
+      localStorage.removeItem('smartschedule-demo-mode');
+      const response = await authApi.facebookAuth(input);
       if (response.status === 'AUTHENTICATED' && response.accessToken) {
         setStoredTokens(response.accessToken, response.refreshToken);
         const user = response.user ? { ...response.user, tier: response.user.tier || 'PRO' } : null;

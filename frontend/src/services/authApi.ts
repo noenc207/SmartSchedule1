@@ -1,9 +1,26 @@
 import apiClient, { getStoredRefreshToken } from './apiClient';
-import type { AuthResponse, GoogleAuthInput, GoogleAuthResponse, LoginInput, RegisterInput, User } from '../types/auth';
+import type {
+  AuthResponse,
+  GoogleAuthInput,
+  GoogleAuthResponse,
+  LoginInput,
+  RegisterInput,
+  SocialAuthInput,
+  SocialAuthResponse,
+  User,
+} from '../types/auth';
 
 export const authApi = {
   async googleAuth(input: GoogleAuthInput) {
     const { data } = await apiClient.post<GoogleAuthResponse>('/auth/google', input);
+    return data;
+  },
+  async githubAuth(input: SocialAuthInput) {
+    const { data } = await apiClient.post<SocialAuthResponse>('/auth/github', input);
+    return data;
+  },
+  async facebookAuth(input: SocialAuthInput) {
+    const { data } = await apiClient.post<SocialAuthResponse>('/auth/facebook', input);
     return data;
   },
   async login(input: LoginInput) {

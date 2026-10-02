@@ -10,4 +10,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     boolean existsByEmailIgnoreCaseAndDeletedAtIsNull(String email);
     Optional<User> findByGoogleIdAndDeletedAtIsNull(String googleId);
     boolean existsByGoogleIdAndDeletedAtIsNull(String googleId);
+    Optional<User> findByGithubIdAndDeletedAtIsNull(String githubId);
+    boolean existsByGithubIdAndDeletedAtIsNull(String githubId);
+    Optional<User> findByFacebookIdAndDeletedAtIsNull(String facebookId);
+    boolean existsByFacebookIdAndDeletedAtIsNull(String facebookId);
 }

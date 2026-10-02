@@ -24,6 +24,12 @@ public class User {
     @Column(name = "google_id", unique = true, length = 255)
     private String googleId;
 
+    @Column(name = "github_id", unique = true, length = 255)
+    private String githubId;
+
+    @Column(name = "facebook_id", unique = true, length = 255)
+    private String facebookId;
+
     @Column(name = "auth_provider", nullable = false, length = 32)
     private String authProvider = "LOCAL";
 
@@ -78,6 +84,30 @@ public class User {
         return user;
     }
 
+    public static User createGithubUser(String email, String displayName, String githubId, String avatarUrl) {
+        User user = new User();
+        user.id = UUID.randomUUID();
+        user.email = email;
+        user.displayName = displayName;
+        user.githubId = githubId;
+        user.avatarUrl = avatarUrl;
+        user.authProvider = "GITHUB";
+        user.tier = "PRO";
+        return user;
+    }
+
+    public static User createFacebookUser(String email, String displayName, String facebookId, String avatarUrl) {
+        User user = new User();
+        user.id = UUID.randomUUID();
+        user.email = email;
+        user.displayName = displayName;
+        user.facebookId = facebookId;
+        user.avatarUrl = avatarUrl;
+        user.authProvider = "FACEBOOK";
+        user.tier = "PRO";
+        return user;
+    }
+
     @PrePersist
     void onCreate() {
         Instant now = Instant.now();
@@ -106,6 +136,10 @@ public class User {
     public Instant getDeletedAt() { return deletedAt; }
     public String getGoogleId() { return googleId; }
     public void setGoogleId(String googleId) { this.googleId = googleId; }
+    public String getGithubId() { return githubId; }
+    public void setGithubId(String githubId) { this.githubId = githubId; }
+    public String getFacebookId() { return facebookId; }
+    public void setFacebookId(String facebookId) { this.facebookId = facebookId; }
     public String getAuthProvider() { return authProvider; }
     public void setAuthProvider(String authProvider) { this.authProvider = authProvider; }
 

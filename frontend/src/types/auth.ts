@@ -31,6 +31,8 @@ export type RegisterInput = {
   activationKey: string;
 };
 
+export type SocialProvider = 'GOOGLE' | 'GITHUB' | 'FACEBOOK';
+
 export type GoogleAuthInput = {
   idToken: string;
   registrationKey?: string;
@@ -46,3 +48,24 @@ export type GoogleAuthResponse = {
   displayName?: string;
   avatarUrl?: string;
 };
+
+export type SocialAuthInput = {
+  idToken?: string;
+  code?: string;
+  accessToken?: string;
+  registrationKey?: string;
+  provider?: SocialProvider;
+};
+
+export type SocialAuthResponse = {
+  status: 'AUTHENTICATED' | 'KEY_REQUIRED';
+  provider?: SocialProvider | string;
+  accessToken?: string;
+  expiresIn?: number;
+  user?: User;
+  refreshToken?: string;
+  email?: string;
+  displayName?: string;
+  avatarUrl?: string;
+};
+

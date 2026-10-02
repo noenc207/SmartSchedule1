@@ -34,6 +34,10 @@ smartschedule:
     secure-cookie: ${SMARTSCHEDULE_SECURE_COOKIE:false}
     registration-key: ${SMARTSCHEDULE_REGISTRATION_KEY:SMART-DEPLOY-2026}
     google-client-id: ${SMARTSCHEDULE_GOOGLE_CLIENT_ID:231472661796-1iegvpdu3jj9s845cbm46imktk73u5ss.apps.googleusercontent.com}
+    github-client-id: ${SMARTSCHEDULE_GITHUB_CLIENT_ID:Ov23liGithubPreviewClientId}
+    github-client-secret: ${SMARTSCHEDULE_GITHUB_CLIENT_SECRET:}
+    facebook-app-id: ${SMARTSCHEDULE_FACEBOOK_APP_ID:123456789012345}
+    facebook-app-secret: ${SMARTSCHEDULE_FACEBOOK_APP_SECRET:}
   plan:
     mode: ${SMARTSCHEDULE_PLAN_MODE:ALL_PRO}
   rate-limit:

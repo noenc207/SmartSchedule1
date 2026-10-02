@@ -12,12 +12,17 @@ public record AuthProperties(
         String refreshCookieName,
         boolean secureCookie,
         String registrationKey,
-        String googleClientId) {
+        String googleClientId,
+        String githubClientId,
+        String githubClientSecret,
+        String facebookAppId,
+        String facebookAppSecret) {
 
     @ConstructorBinding
     public AuthProperties(String jwtSecret, Duration accessTokenTtl, Duration refreshTokenTtl,
                           String refreshCookieName, boolean secureCookie, String registrationKey,
-                          String googleClientId) {
+                          String googleClientId, String githubClientId, String githubClientSecret,
+                          String facebookAppId, String facebookAppSecret) {
         this.jwtSecret = jwtSecret;
         this.accessTokenTtl = accessTokenTtl;
         this.refreshTokenTtl = refreshTokenTtl;
@@ -25,6 +30,17 @@ public record AuthProperties(
         this.secureCookie = secureCookie;
         this.registrationKey = registrationKey;
         this.googleClientId = googleClientId != null ? googleClientId : "";
+        this.githubClientId = githubClientId != null ? githubClientId : "";
+        this.githubClientSecret = githubClientSecret != null ? githubClientSecret : "";
+        this.facebookAppId = facebookAppId != null ? facebookAppId : "";
+        this.facebookAppSecret = facebookAppSecret != null ? facebookAppSecret : "";
+    }
+
+    public AuthProperties(String jwtSecret, Duration accessTokenTtl, Duration refreshTokenTtl,
+                          String refreshCookieName, boolean secureCookie, String registrationKey,
+                          String googleClientId) {
+        this(jwtSecret, accessTokenTtl, refreshTokenTtl, refreshCookieName, secureCookie, registrationKey,
+                googleClientId, "", "", "", "");
     }
 
     public AuthProperties(String jwtSecret, Duration accessTokenTtl, Duration refreshTokenTtl,

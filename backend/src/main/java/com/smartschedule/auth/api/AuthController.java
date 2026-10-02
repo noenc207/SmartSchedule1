@@ -57,6 +57,26 @@ public class AuthController {
         return result.response();
     }
 
+    @PostMapping("/github")
+    public AuthDtos.SocialAuthResponse githubAuth(@Valid @RequestBody AuthDtos.SocialAuthRequest request,
+                                                  HttpServletRequest httpRequest, HttpServletResponse response) {
+        AuthService.SocialAuthResult result = authService.authenticateWithGithub(request, userAgent(httpRequest), httpRequest.getRemoteAddr());
+        if (!result.requiresKey() && result.rawRefreshToken() != null) {
+            setRefreshCookie(response, result.rawRefreshToken());
+        }
+        return result.response();
+    }
+
+    @PostMapping("/facebook")
+    public AuthDtos.SocialAuthResponse facebookAuth(@Valid @RequestBody AuthDtos.SocialAuthRequest request,
+                                                    HttpServletRequest httpRequest, HttpServletResponse response) {
+        AuthService.SocialAuthResult result = authService.authenticateWithFacebook(request, userAgent(httpRequest), httpRequest.getRemoteAddr());
+        if (!result.requiresKey() && result.rawRefreshToken() != null) {
+            setRefreshCookie(response, result.rawRefreshToken());
+        }
+        return result.response();
+    }
+
     @PostMapping("/refresh")
     public AuthDtos.AuthResponse refresh(@RequestBody(required = false) AuthDtos.RefreshRequest body,
                                          HttpServletRequest request, HttpServletResponse response) {

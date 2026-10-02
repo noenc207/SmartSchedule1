@@ -1,7 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
+import type { SocialProvider } from '../../types/auth';
 
-interface SocialAuthButtonsProps {
+export interface SocialAuthPayload {
+  provider: SocialProvider;
+  code?: string;
+  accessToken?: string;
+  idToken?: string;
+}
+
+export interface SocialAuthButtonsProps {
   onGoogleToken: (idToken: string) => void;
+  onSocialAuth?: (auth: SocialAuthPayload) => void;
   isLoading: boolean;
   onNotice?: (message: string) => void;
 }
@@ -24,35 +33,75 @@ export function isRealGoogleClientId(clientId?: string): boolean {
   return /^\d+-[a-zA-Z0-9_-]+\.apps\.googleusercontent\.com$/.test(trimmed);
 }
 
-export function SocialAuthButtons({ onGoogleToken, isLoading, onNotice }: SocialAuthButtonsProps) {
+export function SocialAuthButtons({
+  onGoogleToken,
+  onSocialAuth,
+  isLoading,
+  onNotice,
+}: SocialAuthButtonsProps) {
   const [socialLoading, setSocialLoading] = useState<string | null>(null);
   const popupRef = useRef<Window | null>(null);
   const pollTimerRef = useRef<number | null>(null);
 
   // Single canonical source for Google Client ID with official project fallback
   const rawClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-  const clientId = (rawClientId && rawClientId.trim().length > 0)
+  const googleClientId = (rawClientId && rawClientId.trim().length > 0)
     ? rawClientId.trim()
     : '231472661796-1iegvpdu3jj9s845cbm46imktk73u5ss.apps.googleusercontent.com';
+
+  const rawGithubClientId = import.meta.env.VITE_GITHUB_CLIENT_ID;
+  const githubClientId = (rawGithubClientId && rawGithubClientId.trim().length > 0)
+    ? rawGithubClientId.trim()
+    : 'Ov23liGithubPreviewClientId';
+
+  const rawFacebookAppId = import.meta.env.VITE_FACEBOOK_APP_ID;
+  const facebookAppId = (rawFacebookAppId && rawFacebookAppId.trim().length > 0)
+    ? rawFacebookAppId.trim()
+    : '123456789012345';
 
   useEffect(() => {
     // Listen for postMessage from the popup window callback
     const handleMessage = (event: MessageEvent) => {
       if (typeof window !== 'undefined' && event.origin !== window.location.origin) return;
 
-      if (event.data?.type === 'GOOGLE_OAUTH_RESPONSE') {
+      if (event.data?.type === 'SOCIAL_OAUTH_RESPONSE' || event.data?.type === 'GOOGLE_OAUTH_RESPONSE') {
         if (pollTimerRef.current) {
           window.clearInterval(pollTimerRef.current);
           pollTimerRef.current = null;
         }
         setSocialLoading(null);
 
+        const provider: SocialProvider = (event.data.provider ||
+          (event.data.type === 'GOOGLE_OAUTH_RESPONSE' ? 'GOOGLE' : 'GOOGLE')) as SocialProvider;
+
         if (event.data.error) {
           if (onNotice) {
-            onNotice(`Google sign-in was cancelled or encountered an error.`);
+            onNotice(`${provider} sign-in was cancelled or encountered an error.`);
           }
-        } else if (event.data.idToken) {
+          return;
+        }
+
+        if (provider === 'GOOGLE' && event.data.idToken) {
           onGoogleToken(event.data.idToken);
+          if (onSocialAuth) {
+            onSocialAuth({ provider: 'GOOGLE', idToken: event.data.idToken });
+          }
+        } else if (provider === 'GITHUB') {
+          if (onSocialAuth) {
+            onSocialAuth({
+              provider: 'GITHUB',
+              code: event.data.code,
+              accessToken: event.data.accessToken,
+            });
+          }
+        } else if (provider === 'FACEBOOK') {
+          if (onSocialAuth) {
+            onSocialAuth({
+              provider: 'FACEBOOK',
+              accessToken: event.data.accessToken,
+              code: event.data.code,
+            });
+          }
         }
       }
     };
@@ -64,80 +113,34 @@ export function SocialAuthButtons({ onGoogleToken, isLoading, onNotice }: Social
         window.clearInterval(pollTimerRef.current);
       }
     };
-  }, [onGoogleToken, onNotice]);
+  }, [onGoogleToken, onSocialAuth, onNotice]);
 
-  const handleGoogleClick = () => {
-    if (isLoading || socialLoading) return;
-
-    // Validate that a real, registered Google Cloud Client ID is configured
-    if (!clientId || !isRealGoogleClientId(clientId)) {
-      if (onNotice) {
-        onNotice(
-          'Google OAuth Client ID chưa được cấu hình. Vui lòng thiết lập VITE_GOOGLE_CLIENT_ID (dạng <project-number>-<hash>.apps.googleusercontent.com) trong frontend/.env từ Google Cloud Console.'
-        );
-      }
-      return;
-    }
-
-    setSocialLoading('google');
-    if (onNotice) onNotice('');
-
-    // Compute standard redirect URI to official callback route
-    const redirectUri = `${window.location.origin}/auth/google/callback`;
-    const nonce = Math.random().toString(36).substring(2) + Date.now().toString(36);
-    const state = Math.random().toString(36).substring(2);
-
-    try {
-      sessionStorage.setItem('smartschedule_google_nonce', nonce);
-      sessionStorage.setItem('smartschedule_google_state', state);
-    } catch {
-      /* ignore storage errors */
-    }
-
-    // Official Google OAuth 2.0 authorization endpoint with prompt=select_account
-    // This strictly directs to https://accounts.google.com/... and enforces Google's real Account Chooser
-    const params = new URLSearchParams({
-      client_id: clientId,
-      redirect_uri: redirectUri,
-      response_type: 'id_token',
-      scope: 'openid email profile',
-      prompt: 'select_account',
-      nonce,
-      state,
-    });
-
-    const googleOAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
-
-    // On mobile devices, redirect directly in current window for superior mobile UX
+  const openOAuthWindow = (url: string, targetName: string, width = 500, height = 650) => {
+    // On mobile devices, redirect directly in current window
     const isMobile = typeof window !== 'undefined' && window.innerWidth <= 640;
     if (isMobile) {
-      window.location.href = googleOAuthUrl;
+      window.location.href = url;
       return;
     }
 
-    // On desktop, open a focused, centered popup to accounts.google.com
-    const width = 500;
-    const height = 620;
     const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - width) / 2));
     const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - height) / 2));
 
     const popup = window.open(
-      googleOAuthUrl,
-      'google_account_chooser',
+      url,
+      targetName,
       `width=${width},height=${height},left=${left},top=${top},status=no,toolbar=no,menubar=no,location=yes,resizable=yes`
     );
 
     popupRef.current = popup;
 
-    // If popup was blocked by browser, seamlessly fallback to redirect
     if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-      window.location.href = googleOAuthUrl;
+      window.location.href = url;
       return;
     }
 
     popup.focus();
 
-    // Poll to detect if user manually closes the popup window without completing auth
     if (pollTimerRef.current) window.clearInterval(pollTimerRef.current);
     pollTimerRef.current = window.setInterval(() => {
       if (popup.closed) {
@@ -150,10 +153,106 @@ export function SocialAuthButtons({ onGoogleToken, isLoading, onNotice }: Social
     }, 600);
   };
 
-  const handleUnsupported = (provider: string) => {
-    if (onNotice) {
-      onNotice(`Đăng nhập qua ${provider} đang được phát triển và sẽ sớm ra mắt.`);
+  const handleGoogleClick = () => {
+    if (isLoading || socialLoading) return;
+
+    if (!googleClientId || !isRealGoogleClientId(googleClientId)) {
+      if (onNotice) {
+        onNotice(
+          'Google OAuth Client ID chưa được cấu hình. Vui lòng thiết lập VITE_GOOGLE_CLIENT_ID (dạng <project-number>-<hash>.apps.googleusercontent.com) trong frontend/.env từ Google Cloud Console.'
+        );
+      }
+      return;
     }
+
+    setSocialLoading('google');
+    if (onNotice) onNotice('');
+
+    const rawRedirectUri = import.meta.env.VITE_GOOGLE_REDIRECT_URI;
+    const redirectUri = (rawRedirectUri && rawRedirectUri.trim().length > 0)
+      ? rawRedirectUri.trim()
+      : `${window.location.origin}/auth/google/callback`;
+    const nonce = Math.random().toString(36).substring(2) + Date.now().toString(36);
+    const state = Math.random().toString(36).substring(2);
+
+    try {
+      sessionStorage.setItem('smartschedule_google_nonce', nonce);
+      sessionStorage.setItem('smartschedule_google_state', state);
+    } catch {
+      /* ignore storage errors */
+    }
+
+    const params = new URLSearchParams({
+      client_id: googleClientId,
+      redirect_uri: redirectUri,
+      response_type: 'id_token',
+      scope: 'openid email profile',
+      prompt: 'select_account',
+      nonce,
+      state,
+    });
+
+    const googleOAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+    openOAuthWindow(googleOAuthUrl, 'google_account_chooser', 500, 620);
+  };
+
+  const handleGithubClick = () => {
+    if (isLoading || socialLoading) return;
+
+    setSocialLoading('github');
+    if (onNotice) onNotice('');
+
+    const rawRedirectUri = import.meta.env.VITE_GITHUB_REDIRECT_URI;
+    const redirectUri = (rawRedirectUri && rawRedirectUri.trim().length > 0)
+      ? rawRedirectUri.trim()
+      : `${window.location.origin}/auth/github/callback`;
+    const state = Math.random().toString(36).substring(2);
+
+    try {
+      sessionStorage.setItem('smartschedule_github_state', state);
+    } catch {
+      /* ignore storage errors */
+    }
+
+    const params = new URLSearchParams({
+      client_id: githubClientId,
+      redirect_uri: redirectUri,
+      scope: 'read:user user:email',
+      state,
+    });
+
+    const githubOAuthUrl = `https://github.com/login/oauth/authorize?${params.toString()}`;
+    openOAuthWindow(githubOAuthUrl, 'github_oauth_popup', 520, 650);
+  };
+
+  const handleFacebookClick = () => {
+    if (isLoading || socialLoading) return;
+
+    setSocialLoading('facebook');
+    if (onNotice) onNotice('');
+
+    const rawRedirectUri = import.meta.env.VITE_FACEBOOK_REDIRECT_URI;
+    const redirectUri = (rawRedirectUri && rawRedirectUri.trim().length > 0)
+      ? rawRedirectUri.trim()
+      : `${window.location.origin}/auth/facebook/callback`;
+    const state = Math.random().toString(36).substring(2);
+
+    try {
+      sessionStorage.setItem('smartschedule_facebook_state', state);
+    } catch {
+      /* ignore storage errors */
+    }
+
+    const params = new URLSearchParams({
+      client_id: facebookAppId,
+      redirect_uri: redirectUri,
+      response_type: 'token',
+      scope: 'email,public_profile',
+      state,
+    });
+
+    const facebookOAuthUrl = `https://www.facebook.com/v19.0/dialog/oauth?${params.toString()}`;
+    openOAuthWindow(facebookOAuthUrl, 'facebook_oauth_popup', 540, 650);
   };
 
   const isBusy = isLoading || Boolean(socialLoading);
@@ -183,27 +282,35 @@ export function SocialAuthButtons({ onGoogleToken, isLoading, onNotice }: Social
       <button
         type="button"
         className="social-auth-btn social-facebook-btn"
-        onClick={() => handleUnsupported('Facebook')}
+        onClick={handleFacebookClick}
         disabled={isBusy}
         aria-label="Continue with Facebook"
       >
-        <svg className="social-icon" width="18" height="18" viewBox="0 0 24 24" fill="#1877F2" aria-hidden="true">
-          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-        </svg>
-        <span>Continue with Facebook</span>
+        {socialLoading === 'facebook' ? (
+          <span className="social-spinner" />
+        ) : (
+          <svg className="social-icon" width="18" height="18" viewBox="0 0 24 24" fill="#1877F2" aria-hidden="true">
+            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+          </svg>
+        )}
+        <span>{socialLoading === 'facebook' ? 'Đang mở Facebook Login…' : 'Continue with Facebook'}</span>
       </button>
 
       <button
         type="button"
         className="social-auth-btn social-github-btn"
-        onClick={() => handleUnsupported('GitHub')}
+        onClick={handleGithubClick}
         disabled={isBusy}
         aria-label="Continue with GitHub"
       >
-        <svg className="social-icon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
-        </svg>
-        <span>Continue with GitHub</span>
+        {socialLoading === 'github' ? (
+          <span className="social-spinner" />
+        ) : (
+          <svg className="social-icon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+          </svg>
+        )}
+        <span>{socialLoading === 'github' ? 'Đang mở GitHub Login…' : 'Continue with GitHub'}</span>
       </button>
     </div>
   );

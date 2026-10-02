@@ -69,6 +69,52 @@ public final class AuthDtos {
         }
     }
 
+    public record SocialAuthRequest(
+            String idToken,
+            String code,
+            String accessToken,
+            String registrationKey) {}
+
+    public record SocialAuthResponse(
+            String status, // "AUTHENTICATED" or "KEY_REQUIRED"
+            String provider, // "GOOGLE", "GITHUB", "FACEBOOK"
+            String accessToken,
+            Long expiresIn,
+            UserResponse user,
+            String refreshToken,
+            String email,
+            String displayName,
+            String avatarUrl) {
+
+        public static SocialAuthResponse authenticated(AuthResponse auth, String provider) {
+            return new SocialAuthResponse(
+                    "AUTHENTICATED",
+                    provider,
+                    auth.accessToken(),
+                    auth.expiresIn(),
+                    auth.user(),
+                    auth.refreshToken(),
+                    auth.user() != null ? auth.user().email() : null,
+                    auth.user() != null ? auth.user().displayName() : null,
+                    auth.user() != null ? auth.user().avatarUrl() : null
+            );
+        }
+
+        public static SocialAuthResponse keyRequired(String email, String displayName, String avatarUrl, String provider) {
+            return new SocialAuthResponse(
+                    "KEY_REQUIRED",
+                    provider,
+                    null,
+                    null,
+                    null,
+                    null,
+                    email,
+                    displayName,
+                    avatarUrl
+            );
+        }
+    }
+
     public record UserResponse(
             UUID id, String email, String displayName, String avatarUrl,
             boolean enabled, String timezone, String locale, Instant createdAt, String tier) {

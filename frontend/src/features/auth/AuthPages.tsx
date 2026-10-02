@@ -4,11 +4,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { useAuth } from '../../hooks/useAuth';
-import type { LoginInput, RegisterInput } from '../../types/auth';
+import type { LoginInput, RegisterInput, SocialProvider } from '../../types/auth';
 import { BrandLogo } from '../../components/BrandLogo';
 import { isDemoMode, isRealMode } from '../../services/demoMode';
-import { SocialAuthButtons } from './SocialAuthButtons';
-import { GoogleRegistrationView } from './GoogleRegistrationView';
+import { SocialAuthButtons, type SocialAuthPayload } from './SocialAuthButtons';
+import { SocialRegistrationView } from './GoogleRegistrationView';
 import { getApiErrorMessage } from '../../services/apiClient';
 
 export const loginSchema = z.object({
@@ -28,19 +28,24 @@ export const registerSchema = z.object({
   path: ['confirmPassword'], message: 'Passwords do not match.',
 });
 
+interface PendingSocialAuthState {
+  provider: SocialProvider;
+  idToken?: string;
+  code?: string;
+  accessToken?: string;
+  email: string;
+  displayName?: string;
+  avatarUrl?: string;
+}
+
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, googleAuth, demoLogin, error, clearError } = useAuth();
+  const { login, googleAuth, githubAuth, facebookAuth, demoLogin, error, clearError } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
+  const [socialLoading, setSocialLoading] = useState(false);
   const [socialNotice, setSocialNotice] = useState<string | null>(null);
-  const [pendingGoogleAuth, setPendingGoogleAuth] = useState<{
-    idToken: string;
-    email: string;
-    displayName?: string;
-    avatarUrl?: string;
-  } | null>(null);
+  const [pendingSocialAuth, setPendingSocialAuth] = useState<PendingSocialAuthState | null>(null);
   const [keyModalError, setKeyModalError] = useState<string | null>(null);
 
   const form = useForm<LoginInput>({ resolver: zodResolver(loginSchema), defaultValues: { email: '', password: '' } });
@@ -48,9 +53,19 @@ export function LoginPage() {
 
   // 1. Check state from OAuth redirect flow
   useEffect(() => {
-    const state = location.state as { pendingGoogleAuth?: any; error?: string } | null;
-    if (state?.pendingGoogleAuth) {
-      setPendingGoogleAuth(state.pendingGoogleAuth);
+    const state = location.state as {
+      pendingSocialAuth?: PendingSocialAuthState;
+      pendingGoogleAuth?: any;
+      error?: string;
+    } | null;
+
+    if (state?.pendingSocialAuth) {
+      setPendingSocialAuth(state.pendingSocialAuth);
+    } else if (state?.pendingGoogleAuth) {
+      setPendingSocialAuth({
+        provider: 'GOOGLE',
+        ...state.pendingGoogleAuth,
+      });
     }
     if (state?.error) {
       setSocialNotice(state.error);
@@ -67,7 +82,7 @@ export function LoginPage() {
       const idToken = params.get('id_token');
       if (idToken) {
         window.history.replaceState(null, '', window.location.pathname);
-        void handleGoogleToken(idToken);
+        void handleSocialAuth({ provider: 'GOOGLE', idToken });
       }
     }
   }, []);
@@ -81,20 +96,33 @@ export function LoginPage() {
     }
   };
 
-  const handleGoogleToken = async (idToken: string) => {
-    setGoogleLoading(true);
+  const handleSocialAuth = async (auth: SocialAuthPayload) => {
+    setSocialLoading(true);
     setKeyModalError(null);
     setSocialNotice(null);
     clearError();
     try {
-      const res = await googleAuth({ idToken });
+      let res: any;
+      if (auth.provider === 'GOOGLE' && auth.idToken) {
+        res = await googleAuth({ idToken: auth.idToken });
+      } else if (auth.provider === 'GITHUB') {
+        res = await githubAuth({ code: auth.code, accessToken: auth.accessToken });
+      } else if (auth.provider === 'FACEBOOK') {
+        res = await facebookAuth({ accessToken: auth.accessToken, code: auth.code });
+      } else {
+        throw new Error('Unsupported authentication provider.');
+      }
+
       if (res.status === 'AUTHENTICATED') {
-        // CASE B: Existing account -> directly enter Dashboard!
+        // CASE: Existing social account -> directly enter Dashboard!
         navigate((location.state as { from?: string } | null)?.from ?? '/dashboard', { replace: true });
       } else if (res.status === 'KEY_REQUIRED') {
-        // CASE A: New account -> transition to Registration Key card
-        setPendingGoogleAuth({
-          idToken,
+        // CASE: First time social sign up -> require Registration Key
+        setPendingSocialAuth({
+          provider: auth.provider,
+          idToken: auth.idToken,
+          code: auth.code,
+          accessToken: auth.accessToken,
           email: res.email || '',
           displayName: res.displayName,
           avatarUrl: res.avatarUrl,
@@ -103,46 +131,66 @@ export function LoginPage() {
     } catch {
       /* error is handled in authStore */
     } finally {
-      setGoogleLoading(false);
+      setSocialLoading(false);
     }
   };
 
+  const handleGoogleToken = async (idToken: string) => {
+    await handleSocialAuth({ provider: 'GOOGLE', idToken });
+  };
+
   const handleKeySubmit = async (registrationKey: string) => {
-    if (!pendingGoogleAuth) return;
-    setGoogleLoading(true);
+    if (!pendingSocialAuth) return;
+    setSocialLoading(true);
     setKeyModalError(null);
     try {
-      const res = await googleAuth({
-        idToken: pendingGoogleAuth.idToken,
-        registrationKey,
-      });
-      if (res.status === 'AUTHENTICATED') {
-        setPendingGoogleAuth(null);
+      let res: any;
+      if (pendingSocialAuth.provider === 'GOOGLE') {
+        res = await googleAuth({
+          idToken: pendingSocialAuth.idToken!,
+          registrationKey,
+        });
+      } else if (pendingSocialAuth.provider === 'GITHUB') {
+        res = await githubAuth({
+          code: pendingSocialAuth.code,
+          accessToken: pendingSocialAuth.accessToken,
+          registrationKey,
+        });
+      } else if (pendingSocialAuth.provider === 'FACEBOOK') {
+        res = await facebookAuth({
+          accessToken: pendingSocialAuth.accessToken,
+          code: pendingSocialAuth.code,
+          registrationKey,
+        });
+      }
+      if (res?.status === 'AUTHENTICATED') {
+        setPendingSocialAuth(null);
         navigate('/dashboard', { replace: true });
       }
     } catch (err: any) {
       setKeyModalError(getApiErrorMessage(err));
     } finally {
-      setGoogleLoading(false);
+      setSocialLoading(false);
     }
   };
 
-  // If new Google user detected, show the dedicated Create Account screen
-  if (pendingGoogleAuth) {
+  // If new social user detected, show the dedicated Create Account screen
+  if (pendingSocialAuth) {
     return (
       <AuthLayout
         title="Create your SmartSchedule account"
         subtitle="Registration Key is required only for your first registration."
       >
-        <GoogleRegistrationView
-          email={pendingGoogleAuth.email}
-          displayName={pendingGoogleAuth.displayName}
-          avatarUrl={pendingGoogleAuth.avatarUrl}
-          isLoading={googleLoading}
+        <SocialRegistrationView
+          provider={pendingSocialAuth.provider}
+          email={pendingSocialAuth.email}
+          displayName={pendingSocialAuth.displayName}
+          avatarUrl={pendingSocialAuth.avatarUrl}
+          isLoading={socialLoading}
           error={keyModalError}
           onSubmit={handleKeySubmit}
           onBack={() => {
-            setPendingGoogleAuth(null);
+            setPendingSocialAuth(null);
             setKeyModalError(null);
             clearError();
           }}
@@ -161,7 +209,8 @@ export function LoginPage() {
 
       <SocialAuthButtons
         onGoogleToken={handleGoogleToken}
-        isLoading={googleLoading}
+        onSocialAuth={handleSocialAuth}
+        isLoading={socialLoading}
         onNotice={(msg) => setSocialNotice(msg)}
       />
 
@@ -180,7 +229,7 @@ export function LoginPage() {
           </div>
         </Field>
         {error && <div className="form-error" role="alert">{error}</div>}
-        <button className="primary-button auth-submit" disabled={form.formState.isSubmitting || googleLoading}>
+        <button className="primary-button auth-submit" disabled={form.formState.isSubmitting || socialLoading}>
           {form.formState.isSubmitting ? 'Signing in…' : 'Sign in'}
         </button>
       </form>
@@ -202,17 +251,12 @@ export function LoginPage() {
 
 export function RegisterPage() {
   const navigate = useNavigate();
-  const { register, googleAuth, error, clearError } = useAuth();
+  const { register, googleAuth, githubAuth, facebookAuth, error, clearError } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showActivationKey, setShowActivationKey] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
+  const [socialLoading, setSocialLoading] = useState(false);
   const [socialNotice, setSocialNotice] = useState<string | null>(null);
-  const [pendingGoogleAuth, setPendingGoogleAuth] = useState<{
-    idToken: string;
-    email: string;
-    displayName?: string;
-    avatarUrl?: string;
-  } | null>(null);
+  const [pendingSocialAuth, setPendingSocialAuth] = useState<PendingSocialAuthState | null>(null);
   const [keyModalError, setKeyModalError] = useState<string | null>(null);
 
   const form = useForm<RegisterInput & { confirmPassword: string }>({
@@ -230,18 +274,31 @@ export function RegisterPage() {
     }
   };
 
-  const handleGoogleToken = async (idToken: string) => {
-    setGoogleLoading(true);
+  const handleSocialAuth = async (auth: SocialAuthPayload) => {
+    setSocialLoading(true);
     setKeyModalError(null);
     setSocialNotice(null);
     clearError();
     try {
-      const res = await googleAuth({ idToken });
+      let res: any;
+      if (auth.provider === 'GOOGLE' && auth.idToken) {
+        res = await googleAuth({ idToken: auth.idToken });
+      } else if (auth.provider === 'GITHUB') {
+        res = await githubAuth({ code: auth.code, accessToken: auth.accessToken });
+      } else if (auth.provider === 'FACEBOOK') {
+        res = await facebookAuth({ accessToken: auth.accessToken, code: auth.code });
+      } else {
+        throw new Error('Unsupported authentication provider.');
+      }
+
       if (res.status === 'AUTHENTICATED') {
         navigate('/dashboard', { replace: true });
       } else if (res.status === 'KEY_REQUIRED') {
-        setPendingGoogleAuth({
-          idToken,
+        setPendingSocialAuth({
+          provider: auth.provider,
+          idToken: auth.idToken,
+          code: auth.code,
+          accessToken: auth.accessToken,
           email: res.email || '',
           displayName: res.displayName,
           avatarUrl: res.avatarUrl,
@@ -250,45 +307,65 @@ export function RegisterPage() {
     } catch {
       /* error is handled in authStore */
     } finally {
-      setGoogleLoading(false);
+      setSocialLoading(false);
     }
   };
 
+  const handleGoogleToken = async (idToken: string) => {
+    await handleSocialAuth({ provider: 'GOOGLE', idToken });
+  };
+
   const handleKeySubmit = async (registrationKey: string) => {
-    if (!pendingGoogleAuth) return;
-    setGoogleLoading(true);
+    if (!pendingSocialAuth) return;
+    setSocialLoading(true);
     setKeyModalError(null);
     try {
-      const res = await googleAuth({
-        idToken: pendingGoogleAuth.idToken,
-        registrationKey,
-      });
-      if (res.status === 'AUTHENTICATED') {
-        setPendingGoogleAuth(null);
+      let res: any;
+      if (pendingSocialAuth.provider === 'GOOGLE') {
+        res = await googleAuth({
+          idToken: pendingSocialAuth.idToken!,
+          registrationKey,
+        });
+      } else if (pendingSocialAuth.provider === 'GITHUB') {
+        res = await githubAuth({
+          code: pendingSocialAuth.code,
+          accessToken: pendingSocialAuth.accessToken,
+          registrationKey,
+        });
+      } else if (pendingSocialAuth.provider === 'FACEBOOK') {
+        res = await facebookAuth({
+          accessToken: pendingSocialAuth.accessToken,
+          code: pendingSocialAuth.code,
+          registrationKey,
+        });
+      }
+      if (res?.status === 'AUTHENTICATED') {
+        setPendingSocialAuth(null);
         navigate('/dashboard', { replace: true });
       }
     } catch (err: any) {
       setKeyModalError(getApiErrorMessage(err));
     } finally {
-      setGoogleLoading(false);
+      setSocialLoading(false);
     }
   };
 
-  if (pendingGoogleAuth) {
+  if (pendingSocialAuth) {
     return (
       <AuthLayout
         title="Create your SmartSchedule account"
         subtitle="Registration Key is required only for your first registration."
       >
-        <GoogleRegistrationView
-          email={pendingGoogleAuth.email}
-          displayName={pendingGoogleAuth.displayName}
-          avatarUrl={pendingGoogleAuth.avatarUrl}
-          isLoading={googleLoading}
+        <SocialRegistrationView
+          provider={pendingSocialAuth.provider}
+          email={pendingSocialAuth.email}
+          displayName={pendingSocialAuth.displayName}
+          avatarUrl={pendingSocialAuth.avatarUrl}
+          isLoading={socialLoading}
           error={keyModalError}
           onSubmit={handleKeySubmit}
           onBack={() => {
-            setPendingGoogleAuth(null);
+            setPendingSocialAuth(null);
             setKeyModalError(null);
             clearError();
           }}
@@ -307,7 +384,8 @@ export function RegisterPage() {
 
       <SocialAuthButtons
         onGoogleToken={handleGoogleToken}
-        isLoading={googleLoading}
+        onSocialAuth={handleSocialAuth}
+        isLoading={socialLoading}
         onNotice={(msg) => setSocialNotice(msg)}
       />
 
@@ -345,7 +423,7 @@ export function RegisterPage() {
           </div>
         </Field>
         {error && <div className="form-error" role="alert">{error}</div>}
-        <button className="primary-button auth-submit" disabled={form.formState.isSubmitting || googleLoading}>
+        <button className="primary-button auth-submit" disabled={form.formState.isSubmitting || socialLoading}>
           {form.formState.isSubmitting ? 'Creating…' : 'Create account'}
         </button>
       </form>

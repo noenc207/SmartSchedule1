@@ -58,7 +58,8 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         if (path.endsWith("/api/v1/auth/register")) {
             return properties.getRegisterPerMinute();
         }
-        if (path.endsWith("/api/v1/auth/login") || path.endsWith("/api/v1/auth/google")) {
+        if (path.endsWith("/api/v1/auth/login") || path.endsWith("/api/v1/auth/google")
+                || path.endsWith("/api/v1/auth/github") || path.endsWith("/api/v1/auth/facebook")) {
             return properties.getLoginPerMinute();
         }
         if (path.endsWith("/api/v1/auth/refresh")) {
@@ -69,7 +70,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
     private String normalizePath(String path) {
         if (path.contains("/register")) return "register";
-        if (path.contains("/login") || path.contains("/google")) return "login";
+        if (path.contains("/login") || path.contains("/google") || path.contains("/github") || path.contains("/facebook")) return "login";
         if (path.contains("/refresh")) return "refresh";
         return path;
     }

@@ -5,6 +5,8 @@ import com.smartschedule.auth.api.AuthDtos.GoogleAuthRequest;
 import com.smartschedule.auth.api.AuthDtos.GoogleAuthResponse;
 import com.smartschedule.auth.api.AuthDtos.LoginRequest;
 import com.smartschedule.auth.api.AuthDtos.RegisterRequest;
+import com.smartschedule.auth.api.AuthDtos.SocialAuthRequest;
+import com.smartschedule.auth.api.AuthDtos.SocialAuthResponse;
 import com.smartschedule.auth.api.AuthDtos.UserResponse;
 import com.smartschedule.auth.config.AuthProperties;
 import com.smartschedule.auth.domain.RefreshToken;
@@ -41,13 +43,15 @@ public class AuthService {
     private final AuthProperties properties;
     private final PlanService planService;
     private final GoogleTokenVerifier googleTokenVerifier;
+    private final GithubTokenVerifier githubTokenVerifier;
+    private final FacebookTokenVerifier facebookTokenVerifier;
     private final SecureRandom secureRandom = new SecureRandom();
 
     public AuthService(UserRepository users, RefreshTokenRepository refreshTokens,
                        PasswordEncoder passwordEncoder, AuthenticationManager authenticationManager,
                        JwtService jwtService, TokenHasher tokenHasher, AuthProperties properties) {
         this(users, refreshTokens, null, passwordEncoder, authenticationManager, jwtService, tokenHasher, properties,
-                new PlanService(new PlanProperties("ALL_PRO")), null);
+                new PlanService(new PlanProperties("ALL_PRO")), null, null, null);
     }
 
     public AuthService(UserRepository users, RefreshTokenRepository refreshTokens,
@@ -55,7 +59,16 @@ public class AuthService {
                        JwtService jwtService, TokenHasher tokenHasher, AuthProperties properties,
                        PlanService planService) {
         this(users, refreshTokens, null, passwordEncoder, authenticationManager, jwtService, tokenHasher, properties,
-                planService, null);
+                planService, null, null, null);
+    }
+
+    public AuthService(UserRepository users, RefreshTokenRepository refreshTokens,
+                       RegistrationKeyRepository registrationKeys,
+                       PasswordEncoder passwordEncoder, AuthenticationManager authenticationManager,
+                       JwtService jwtService, TokenHasher tokenHasher, AuthProperties properties,
+                       PlanService planService, GoogleTokenVerifier googleTokenVerifier) {
+        this(users, refreshTokens, registrationKeys, passwordEncoder, authenticationManager, jwtService, tokenHasher,
+                properties, planService, googleTokenVerifier, null, null);
     }
 
     @Autowired
@@ -63,7 +76,8 @@ public class AuthService {
                        RegistrationKeyRepository registrationKeys,
                        PasswordEncoder passwordEncoder, AuthenticationManager authenticationManager,
                        JwtService jwtService, TokenHasher tokenHasher, AuthProperties properties,
-                       PlanService planService, GoogleTokenVerifier googleTokenVerifier) {
+                       PlanService planService, GoogleTokenVerifier googleTokenVerifier,
+                       GithubTokenVerifier githubTokenVerifier, FacebookTokenVerifier facebookTokenVerifier) {
         this.users = users;
         this.refreshTokens = refreshTokens;
         this.registrationKeys = registrationKeys;
@@ -74,6 +88,8 @@ public class AuthService {
         this.properties = properties;
         this.planService = planService != null ? planService : new PlanService(new PlanProperties("ALL_PRO"));
         this.googleTokenVerifier = googleTokenVerifier != null ? googleTokenVerifier : new GoogleTokenVerifier(properties);
+        this.githubTokenVerifier = githubTokenVerifier != null ? githubTokenVerifier : new GithubTokenVerifier(properties);
+        this.facebookTokenVerifier = facebookTokenVerifier != null ? facebookTokenVerifier : new FacebookTokenVerifier(properties);
     }
 
     @Transactional
@@ -89,52 +105,37 @@ public class AuthService {
         } catch (DataIntegrityViolationException exception) {
             throw new AuthException("EMAIL_ALREADY_REGISTERED", "An account with this email already exists.");
         }
-
-        // If key exists in registration_keys, mark it used
-        if (registrationKeys != null && request.activationKey() != null) {
-            String keyHash = tokenHasher.hash(request.activationKey().trim());
-            registrationKeys.findByKeyHashForUpdate(keyHash).ifPresent(key -> {
-                key.markUsed(user, Instant.now());
-                registrationKeys.save(key);
-            });
-        }
-
         Session session = issueSession(user, userAgent, ipAddress);
         return new AuthSession(session.response(), session.rawRefreshToken());
     }
 
-    private void validateActivationKey(String activationKey) {
-        if (activationKey == null || activationKey.isBlank()) {
-            throw new AuthException("INVALID_ACTIVATION_KEY", "Mã kích hoạt không được để trống.");
+    private void validateActivationKey(String rawKey) {
+        if (rawKey == null || rawKey.isBlank()) {
+            throw new AuthException("INVALID_ACTIVATION_KEY", "Mã kích hoạt là bắt buộc (Activation key required).");
         }
-        String trimmed = activationKey.trim();
-
-        // 1. Check database registration_keys if repository is present
-        if (registrationKeys != null) {
-            String hash = tokenHasher.hash(trimmed);
-            Optional<RegistrationKey> optKey = registrationKeys.findByKeyHash(hash);
-            if (optKey.isPresent()) {
-                RegistrationKey key = optKey.get();
-                if ("USED".equalsIgnoreCase(key.getStatus())) {
-                    throw new AuthException("REGISTRATION_KEY_ALREADY_USED", "Mã kích hoạt này đã được sử dụng.");
-                }
-                if (key.getExpiresAt() != null && key.getExpiresAt().isBefore(Instant.now())) {
-                    throw new AuthException("REGISTRATION_KEY_EXPIRED", "Mã kích hoạt đã hết hạn.");
-                }
-                if ("ACTIVE".equalsIgnoreCase(key.getStatus())) {
-                    return;
-                }
-            }
-        }
-
-        // 2. Check fallback master key from configuration
         String configuredKey = properties.registrationKey();
         if (configuredKey == null || configuredKey.isBlank()) {
-            throw new AuthException("REGISTRATION_DISABLED", "Hệ thống tạm thời chưa mở đăng ký.");
+            return;
         }
-        if (!configuredKey.trim().equals(trimmed)) {
-            throw new AuthException("INVALID_ACTIVATION_KEY", "Mã kích hoạt không chính xác hoặc đã hết hạn.");
+        if (!configuredKey.trim().equals(rawKey.trim())) {
+            throw new AuthException("INVALID_ACTIVATION_KEY", "Mã kích hoạt không chính xác.");
         }
+    }
+
+    @Transactional
+    public AuthSession login(LoginRequest request, String userAgent, String ipAddress) {
+        String email = normalizeEmail(request.email());
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(email, request.password())
+        );
+        UserDetails principal = (UserDetails) authentication.getPrincipal();
+        User user = users.findByEmailIgnoreCaseAndDeletedAtIsNull(principal.getUsername())
+                .orElseThrow(() -> new AuthException("USER_NOT_FOUND", "User account was not found."));
+        if (!user.isEnabled()) {
+            throw new AuthException("UNAUTHORIZED", "Your account has been disabled.");
+        }
+        Session session = issueSession(user, userAgent, ipAddress);
+        return new AuthSession(session.response(), session.rawRefreshToken());
     }
 
     @Transactional
@@ -145,14 +146,13 @@ public class AuthService {
 
         GoogleTokenVerifier.GoogleIdentity identity = googleTokenVerifier.verify(request.idToken());
 
-        // 1. Check if user already exists with this googleId (CASE B & CASE E: Returning user)
+        // 1. Check if user already exists with this googleId (Returning user: Login directly)
         Optional<User> existingUser = users.findByGoogleIdAndDeletedAtIsNull(identity.googleId());
         if (existingUser.isPresent()) {
             User user = existingUser.get();
             if (!user.isEnabled()) {
                 throw new AuthException("UNAUTHORIZED", "Tài khoản của bạn đã bị vô hiệu hóa.");
             }
-            // Existing Google user: LOGIN DIRECTLY, NEVER PROMPT FOR KEY!
             Session session = issueSession(user, userAgent, ipAddress);
             return new GoogleAuthResult(GoogleAuthResponse.authenticated(session.response()), session.rawRefreshToken(), false);
         }
@@ -160,7 +160,6 @@ public class AuthService {
         // 2. Google user does NOT exist yet. Check if registration key was provided:
         String rawKey = request.registrationKey();
         if (rawKey == null || rawKey.isBlank()) {
-            // CASE A (Step 1): Key required! Prompt user to enter Registration Key.
             return new GoogleAuthResult(
                     GoogleAuthResponse.keyRequired(identity.email(), identity.name(), identity.picture()),
                     null,
@@ -176,10 +175,8 @@ public class AuthService {
             throw new AuthException("EMAIL_ALREADY_REGISTERED", "Email này đã được liên kết với một tài khoản Google khác.");
         }
 
-        // Validate and lock registration key atomically (pessimistic lock prevents race condition)
         RegistrationKey consumedKey = validateAndLockRegistrationKey(rawKey.trim());
 
-        // Create new user or link existing local email account
         User user;
         if (emailUser.isPresent()) {
             user = emailUser.get();
@@ -198,7 +195,143 @@ public class AuthService {
             }
         }
 
-        // Mark key as USED atomically in the same database transaction
+        consumeRegistrationKey(consumedKey, user, rawKey.trim());
+
+        Session session = issueSession(user, userAgent, ipAddress);
+        return new GoogleAuthResult(GoogleAuthResponse.authenticated(session.response()), session.rawRefreshToken(), false);
+    }
+
+    @Transactional
+    public SocialAuthResult authenticateWithGithub(SocialAuthRequest request, String userAgent, String ipAddress) {
+        if (request == null || ((request.code() == null || request.code().isBlank())
+                && (request.accessToken() == null || request.accessToken().isBlank()))) {
+            throw new AuthException("INVALID_GITHUB_TOKEN", "GitHub authorization code or access token is required.");
+        }
+
+        String codeOrToken = (request.code() != null && !request.code().isBlank()) ? request.code() : request.accessToken();
+        GithubTokenVerifier.GithubIdentity identity = githubTokenVerifier.verify(codeOrToken);
+
+        // 1. Returning GitHub user: login directly without registration key!
+        Optional<User> existingUser = users.findByGithubIdAndDeletedAtIsNull(identity.githubId());
+        if (existingUser.isPresent()) {
+            User user = existingUser.get();
+            if (!user.isEnabled()) {
+                throw new AuthException("UNAUTHORIZED", "Tài khoản của bạn đã bị vô hiệu hóa.");
+            }
+            Session session = issueSession(user, userAgent, ipAddress);
+            return new SocialAuthResult(SocialAuthResponse.authenticated(session.response(), "GITHUB"), session.rawRefreshToken(), false);
+        }
+
+        // 2. New GitHub user: key required
+        String rawKey = request.registrationKey();
+        if (rawKey == null || rawKey.isBlank()) {
+            return new SocialAuthResult(
+                    SocialAuthResponse.keyRequired(identity.email(), identity.name(), identity.picture(), "GITHUB"),
+                    null,
+                    true
+            );
+        }
+
+        // 3. Atomically validate key and create / link user
+        String normalizedEmail = normalizeEmail(identity.email());
+        Optional<User> emailUser = users.findByEmailIgnoreCaseAndDeletedAtIsNull(normalizedEmail);
+        if (emailUser.isPresent() && emailUser.get().getGithubId() != null
+                && !emailUser.get().getGithubId().equals(identity.githubId())) {
+            throw new AuthException("EMAIL_ALREADY_REGISTERED", "Email này đã được liên kết với một tài khoản GitHub khác.");
+        }
+
+        RegistrationKey consumedKey = validateAndLockRegistrationKey(rawKey.trim());
+
+        User user;
+        if (emailUser.isPresent()) {
+            user = emailUser.get();
+            user.setGithubId(identity.githubId());
+            user.setAuthProvider("GITHUB");
+            if (user.getAvatarUrl() == null || user.getAvatarUrl().isBlank()) {
+                user.updateProfile(user.getDisplayName(), user.getTimezone(), user.getLocale(), identity.picture());
+            }
+            user = users.save(user);
+        } else {
+            user = User.createGithubUser(normalizedEmail, identity.name(), identity.githubId(), identity.picture());
+            try {
+                user = users.save(user);
+            } catch (DataIntegrityViolationException ex) {
+                throw new AuthException("EMAIL_ALREADY_REGISTERED", "Email này đã được sử dụng.");
+            }
+        }
+
+        consumeRegistrationKey(consumedKey, user, rawKey.trim());
+
+        Session session = issueSession(user, userAgent, ipAddress);
+        return new SocialAuthResult(SocialAuthResponse.authenticated(session.response(), "GITHUB"), session.rawRefreshToken(), false);
+    }
+
+    @Transactional
+    public SocialAuthResult authenticateWithFacebook(SocialAuthRequest request, String userAgent, String ipAddress) {
+        if (request == null || ((request.accessToken() == null || request.accessToken().isBlank())
+                && (request.code() == null || request.code().isBlank()))) {
+            throw new AuthException("INVALID_FACEBOOK_TOKEN", "Facebook access token is required.");
+        }
+
+        String token = (request.accessToken() != null && !request.accessToken().isBlank()) ? request.accessToken() : request.code();
+        FacebookTokenVerifier.FacebookIdentity identity = facebookTokenVerifier.verify(token);
+
+        // 1. Returning Facebook user: login directly without registration key!
+        Optional<User> existingUser = users.findByFacebookIdAndDeletedAtIsNull(identity.facebookId());
+        if (existingUser.isPresent()) {
+            User user = existingUser.get();
+            if (!user.isEnabled()) {
+                throw new AuthException("UNAUTHORIZED", "Tài khoản của bạn đã bị vô hiệu hóa.");
+            }
+            Session session = issueSession(user, userAgent, ipAddress);
+            return new SocialAuthResult(SocialAuthResponse.authenticated(session.response(), "FACEBOOK"), session.rawRefreshToken(), false);
+        }
+
+        // 2. New Facebook user: key required
+        String rawKey = request.registrationKey();
+        if (rawKey == null || rawKey.isBlank()) {
+            return new SocialAuthResult(
+                    SocialAuthResponse.keyRequired(identity.email(), identity.name(), identity.picture(), "FACEBOOK"),
+                    null,
+                    true
+            );
+        }
+
+        // 3. Atomically validate key and create / link user
+        String normalizedEmail = normalizeEmail(identity.email());
+        Optional<User> emailUser = users.findByEmailIgnoreCaseAndDeletedAtIsNull(normalizedEmail);
+        if (emailUser.isPresent() && emailUser.get().getFacebookId() != null
+                && !emailUser.get().getFacebookId().equals(identity.facebookId())) {
+            throw new AuthException("EMAIL_ALREADY_REGISTERED", "Email này đã được liên kết với một tài khoản Facebook khác.");
+        }
+
+        RegistrationKey consumedKey = validateAndLockRegistrationKey(rawKey.trim());
+
+        User user;
+        if (emailUser.isPresent()) {
+            user = emailUser.get();
+            user.setFacebookId(identity.facebookId());
+            user.setAuthProvider("FACEBOOK");
+            if (user.getAvatarUrl() == null || user.getAvatarUrl().isBlank()) {
+                user.updateProfile(user.getDisplayName(), user.getTimezone(), user.getLocale(), identity.picture());
+            }
+            user = users.save(user);
+        } else {
+            user = User.createFacebookUser(normalizedEmail, identity.name(), identity.facebookId(), identity.picture());
+            try {
+                user = users.save(user);
+            } catch (DataIntegrityViolationException ex) {
+                throw new AuthException("EMAIL_ALREADY_REGISTERED", "Email này đã được sử dụng.");
+            }
+        }
+
+        consumeRegistrationKey(consumedKey, user, rawKey.trim());
+
+        Session session = issueSession(user, userAgent, ipAddress);
+        return new SocialAuthResult(SocialAuthResponse.authenticated(session.response(), "FACEBOOK"), session.rawRefreshToken(), false);
+    }
+
+    private void consumeRegistrationKey(RegistrationKey consumedKey, User user, String rawKey) {
         Instant now = Instant.now();
         if (registrationKeys != null) {
             if (consumedKey != null) {
@@ -206,16 +339,12 @@ public class AuthService {
                 registrationKeys.save(consumedKey);
             } else {
                 // Fallback master key consumed: record audit entry
-                String keyHash = tokenHasher.hash(rawKey.trim());
+                String keyHash = tokenHasher.hash(rawKey);
                 RegistrationKey fallbackAudit = new RegistrationKey(keyHash, null);
                 fallbackAudit.markUsed(user, now);
                 registrationKeys.save(fallbackAudit);
             }
         }
-
-        // Issue authenticated session
-        Session session = issueSession(user, userAgent, ipAddress);
-        return new GoogleAuthResult(GoogleAuthResponse.authenticated(session.response()), session.rawRefreshToken(), false);
     }
 
     private RegistrationKey validateAndLockRegistrationKey(String rawKey) {
@@ -250,18 +379,6 @@ public class AuthService {
         }
 
         throw new AuthException("INVALID_REGISTRATION_KEY", "Mã kích hoạt không chính xác hoặc không tồn tại.");
-    }
-
-    @Transactional
-    public AuthSession login(LoginRequest request, String userAgent, String ipAddress) {
-        String email = normalizeEmail(request.email());
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(email, request.password()));
-        UserDetails details = (UserDetails) authentication.getPrincipal();
-        User user = users.findByEmailIgnoreCaseAndDeletedAtIsNull(details.getUsername())
-                .orElseThrow(() -> new AuthException("UNAUTHORIZED", "Invalid email or password."));
-        Session session = issueSession(user, userAgent, ipAddress);
-        return new AuthSession(session.response(), session.rawRefreshToken());
     }
 
     @Transactional
@@ -315,6 +432,8 @@ public class AuthService {
     public record AuthSession(AuthResponse response, String rawRefreshToken) {}
 
     public record GoogleAuthResult(GoogleAuthResponse response, String rawRefreshToken, boolean keyRequired) {}
+
+    public record SocialAuthResult(SocialAuthResponse response, String rawRefreshToken, boolean requiresKey) {}
 
     private record Session(AuthResponse response, RefreshToken refreshToken, String rawRefreshToken) {}
 }
