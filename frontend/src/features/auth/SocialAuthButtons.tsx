@@ -33,6 +33,40 @@ export function isRealGoogleClientId(clientId?: string): boolean {
   return /^\d+-[a-zA-Z0-9_-]+\.apps\.googleusercontent\.com$/.test(trimmed);
 }
 
+/**
+ * Validates whether a Facebook App ID is a genuine Meta App ID (14-18 digits).
+ */
+export function isRealFacebookAppId(appId?: string): boolean {
+  if (!appId) return false;
+  const trimmed = appId.trim();
+  if (
+    trimmed.length === 0 ||
+    trimmed === '123456789012345' ||
+    trimmed.includes('replace-with') ||
+    trimmed.includes('your-facebook-app-id')
+  ) {
+    return false;
+  }
+  return /^\d{12,20}$/.test(trimmed);
+}
+
+/**
+ * Validates whether a GitHub Client ID is a genuine GitHub OAuth App Client ID (e.g., Ov23li... or 20 alphanumeric chars).
+ */
+export function isRealGithubClientId(clientId?: string): boolean {
+  if (!clientId) return false;
+  const trimmed = clientId.trim();
+  if (
+    trimmed.length === 0 ||
+    trimmed === 'Ov23liGithubPreviewClientId' ||
+    trimmed.includes('replace-with') ||
+    trimmed.includes('your-github-client-id')
+  ) {
+    return false;
+  }
+  return /^[a-zA-Z0-9_]{16,30}$/.test(trimmed);
+}
+
 export function SocialAuthButtons({
   onGoogleToken,
   onSocialAuth,
@@ -206,6 +240,15 @@ export function SocialAuthButtons({
   const handleGithubClick = () => {
     if (isLoading || socialLoading) return;
 
+    if (!githubClientId || !isRealGithubClientId(githubClientId)) {
+      if (onNotice) {
+        onNotice(
+          'GitHub Client ID chưa được cấu hình. Vui lòng tạo OAuth App trên GitHub (Settings > Developer settings > OAuth Apps) và thiết lập biến môi trường VITE_GITHUB_CLIENT_ID.'
+        );
+      }
+      return;
+    }
+
     setSocialLoading('github');
     if (onNotice) onNotice('');
 
@@ -234,6 +277,15 @@ export function SocialAuthButtons({
 
   const handleFacebookClick = () => {
     if (isLoading || socialLoading) return;
+
+    if (!facebookAppId || !isRealFacebookAppId(facebookAppId)) {
+      if (onNotice) {
+        onNotice(
+          'Facebook App ID chưa được cấu hình. Vui lòng tạo ứng dụng trên Meta for Developers (developers.facebook.com) và thiết lập biến môi trường VITE_FACEBOOK_APP_ID.'
+        );
+      }
+      return;
+    }
 
     setSocialLoading('facebook');
     if (onNotice) onNotice('');
