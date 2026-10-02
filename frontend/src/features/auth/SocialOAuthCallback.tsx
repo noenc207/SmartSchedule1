@@ -59,7 +59,7 @@ export function SocialOAuthCallback({ defaultProvider }: SocialOAuthCallbackProp
             accessToken: accessToken || null,
             error: errorDetails,
           },
-          window.location.origin
+          '*'
         );
 
         // Also post legacy GOOGLE_OAUTH_RESPONSE if Google for backward compatibility
@@ -70,7 +70,7 @@ export function SocialOAuthCallback({ defaultProvider }: SocialOAuthCallbackProp
               idToken: idToken || null,
               error: errorDetails,
             },
-            window.location.origin
+            '*'
           );
         }
 

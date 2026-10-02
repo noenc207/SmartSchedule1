@@ -62,7 +62,14 @@ export function SocialAuthButtons({
   useEffect(() => {
     // Listen for postMessage from the popup window callback
     const handleMessage = (event: MessageEvent) => {
-      if (typeof window !== 'undefined' && event.origin !== window.location.origin) return;
+      const origin = event.origin || '';
+      const isTrusted =
+        origin === window.location.origin ||
+        origin.endsWith('.vercel.app') ||
+        origin.includes('localhost') ||
+        origin.includes('127.0.0.1');
+
+      if (!isTrusted) return;
 
       if (event.data?.type === 'SOCIAL_OAUTH_RESPONSE' || event.data?.type === 'GOOGLE_OAUTH_RESPONSE') {
         if (pollTimerRef.current) {
