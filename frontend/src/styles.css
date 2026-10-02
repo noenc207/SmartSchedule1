@@ -18416,6 +18416,331 @@ body {
   }
 }
 
+/* ==========================================================================
+   AI Action Cards (Human-in-the-loop Gemini Function Calling)
+   ========================================================================== */
+
+.ai-message-actions-wrapper {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.ai-action-intro-text {
+  font-weight: 500;
+  color: #334155;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.ai-action-card {
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ai-action-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.ai-action-card.has-conflict {
+  border-color: #fca5a5;
+  background: #fffafa;
+}
+
+.ai-action-card.status-success {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.ai-action-card.status-failed {
+  border-color: #fca5a5;
+  background: #fef2f2;
+}
+
+.ai-action-card.status-cancelled {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  opacity: 0.8;
+}
+
+/* Action Header */
+.ai-action-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ai-action-type-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.ai-action-type-pill.ai-tool-create {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.ai-action-type-pill.ai-tool-reschedule {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.ai-action-type-pill.ai-tool-update {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.ai-action-type-pill.ai-tool-delete {
+  background: #ffe4e6;
+  color: #be123c;
+}
+
+.ai-action-type-pill.ai-tool-default {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.ai-action-status-pill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.ai-action-status-pill.status-proposed {
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+.ai-action-status-pill.status-confirmed,
+.ai-action-status-pill.status-executing {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.ai-action-status-pill.status-success {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.ai-action-status-pill.status-failed {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.ai-action-status-pill.status-cancelled {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.status-flex {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Action Body */
+.ai-action-body {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.ai-action-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.35;
+}
+
+.ai-action-detail-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12.5px;
+  color: #475569;
+}
+
+.ai-action-detail-row .detail-icon {
+  margin-top: 2px;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.ai-action-detail-row .description-text {
+  color: #64748b;
+  font-style: italic;
+}
+
+/* Conflict Banner */
+.ai-action-conflict-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #9f1239;
+}
+
+.ai-action-conflict-banner .conflict-icon {
+  color: #e11d48;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.ai-action-conflict-banner .conflict-title {
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.ai-action-conflict-banner .conflict-details {
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+/* Results & Feedback Banners */
+.ai-action-result-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.ai-action-result-banner.success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.ai-action-result-banner.failed {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.ai-action-result-banner.cancelled {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.ai-action-expired-banner {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  color: #64748b;
+  font-size: 11.5px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  text-align: center;
+}
+
+/* Buttons */
+.ai-action-button-group {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.ai-btn-cancel {
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  background: #ffffff;
+  color: #64748b;
+  border: 1px solid #cbd5e1;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ai-btn-cancel:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.ai-btn-find-alt {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ai-btn-find-alt:hover:not(:disabled) {
+  background: #dbeafe;
+}
+
+.ai-btn-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.25);
+  transition: all 0.15s ease;
+}
+
+.ai-btn-confirm:hover:not(:disabled) {
+  background: linear-gradient(135deg, #1d4ed8, #1e40af);
+  transform: translateY(-0.5px);
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
+}
+
+.ai-btn-confirm.warn {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  box-shadow: 0 1px 3px rgba(220, 38, 38, 0.25);
+}
+
+.ai-btn-confirm.warn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #b91c1c, #991b1b);
+}
+
+.ai-btn-confirm:disabled,
+.ai-btn-cancel:disabled,
+.ai-btn-find-alt:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+
 
 
 

@@ -97,7 +97,9 @@ public class GeminiProvider implements AiProvider {
 
     @Override
     public void streamResponse(String systemInstruction, List<ChatMessage> history, String userMessage,
-                               Consumer<String> onChunk, Runnable onComplete, Consumer<Throwable> onError) {
+                               Consumer<String> onChunk,
+                               Consumer<List<ToolCall>> onCompleteWithTools,
+                               Consumer<Throwable> onError) {
         ensureApiKeyConfigured();
 
         String model = properties.geminiModel();
@@ -105,7 +107,8 @@ public class GeminiProvider implements AiProvider {
         String urlString = String.format("https://generativelanguage.googleapis.com/v1beta/models/%s:streamGenerateContent?key=%s&alt=sse",
                 model, apiKey);
 
-        Map<String, Object> requestPayload = buildGeminiPayload(systemInstruction, history, userMessage, false);
+        Map<String, Object> requestPayload = buildGeminiPayload(systemInstruction, history, userMessage, true);
+        List<ToolCall> streamedToolCalls = new ArrayList<>();
 
         try {
             URL url = URI.create(urlString).toURL();
@@ -157,6 +160,9 @@ public class GeminiProvider implements AiProvider {
                                         if (part.text != null && !part.text.isEmpty()) {
                                             onChunk.accept(part.text);
                                         }
+                                        if (part.functionCall != null) {
+                                            streamedToolCalls.add(new ToolCall(part.functionCall.name, part.functionCall.args));
+                                        }
                                     }
                                 }
                             }
@@ -167,7 +173,7 @@ public class GeminiProvider implements AiProvider {
                 }
             }
 
-            onComplete.run();
+            onCompleteWithTools.accept(streamedToolCalls);
         } catch (Throwable ex) {
             log.error("Streaming error from Gemini: {}", ex.getMessage());
             onError.accept(ex);
@@ -228,24 +234,126 @@ public class GeminiProvider implements AiProvider {
                 "maxOutputTokens", properties.maxOutputTokens()
         ));
 
-        // Read-only tools
+        // Read & Write Tools declarations
         if (includeTools) {
             payload.put("tools", List.of(
                     Map.of("function_declarations", List.of(
+                            // 1. Read: Today's schedule
                             Map.of(
                                     "name", "get_today_schedule",
                                     "description", "Lấy toàn bộ danh sách lớp học và sự kiện trong ngày hôm nay của người dùng.",
                                     "parameters", Map.of("type", "OBJECT", "properties", Map.of())
                             ),
+                            // 2. Read: Upcoming schedule
                             Map.of(
                                     "name", "get_upcoming_schedule",
-                                    "description", "Lấy toàn bộ lịch trình các lớp học và sự kiện sắp tới trong 7 ngày tiếp theo.",
-                                    "parameters", Map.of("type", "OBJECT", "properties", Map.of())
+                                    "description", "Lấy toàn bộ lịch trình các lớp học và sự kiện sắp tới trong các ngày tiếp theo.",
+                                    "parameters", Map.of(
+                                            "type", "OBJECT",
+                                            "properties", Map.of(
+                                                    "days", Map.of("type", "INTEGER", "description", "Số ngày cần xem (mặc định 7 ngày, tối đa 30 ngày)")
+                                            )
+                                    )
                             ),
+                            // 3. Read: Find free time
                             Map.of(
                                     "name", "find_free_time",
-                                    "description", "Tìm các khoảng thời gian trống giữa các tiết học và cam kết hôm nay để người dùng sắp xếp ôn tập hoặc nghỉ ngơi.",
-                                    "parameters", Map.of("type", "OBJECT", "properties", Map.of())
+                                    "description", "Tìm các khoảng thời gian trống giữa các tiết học và cam kết để người dùng sắp xếp ôn tập, làm việc hoặc nghỉ ngơi.",
+                                    "parameters", Map.of(
+                                            "type", "OBJECT",
+                                            "properties", Map.of(
+                                                    "date", Map.of("type", "STRING", "description", "Ngày cần tìm giờ rảnh dạng YYYY-MM-DD (mặc định là hôm nay)"),
+                                                    "duration_minutes", Map.of("type", "INTEGER", "description", "Thời lượng cần tìm tính theo phút (ví dụ 60, 120)")
+                                            )
+                                    )
+                            ),
+                            // 4. Read: Check schedule conflict
+                            Map.of(
+                                    "name", "check_schedule_conflict",
+                                    "description", "Kiểm tra xem một khung thời gian cụ thể có bị trùng lịch hoặc xung đột với các sự kiện hiện có của người dùng không.",
+                                    "parameters", Map.of(
+                                            "type", "OBJECT",
+                                            "properties", Map.of(
+                                                    "start_time", Map.of("type", "STRING", "description", "Thời gian bắt đầu (ISO 8601 hoặc YYYY-MM-DDTHH:mm hoặc HH:mm)"),
+                                                    "end_time", Map.of("type", "STRING", "description", "Thời gian kết thúc (ISO 8601 hoặc YYYY-MM-DDTHH:mm hoặc HH:mm)"),
+                                                    "exclude_event_id", Map.of("type", "STRING", "description", "ID sự kiện bỏ qua khi kiểm tra trùng")
+                                            ),
+                                            "required", List.of("start_time", "end_time")
+                                    )
+                            ),
+                            // 5. Read: Get schedule details
+                            Map.of(
+                                    "name", "get_schedule_details",
+                                    "description", "Tra cứu thông tin chi tiết của một sự kiện/tiết học theo tên hoặc mã ID.",
+                                    "parameters", Map.of(
+                                            "type", "OBJECT",
+                                            "properties", Map.of(
+                                                    "event_id_or_title", Map.of("type", "STRING", "description", "Tên sự kiện hoặc ID sự kiện cần tra cứu")
+                                            ),
+                                            "required", List.of("event_id_or_title")
+                                    )
+                            ),
+                            // 6. Write: Create schedule
+                            Map.of(
+                                    "name", "create_schedule",
+                                    "description", "Đề xuất tạo mới một sự kiện/lịch học/lịch ôn tập trên thời khóa biểu. Hệ thống sẽ tạo yêu cầu xác nhận để người dùng đồng ý trước khi lưu.",
+                                    "parameters", Map.of(
+                                            "type", "OBJECT",
+                                            "properties", Map.of(
+                                                    "title", Map.of("type", "STRING", "description", "Tên môn học hoặc sự kiện (ví dụ: Physics, Ôn thi Giải tích)"),
+                                                    "start_time", Map.of("type", "STRING", "description", "Thời gian bắt đầu (ví dụ: 08:00, 2026-10-03T08:00)"),
+                                                    "end_time", Map.of("type", "STRING", "description", "Thời gian kết thúc (ví dụ: 10:00, 2026-10-03T10:00)"),
+                                                    "duration_minutes", Map.of("type", "INTEGER", "description", "Thời lượng bằng phút nếu không rõ giờ kết thúc (mặc định 60 phút)"),
+                                                    "date", Map.of("type", "STRING", "description", "Ngày diễn ra định dạng YYYY-MM-DD"),
+                                                    "location", Map.of("type", "STRING", "description", "Phòng học hoặc địa điểm (ví dụ: Phòng Beta 204)"),
+                                                    "description", Map.of("type", "STRING", "description", "Mô tả hoặc ghi chú")
+                                            ),
+                                            "required", List.of("title", "start_time")
+                                    )
+                            ),
+                            // 7. Write: Update schedule
+                            Map.of(
+                                    "name", "update_schedule",
+                                    "description", "Đề xuất cập nhật tiêu đề, thời gian, phòng học hoặc mô tả của một sự kiện đã có. Cần người dùng xác nhận trước khi thực thi.",
+                                    "parameters", Map.of(
+                                            "type", "OBJECT",
+                                            "properties", Map.of(
+                                                    "event_id", Map.of("type", "STRING", "description", "ID sự kiện cần cập nhật"),
+                                                    "title", Map.of("type", "STRING", "description", "Tên sự kiện để tìm hoặc đổi tên mới"),
+                                                    "start_time", Map.of("type", "STRING", "description", "Thời gian bắt đầu mới"),
+                                                    "end_time", Map.of("type", "STRING", "description", "Thời gian kết thúc mới"),
+                                                    "location", Map.of("type", "STRING", "description", "Phòng học hoặc địa điểm mới"),
+                                                    "description", Map.of("type", "STRING", "description", "Mô tả mới")
+                                            )
+                                    )
+                            ),
+                            // 8. Write: Delete schedule
+                            Map.of(
+                                    "name", "delete_schedule",
+                                    "description", "Đề xuất xóa một sự kiện/tiết học khỏi lịch trình. Cần người dùng xác nhận trước khi thực thi.",
+                                    "parameters", Map.of(
+                                            "type", "OBJECT",
+                                            "properties", Map.of(
+                                                    "event_id", Map.of("type", "STRING", "description", "ID sự kiện cần xóa"),
+                                                    "title", Map.of("type", "STRING", "description", "Tên sự kiện cần xóa nếu không có ID")
+                                            )
+                                    )
+                            ),
+                            // 9. Write: Reschedule event
+                            Map.of(
+                                    "name", "reschedule_event",
+                                    "description", "Đề xuất dời thời gian của một sự kiện đã có sang một khung giờ hoặc ngày khác. Cần người dùng xác nhận trước khi thực thi.",
+                                    "parameters", Map.of(
+                                            "type", "OBJECT",
+                                            "properties", Map.of(
+                                                    "event_id", Map.of("type", "STRING", "description", "ID sự kiện cần dời"),
+                                                    "title", Map.of("type", "STRING", "description", "Tên sự kiện cần dời"),
+                                                    "new_start_time", Map.of("type", "STRING", "description", "Thời gian bắt đầu mới"),
+                                                    "new_end_time", Map.of("type", "STRING", "description", "Thời gian kết thúc mới"),
+                                                    "date", Map.of("type", "STRING", "description", "Ngày mới dạng YYYY-MM-DD nếu dời sang ngày khác")
+                                            ),
+                                            "required", List.of("new_start_time")
+                                    )
                             )
                     ))
             ));

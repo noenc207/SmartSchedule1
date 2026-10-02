@@ -124,6 +124,6 @@ class AiContextServiceTest {
 
         String freeTimeResult = contextService.executeTool("find_free_time", testUser, Map.of());
 
-        assertThat(freeTimeResult).contains("Dựa trên lịch hiện tại");
+        assertThat(freeTimeResult).contains("Khoảng trống thời gian");
     }
 }

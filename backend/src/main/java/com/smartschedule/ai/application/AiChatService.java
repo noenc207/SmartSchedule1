@@ -12,7 +12,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
@@ -24,6 +23,7 @@ public class AiChatService {
     private final AiConversationRepository conversationRepository;
     private final AiMessageRepository messageRepository;
     private final AiContextService contextService;
+    private final AiActionService actionService;
     private final AiProvider aiProvider;
     private final AiProperties properties;
 
@@ -33,13 +33,23 @@ public class AiChatService {
     public AiChatService(AiConversationRepository conversationRepository,
                          AiMessageRepository messageRepository,
                          AiContextService contextService,
+                         AiActionService actionService,
                          AiProvider aiProvider,
                          AiProperties properties) {
         this.conversationRepository = conversationRepository;
         this.messageRepository = messageRepository;
         this.contextService = contextService;
+        this.actionService = actionService;
         this.aiProvider = aiProvider;
         this.properties = properties;
+    }
+
+    public AiChatService(AiConversationRepository conversationRepository,
+                         AiMessageRepository messageRepository,
+                         AiContextService contextService,
+                         AiProvider aiProvider,
+                         AiProperties properties) {
+        this(conversationRepository, messageRepository, contextService, null, aiProvider, properties);
     }
 
     @Transactional
@@ -54,13 +64,12 @@ public class AiChatService {
         AiMessage userMessage = new AiMessage(conversation, "user", userPrompt);
         messageRepository.save(userMessage);
 
-        // Build dynamic system instruction with SmartSchedule context
-        String systemInstruction = buildSystemPrompt(user);
+        // Build dynamic system instruction with SmartSchedule context & client view
+        String systemInstruction = buildSystemPrompt(user, request.context());
 
         // Fetch recent message history (up to 20 messages for context)
         List<AiMessage> pastMessages = messageRepository.findAllByConversationIdOrderByCreatedAtAsc(conversation.getId());
         List<AiProvider.ChatMessage> chatHistory = new ArrayList<>();
-        // Exclude the message we just saved so it is sent as current user message
         for (int i = 0; i < pastMessages.size() - 1; i++) {
             AiMessage m = pastMessages.get(i);
             chatHistory.add(new AiProvider.ChatMessage(m.getRole(), m.getContent()));
@@ -70,13 +79,26 @@ public class AiChatService {
         AiProvider.ProviderResponse response = aiProvider.generateResponse(systemInstruction, chatHistory, userPrompt);
 
         String replyContent = response.content();
+        List<AiDtos.ProposedActionDto> proposedActions = new ArrayList<>();
 
         // Handle tool calls if returned
         if (response.toolCalls() != null && !response.toolCalls().isEmpty()) {
             StringBuilder toolResults = new StringBuilder();
             for (AiProvider.ToolCall tool : response.toolCalls()) {
-                String toolOutput = contextService.executeTool(tool.name(), user, tool.arguments());
-                toolResults.append(toolOutput).append("\n");
+                if (isWriteTool(tool.name()) && actionService != null) {
+                    AiDtos.ProposedActionDto proposed = actionService.proposeAction(
+                            user, conversation, tool.name(), tool.arguments(), request.context()
+                    );
+                    proposedActions.add(proposed);
+                    String conflictNote = proposed.hasConflict()
+                            ? "\n⚠️ " + proposed.conflictDetails()
+                            : "\nKhông phát hiện xung đột thời gian.";
+                    toolResults.append("Tôi đề xuất: ").append(proposed.summary()).append(conflictNote)
+                            .append("\n\nVui lòng kiểm tra và xác nhận trong thẻ hành động bên dưới.\n");
+                } else {
+                    String toolOutput = contextService.executeTool(tool.name(), user, tool.arguments());
+                    toolResults.append(toolOutput).append("\n");
+                }
             }
             if (replyContent.isBlank()) {
                 replyContent = toolResults.toString().trim();
@@ -94,7 +116,6 @@ public class AiChatService {
         messageRepository.save(modelMessage);
 
         conversation.touch();
-        // Automatically title the conversation if it's the first message
         if (pastMessages.size() <= 1 && conversation.getTitle().equals("Cuộc trò chuyện mới")) {
             String newTitle = userPrompt.length() > 36 ? userPrompt.substring(0, 36) + "…" : userPrompt;
             conversation.setTitle(newTitle);
@@ -106,7 +127,8 @@ public class AiChatService {
                 modelMessage.getId(),
                 modelMessage.getRole(),
                 modelMessage.getContent(),
-                modelMessage.getCreatedAt()
+                modelMessage.getCreatedAt(),
+                proposedActions
         );
     }
 
@@ -125,7 +147,7 @@ public class AiChatService {
             AiMessage userMessage = new AiMessage(conversation, "user", userPrompt);
             messageRepository.save(userMessage);
 
-            String systemInstruction = buildSystemPrompt(user);
+            String systemInstruction = buildSystemPrompt(user, request.context());
 
             List<AiMessage> pastMessages = messageRepository.findAllByConversationIdOrderByCreatedAtAsc(conversation.getId());
             List<AiProvider.ChatMessage> chatHistory = new ArrayList<>();
@@ -144,7 +166,31 @@ public class AiChatService {
                         accumulatedResponse.append(chunk);
                         onChunk.accept(chunk);
                     },
-                    () -> {
+                    streamedToolCalls -> {
+                        List<AiDtos.ProposedActionDto> proposedActions = new ArrayList<>();
+
+                        if (streamedToolCalls != null && !streamedToolCalls.isEmpty()) {
+                            for (AiProvider.ToolCall tool : streamedToolCalls) {
+                                if (isWriteTool(tool.name()) && actionService != null) {
+                                    AiDtos.ProposedActionDto proposed = actionService.proposeAction(
+                                            user, conversation, tool.name(), tool.arguments(), request.context()
+                                    );
+                                    proposedActions.add(proposed);
+                                    String conflictNote = proposed.hasConflict()
+                                            ? "\n⚠️ " + proposed.conflictDetails()
+                                            : "\nKhông phát hiện xung đột.";
+                                    String text = "\n\nTôi đề xuất: " + proposed.summary() + conflictNote +
+                                            "\n\nVui lòng kiểm tra và xác nhận trong thẻ bên dưới.";
+                                    accumulatedResponse.append(text);
+                                    onChunk.accept(text);
+                                } else {
+                                    String readOutput = "\n\n" + contextService.executeTool(tool.name(), user, tool.arguments());
+                                    accumulatedResponse.append(readOutput);
+                                    onChunk.accept(readOutput);
+                                }
+                            }
+                        }
+
                         String fullContent = accumulatedResponse.toString().trim();
                         if (fullContent.isEmpty()) {
                             fullContent = "Tôi đã ghi nhận nhưng không nhận được nội dung phản hồi từ mô hình.";
@@ -165,7 +211,8 @@ public class AiChatService {
                                 modelMessage.getId(),
                                 modelMessage.getRole(),
                                 modelMessage.getContent(),
-                                modelMessage.getCreatedAt()
+                                modelMessage.getCreatedAt(),
+                                proposedActions
                         ));
                     },
                     onError
@@ -216,6 +263,13 @@ public class AiChatService {
         conversationRepository.delete(conversation);
     }
 
+    public static boolean isWriteTool(String toolName) {
+        return switch (toolName) {
+            case "create_schedule", "update_schedule", "delete_schedule", "reschedule_event" -> true;
+            default -> false;
+        };
+    }
+
     private void validateRequest(User user, String message) {
         if (user == null) {
             throw new AiException("UNAUTHORIZED", "Vui lòng đăng nhập để sử dụng tính năng SmartSchedule AI.");
@@ -259,17 +313,18 @@ public class AiChatService {
                 .orElseGet(() -> conversationRepository.save(new AiConversation(user, "Cuộc trò chuyện mới")));
     }
 
-    private String buildSystemPrompt(User user) {
-        String scheduleContext = contextService.buildContextSummary(user);
+    private String buildSystemPrompt(User user, AiDtos.ClientContextDto clientContext) {
+        String scheduleContext = contextService.buildContextSummary(user, clientContext);
 
         return """
-                Bạn là SmartSchedule AI — Academic Planning Assistant, một trợ lý học tập và lập kế hoạch học thuật thông minh, tận tâm và chính xác được tích hợp trực tiếp vào ứng dụng SmartSchedule (dành cho sinh viên, giảng viên và cán bộ tại FPT University Quy Nhơn AI Campus).
+                Bạn là SmartSchedule AI — Action-Capable Academic Assistant, một trợ lý học tập và lập kế hoạch học thuật thông minh, tận tâm và chính xác được tích hợp trực tiếp vào SmartSchedule (dành cho sinh viên, giảng viên tại FPT University Quy Nhơn AI Campus).
 
-                NGUYÊN TẮC CỐT LÕI:
+                QUYỀN HẠN & NGUYÊN TẮC:
                 1. Tính chính xác: Luôn dựa trên thời gian thực và dữ liệu lịch trình thực tế của người dùng được cung cấp dưới đây. TUYỆT ĐỐI KHÔNG bịa đặt tiết học, môn học, phòng học, bài kiểm tra hay deadline mà người dùng không có.
-                2. Tính hỗ trợ: Trả lời ngắn gọn, rõ ràng, trực diện, lịch sự và thân thiện bằng tiếng Việt (hoặc tiếng Anh nếu người dùng hỏi bằng tiếng Anh).
-                3. Gợi ý thông minh: Khi người dùng hỏi về khoảng thời gian rảnh, hãy chỉ rõ các khung giờ trống và gợi ý hoạt động hợp lý (ví dụ: ôn bài, làm bài tập, nghỉ ngơi, thể thao).
-                4. Giới hạn thẩm quyền: Hiện tại bạn có quyền ĐỌC dữ liệu lịch trình (read-only). Bạn không thể tự ý sửa hay xóa dữ liệu của người dùng khi chưa có xác nhận từ hệ thống.
+                2. Tính hành động (Action-Capable): Khi người dùng yêu cầu tạo lịch, cập nhật lịch, xóa lịch, dời lịch, hãy GỌI FUNCTION TƯƠNG ỨNG (`create_schedule`, `update_schedule`, `delete_schedule`, `reschedule_event`).
+                3. Nguyên tắc con người xác nhận (Human-in-the-loop): Hệ thống sẽ KHÔNG tự ý thay đổi dữ liệu ngầm mà sẽ hiển thị Thẻ Xác Nhận (Action Card) kèm thông tin xung đột để người dùng chủ động bấm Xác nhận. Hãy thông báo rõ bạn đã chuẩn bị đề xuất tạo/sửa lịch và mời người dùng bấm nút xác nhận.
+                4. Phát hiện xung đột (Conflict Detection): Luôn chú ý các khung giờ đã có lịch trước khi đề xuất giờ mới. Nếu phát hiện xung đột, hãy cảnh báo và gợi ý khung giờ thay thế.
+                5. Tối ưu ngày (Optimize my day): Khi người dùng yêu cầu tối ưu lịch trình hôm nay, hãy phân tích lịch học, phát hiện các khoảng trống hoặc nguy cơ quá tải/xung đột, và đưa ra đề xuất điều chỉnh cụ thể.
 
                 NGỮ CẢNH DỮ LIỆU LỊCH TRÌNH THỰC TẾ CỦA NGƯỜI DÙNG:
                 """ + scheduleContext;

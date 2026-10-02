@@ -47,7 +47,7 @@ class AiChatServiceTest {
     void testChat_successPersistsMessagesAndReturnsResponse() {
         AiConversation conversation = new AiConversation(testUser, "Cuộc trò chuyện mới");
         when(conversationRepository.findLatestByUserId(testUser.getId())).thenReturn(Optional.of(conversation));
-        when(contextService.buildContextSummary(testUser)).thenReturn("Mock Timetable Context");
+        when(contextService.buildContextSummary(eq(testUser), any())).thenReturn("Mock Timetable Context");
 
         when(aiProvider.generateResponse(anyString(), anyList(), eq("Hôm nay tôi rảnh lúc nào?")))
                 .thenReturn(new AiProvider.ProviderResponse("Hôm nay bạn rảnh từ 17:00 đến 19:00.", List.of(), 150));
@@ -67,7 +67,7 @@ class AiChatServiceTest {
     void testChat_handlesToolExecutionGracefully() {
         AiConversation conversation = new AiConversation(testUser, "Cuộc trò chuyện mới");
         when(conversationRepository.findLatestByUserId(testUser.getId())).thenReturn(Optional.of(conversation));
-        when(contextService.buildContextSummary(testUser)).thenReturn("Mock Context");
+        when(contextService.buildContextSummary(eq(testUser), any())).thenReturn("Mock Context");
 
         AiProvider.ToolCall toolCall = new AiProvider.ToolCall("find_free_time", java.util.Map.of());
         when(aiProvider.generateResponse(anyString(), anyList(), eq("Tìm giờ rảnh")))

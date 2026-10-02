@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { aiApi, type ChatMessageDto } from '../services/aiApi';
+import { aiApi, type ChatMessageDto, type ClientContextDto, type ProposedActionDto } from '../services/aiApi';
 import { getApiErrorMessage } from '../services/apiClient';
+import { showToast } from '../components/Toast';
 
 export type MascotState = 'IDLE' | 'HOVER' | 'OPEN' | 'THINKING' | 'ERROR';
 
@@ -39,13 +40,17 @@ export interface AiChatState {
   unreadCount: number;
   mascotState: MascotState;
   bubblePosition: BubblePosition | null;
+  clientContext: ClientContextDto;
 
   toggleOpen: () => void;
   setOpen: (open: boolean) => void;
   setMascotHover: (hover: boolean) => void;
   setBubblePosition: (pos: BubblePosition | null) => void;
+  setClientContext: (ctx: Partial<ClientContextDto>) => void;
   loadHistory: () => Promise<void>;
   sendMessage: (text: string) => Promise<void>;
+  confirmAction: (actionId: string) => Promise<void>;
+  cancelAction: (actionId: string) => Promise<void>;
   newConversation: () => Promise<void>;
   clearError: () => void;
 }
@@ -60,6 +65,13 @@ export const useAiChatStore = create<AiChatState>((set, get) => ({
   unreadCount: 0,
   mascotState: 'IDLE',
   bubblePosition: loadInitialBubblePosition(),
+  clientContext: {},
+
+  setClientContext: (ctx) => {
+    set((state) => ({
+      clientContext: { ...state.clientContext, ...ctx },
+    }));
+  },
 
   setBubblePosition: (pos) => {
     set({ bubblePosition: pos });
@@ -135,6 +147,88 @@ export const useAiChatStore = create<AiChatState>((set, get) => ({
     }
   },
 
+  confirmAction: async (actionId: string) => {
+    try {
+      const res = await aiApi.confirmAction(actionId);
+      set((state) => ({
+        messages: state.messages.map((msg) => {
+          if (!msg.proposedActions || msg.proposedActions.length === 0) return msg;
+          return {
+            ...msg,
+            proposedActions: msg.proposedActions.map((act) =>
+              act.id === actionId
+                ? {
+                    ...act,
+                    status: res.status || 'SUCCESS',
+                    resultDetails: res.message || 'Thao tác đã được áp dụng thành công.',
+                  }
+                : act
+            ),
+          };
+        }),
+      }));
+
+      showToast(res.message || 'Đã áp dụng thay đổi lịch thành công!', 'success');
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('smartschedule:calendar-refresh'));
+      }
+    } catch (err) {
+      const errMsg = getApiErrorMessage(err);
+      set((state) => ({
+        messages: state.messages.map((msg) => {
+          if (!msg.proposedActions) return msg;
+          return {
+            ...msg,
+            proposedActions: msg.proposedActions.map((act) =>
+              act.id === actionId ? { ...act, status: 'FAILED', errorMessage: errMsg } : act
+            ),
+          };
+        }),
+      }));
+      showToast(`Không thể thực thi: ${errMsg}`, 'error');
+      throw err;
+    }
+  },
+
+  cancelAction: async (actionId: string) => {
+    try {
+      const res = await aiApi.cancelAction(actionId);
+      set((state) => ({
+        messages: state.messages.map((msg) => {
+          if (!msg.proposedActions || msg.proposedActions.length === 0) return msg;
+          return {
+            ...msg,
+            proposedActions: msg.proposedActions.map((act) =>
+              act.id === actionId
+                ? {
+                    ...act,
+                    status: 'CANCELLED',
+                    resultDetails: res.message || 'Đã hủy thao tác.',
+                  }
+                : act
+            ),
+          };
+        }),
+      }));
+      showToast('Đã hủy thao tác.', 'info');
+    } catch (err) {
+      const errMsg = getApiErrorMessage(err);
+      set((state) => ({
+        messages: state.messages.map((msg) => {
+          if (!msg.proposedActions) return msg;
+          return {
+            ...msg,
+            proposedActions: msg.proposedActions.map((act) =>
+              act.id === actionId ? { ...act, status: 'CANCELLED', errorMessage: errMsg } : act
+            ),
+          };
+        }),
+      }));
+      showToast(`Không thể hủy: ${errMsg}`, 'error');
+      throw err;
+    }
+  },
+
   sendMessage: async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed || get().isThinking || get().isStreaming) return;
@@ -164,6 +258,14 @@ export const useAiChatStore = create<AiChatState>((set, get) => ({
     }));
 
     const conversationId = get().activeConversationId || undefined;
+    const currentContext = get().clientContext;
+    const resolvedContext: ClientContextDto = {
+      page: currentContext.page || (typeof window !== 'undefined' ? window.location.pathname : undefined),
+      selectedDate: currentContext.selectedDate,
+      selectedEventId: currentContext.selectedEventId,
+      selectedEventTitle: currentContext.selectedEventTitle,
+      timezone: currentContext.timezone || (typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'Asia/Ho_Chi_Minh'),
+    };
 
     try {
       await aiApi.streamChat(
@@ -187,9 +289,12 @@ export const useAiChatStore = create<AiChatState>((set, get) => ({
           set((state) => {
             const updated = [...state.messages];
             const last = updated[updated.length - 1];
-            if (last && last.role === 'model' && completed.content) {
-              last.content = completed.content;
+            if (last && last.role === 'model') {
+              if (completed.content) last.content = completed.content;
               if (completed.messageId) last.id = completed.messageId;
+              if (completed.proposedActions && completed.proposedActions.length > 0) {
+                last.proposedActions = completed.proposedActions;
+              }
             }
             return {
               messages: updated,
@@ -217,7 +322,8 @@ export const useAiChatStore = create<AiChatState>((set, get) => ({
               mascotState: 'ERROR',
             };
           });
-        }
+        },
+        resolvedContext
       );
     } catch (err) {
       const errMsg = getApiErrorMessage(err);

@@ -14,5 +14,7 @@ public interface AiProvider {
     ProviderResponse generateResponse(String systemInstruction, List<ChatMessage> history, String userMessage);
 
     void streamResponse(String systemInstruction, List<ChatMessage> history, String userMessage,
-                        Consumer<String> onChunk, Runnable onComplete, Consumer<Throwable> onError);
+                        Consumer<String> onChunk,
+                        Consumer<List<ToolCall>> onCompleteWithTools,
+                        Consumer<Throwable> onError);
 }

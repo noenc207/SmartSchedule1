@@ -1,10 +1,45 @@
 import apiClient, { getStoredAccessToken } from './apiClient';
 
+export type ActionStatus = 'PROPOSED' | 'CONFIRMED' | 'EXECUTING' | 'SUCCESS' | 'FAILED' | 'CANCELLED';
+
+export interface ProposedActionDto {
+  id: string;
+  conversationId: string;
+  tool: 'create_schedule' | 'update_schedule' | 'delete_schedule' | 'reschedule_event' | string;
+  status: ActionStatus;
+  summary: string;
+  parameters: Record<string, any>;
+  hasConflict: boolean;
+  conflictDetails?: string;
+  targetEventId?: string;
+  expiresAt: string;
+  createdAt: string;
+  resultDetails?: string;
+  errorMessage?: string;
+}
+
+export interface ActionConfirmResponse {
+  actionId: string;
+  status: ActionStatus;
+  message: string;
+  targetEventId?: string;
+  data?: Record<string, any>;
+}
+
+export interface ClientContextDto {
+  page?: string;
+  selectedDate?: string;
+  selectedEventId?: string;
+  selectedEventTitle?: string;
+  timezone?: string;
+}
+
 export interface ChatMessageDto {
   id: string;
   role: 'user' | 'model';
   content: string;
   createdAt: string;
+  proposedActions?: ProposedActionDto[];
 }
 
 export interface ConversationDto {
@@ -21,14 +56,16 @@ export interface ChatResponseDto {
   role: 'model';
   content: string;
   createdAt: string;
+  proposedActions?: ProposedActionDto[];
 }
 
 export const aiApi = {
-  async chat(message: string, conversationId?: string): Promise<ChatResponseDto> {
+  async chat(message: string, conversationId?: string, context?: ClientContextDto): Promise<ChatResponseDto> {
     const { data } = await apiClient.post<ChatResponseDto>('/ai/chat', {
       message,
       conversationId: conversationId || undefined,
       stream: false,
+      context,
     });
     return data;
   },
@@ -38,7 +75,8 @@ export const aiApi = {
     conversationId: string | undefined,
     onChunk: (chunk: string) => void,
     onComplete: (data: Partial<ChatResponseDto>) => void,
-    onError: (err: any) => void
+    onError: (err: any) => void,
+    context?: ClientContextDto
   ): Promise<void> {
     const rawApiUrl =
       import.meta.env.VITEAPIURL ||
@@ -63,6 +101,7 @@ export const aiApi = {
           message,
           conversationId: conversationId || undefined,
           stream: true,
+          context,
         }),
       });
 
@@ -112,6 +151,7 @@ export const aiApi = {
                   messageId: payload.messageId,
                   content: payload.content,
                   role: payload.role || 'model',
+                  proposedActions: payload.proposedActions || [],
                 });
               }
             } catch (jsonErr) {
@@ -123,13 +163,28 @@ export const aiApi = {
     } catch (err: any) {
       // Fallback to non-streaming chat if SSE fails
       try {
-        const fallbackRes = await aiApi.chat(message, conversationId);
+        const fallbackRes = await aiApi.chat(message, conversationId, context);
         onChunk(fallbackRes.content);
         onComplete(fallbackRes);
       } catch (fallbackErr) {
         onError(err);
       }
     }
+  },
+
+  async confirmAction(actionId: string): Promise<ActionConfirmResponse> {
+    const { data } = await apiClient.post<ActionConfirmResponse>(`/ai/actions/${actionId}/confirm`);
+    return data;
+  },
+
+  async cancelAction(actionId: string): Promise<ActionConfirmResponse> {
+    const { data } = await apiClient.post<ActionConfirmResponse>(`/ai/actions/${actionId}/cancel`);
+    return data;
+  },
+
+  async getAction(actionId: string): Promise<ProposedActionDto> {
+    const { data } = await apiClient.get<ProposedActionDto>(`/ai/actions/${actionId}`);
+    return data;
   },
 
   async getConversations(): Promise<ConversationDto[]> {

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAiChatStore } from '../../stores/aiChatStore';
-import { aiApi } from '../../services/aiApi';
+import { aiApi, type ProposedActionDto } from '../../services/aiApi';
 
 vi.mock('../../services/aiApi', () => ({
   aiApi: {
@@ -8,6 +8,9 @@ vi.mock('../../services/aiApi', () => ({
     getMessages: vi.fn(),
     createConversation: vi.fn(),
     streamChat: vi.fn(),
+    confirmAction: vi.fn(),
+    cancelAction: vi.fn(),
+    getAction: vi.fn(),
   },
 }));
 
@@ -23,6 +26,7 @@ describe('aiChatStore', () => {
       error: null,
       unreadCount: 0,
       mascotState: 'IDLE',
+      clientContext: {},
     });
   });
 
@@ -98,32 +102,147 @@ describe('aiChatStore', () => {
     expect(useAiChatStore.getState().isThinking).toBe(false);
   });
 
-  it('sends a message and handles streaming tokens and completion', async () => {
+  it('sends a message and handles streaming tokens and completion with proposed actions', async () => {
+    const mockAction: ProposedActionDto = {
+      id: 'act-111',
+      conversationId: 'conv-auto',
+      tool: 'create_schedule',
+      status: 'PROPOSED',
+      summary: 'Tạo lịch họp nhóm',
+      parameters: { title: 'Họp nhóm AI' },
+      hasConflict: false,
+      expiresAt: '2026-10-02T12:00:00Z',
+      createdAt: '2026-10-02T11:45:00Z',
+    };
+
     vi.mocked(aiApi.streamChat).mockImplementation(
       async (_message, _convId, onChunk, onComplete) => {
-        onChunk('Hôm ');
-        onChunk('nay ');
-        onChunk('bạn có lịch.');
+        onChunk('Tôi đã ');
+        onChunk('tạo lịch.');
         onComplete({
           conversationId: 'conv-auto',
           messageId: 'resp-999',
-          content: 'Hôm nay bạn có lịch.',
+          content: 'Tôi đã tạo lịch.',
+          proposedActions: [mockAction],
         });
       }
     );
 
-    await useAiChatStore.getState().sendMessage('Hôm nay tôi có gì?');
+    await useAiChatStore.getState().sendMessage('Tạo lịch họp nhóm mai 9h');
 
     const state = useAiChatStore.getState();
     expect(state.messages).toHaveLength(2);
     expect(state.messages[0].role).toBe('user');
-    expect(state.messages[0].content).toBe('Hôm nay tôi có gì?');
+    expect(state.messages[0].content).toBe('Tạo lịch họp nhóm mai 9h');
     expect(state.messages[1].role).toBe('model');
-    expect(state.messages[1].content).toBe('Hôm nay bạn có lịch.');
+    expect(state.messages[1].content).toBe('Tôi đã tạo lịch.');
     expect(state.messages[1].id).toBe('resp-999');
+    expect(state.messages[1].proposedActions).toHaveLength(1);
+    expect(state.messages[1].proposedActions?.[0].id).toBe('act-111');
     expect(state.activeConversationId).toBe('conv-auto');
     expect(state.isThinking).toBe(false);
     expect(state.isStreaming).toBe(false);
+  });
+
+  it('confirms action and updates status to SUCCESS', async () => {
+    const actionId = 'act-confirm-test';
+    const mockAction: ProposedActionDto = {
+      id: actionId,
+      conversationId: 'conv-1',
+      tool: 'create_schedule',
+      status: 'PROPOSED',
+      summary: 'Tạo lịch mới',
+      parameters: { title: 'Thực tập tốt nghiệp' },
+      hasConflict: false,
+      expiresAt: '2026-10-02T12:00:00Z',
+      createdAt: '2026-10-02T11:45:00Z',
+    };
+
+    useAiChatStore.setState({
+      messages: [
+        {
+          id: 'm1',
+          role: 'model',
+          content: 'Xác nhận tạo lịch:',
+          createdAt: '2026-10-02T11:45:00Z',
+          proposedActions: [mockAction],
+        },
+      ],
+    });
+
+    vi.mocked(aiApi.confirmAction).mockResolvedValueOnce({
+      actionId,
+      status: 'SUCCESS',
+      message: 'Đã tạo sự kiện Thực tập tốt nghiệp thành công!',
+    });
+
+    await useAiChatStore.getState().confirmAction(actionId);
+
+    expect(aiApi.confirmAction).toHaveBeenCalledWith(actionId);
+    const updatedAction = useAiChatStore.getState().messages[0].proposedActions?.[0];
+    expect(updatedAction?.status).toBe('SUCCESS');
+    expect(updatedAction?.resultDetails).toContain('thành công');
+  });
+
+  it('cancels action and updates status to CANCELLED', async () => {
+    const actionId = 'act-cancel-test';
+    const mockAction: ProposedActionDto = {
+      id: actionId,
+      conversationId: 'conv-1',
+      tool: 'delete_schedule',
+      status: 'PROPOSED',
+      summary: 'Xóa sự kiện',
+      parameters: { title: 'Họp CLB' },
+      hasConflict: false,
+      expiresAt: '2026-10-02T12:00:00Z',
+      createdAt: '2026-10-02T11:45:00Z',
+    };
+
+    useAiChatStore.setState({
+      messages: [
+        {
+          id: 'm1',
+          role: 'model',
+          content: 'Xác nhận xóa:',
+          createdAt: '2026-10-02T11:45:00Z',
+          proposedActions: [mockAction],
+        },
+      ],
+    });
+
+    vi.mocked(aiApi.cancelAction).mockResolvedValueOnce({
+      actionId,
+      status: 'CANCELLED',
+      message: 'Đã hủy thao tác xóa sự kiện.',
+    });
+
+    await useAiChatStore.getState().cancelAction(actionId);
+
+    expect(aiApi.cancelAction).toHaveBeenCalledWith(actionId);
+    const updatedAction = useAiChatStore.getState().messages[0].proposedActions?.[0];
+    expect(updatedAction?.status).toBe('CANCELLED');
+  });
+
+  it('updates and passes clientContext to streamChat', async () => {
+    useAiChatStore.getState().setClientContext({
+      page: '/calendar',
+      selectedDate: '2026-10-05',
+    });
+
+    vi.mocked(aiApi.streamChat).mockImplementation(
+      async (_msg, _conv, _chunk, onComplete, _err, ctx) => {
+        expect(ctx?.page).toBe('/calendar');
+        expect(ctx?.selectedDate).toBe('2026-10-05');
+        onComplete({
+          conversationId: 'conv-1',
+          content: 'Đã nhận ngữ cảnh lịch.',
+        });
+      }
+    );
+
+    await useAiChatStore.getState().sendMessage('Lịch ngày này thế nào?');
+
+    expect(aiApi.streamChat).toHaveBeenCalled();
   });
 
   it('handles stream errors gracefully and marks error state', async () => {
@@ -151,4 +270,3 @@ describe('aiChatStore', () => {
     expect(useAiChatStore.getState().bubblePosition).toBeNull();
   });
 });
-

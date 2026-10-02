@@ -12,6 +12,7 @@ import { taskApi, type TaskInput } from '../../services/taskApi';
 import { categoryApi } from '../../services/categoryApi';
 import { scheduleApi, type AiPlannerRecommendation } from '../../services/scheduleApi';
 import { useAuthStore } from '../../stores/authStore';
+import { useAiChatStore } from '../../stores/aiChatStore';
 import { SchedulePicker } from '../../components/SchedulePicker';
 import { useWorkspaceStore } from '../../stores/workspaceStore';
 import type { Category, EventItem, MobilityFinding, RecurrenceRule, ScheduleSummary, Task } from '../../types/domain';
@@ -394,6 +395,28 @@ export function CalendarPage() {
     }
   }, [activeScheduleId, calendarView, activeYear, activeQuarter, load]);
 
+  // Refresh calendar when AI Action confirms a create/update/reschedule/delete
+  useEffect(() => {
+    const handleCalendarRefresh = () => {
+      if (rangeRef.current?.from && rangeRef.current?.to) {
+        void load(rangeRef.current.from, rangeRef.current.to);
+      }
+    };
+    window.addEventListener('smartschedule:calendar-refresh', handleCalendarRefresh);
+    return () => window.removeEventListener('smartschedule:calendar-refresh', handleCalendarRefresh);
+  }, [load]);
+
+  // Sync Calendar context (selected date & page) to AI Chat store
+  useEffect(() => {
+    const selectedDateStr =
+      activeDate instanceof Date && !isNaN(activeDate.getTime())
+        ? activeDate.toISOString().split('T')[0]
+        : undefined;
+    useAiChatStore.getState().setClientContext({
+      page: '/calendar',
+      selectedDate: selectedDateStr,
+    });
+  }, [activeDate]);
 
   // Detect hard conflicts (overlaps between events)
   const detectedConflicts = useMemo(() => {

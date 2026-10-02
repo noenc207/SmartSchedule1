@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, Clock, AlertCircle, Sparkles } from 'lucide-react';
+import { Calendar, Clock, AlertCircle, Sparkles, Zap } from 'lucide-react';
 
 interface AIQuickActionsProps {
   onSelect: (prompt: string) => void;
@@ -8,6 +8,11 @@ interface AIQuickActionsProps {
 
 export function AIQuickActions({ onSelect, disabled = false }: AIQuickActionsProps) {
   const actions = [
+    {
+      label: 'Tối ưu ngày hôm nay',
+      prompt: 'Hãy tối ưu ngày hôm nay cho tôi: phân tích lịch học, deadline và gợi ý các khoảng thời gian học tập & nghỉ ngơi tốt nhất.',
+      icon: Zap,
+    },
     {
       label: 'Lịch học hôm nay',
       prompt: 'Hôm nay tôi có những lớp học hay sự kiện gì?',

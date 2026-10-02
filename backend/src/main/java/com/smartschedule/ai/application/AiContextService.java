@@ -1,5 +1,6 @@
 package com.smartschedule.ai.application;
 
+import com.smartschedule.ai.api.AiDtos;
 import com.smartschedule.event.domain.Event;
 import com.smartschedule.event.infrastructure.EventRepository;
 import com.smartschedule.schedule.domain.Schedule;
@@ -30,7 +31,12 @@ public class AiContextService {
 
     @Transactional(readOnly = true)
     public String buildContextSummary(User user) {
-        ZoneId zoneId = resolveZone(user.getTimezone());
+        return buildContextSummary(user, null);
+    }
+
+    @Transactional(readOnly = true)
+    public String buildContextSummary(User user, AiDtos.ClientContextDto clientContext) {
+        ZoneId zoneId = resolveZone(user.getTimezone(), clientContext);
         ZonedDateTime now = ZonedDateTime.now(zoneId);
         DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("HH:mm");
         DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("EEEE, dd/MM/yyyy", Locale.forLanguageTag("vi-VN"));
@@ -40,7 +46,25 @@ public class AiContextService {
         sb.append("- Người dùng: ").append(user.getDisplayName()).append(" (Email: ").append(user.getEmail()).append(")\n");
         sb.append("- Thời gian hiện tại: ").append(now.format(timeFmt)).append("\n");
         sb.append("- Ngày hiện tại: ").append(now.format(dateFmt)).append("\n");
-        sb.append("- Múi giờ: ").append(zoneId.getId()).append("\n\n");
+        sb.append("- Múi giờ: ").append(zoneId.getId()).append("\n");
+
+        if (clientContext != null) {
+            sb.append("\n=== NGỮ CẢNH GIAO DIỆN HIỆN TẠI (CLIENT CONTEXT) ===\n");
+            if (clientContext.page() != null && !clientContext.page().isBlank()) {
+                sb.append("- Màn hình đang mở: ").append(clientContext.page()).append("\n");
+            }
+            if (clientContext.selectedDate() != null && !clientContext.selectedDate().isBlank()) {
+                sb.append("- Ngày đang được xem/chọn trên lịch: ").append(clientContext.selectedDate()).append("\n");
+            }
+            if (clientContext.selectedEventTitle() != null && !clientContext.selectedEventTitle().isBlank()) {
+                sb.append("- Sự kiện đang được chọn/mở: ").append(clientContext.selectedEventTitle());
+                if (clientContext.selectedEventId() != null) {
+                    sb.append(" (ID: ").append(clientContext.selectedEventId()).append(")");
+                }
+                sb.append("\n");
+            }
+        }
+        sb.append("\n");
 
         List<Schedule> schedules = scheduleRepository.findAllByOwnerIdOrderByUpdatedAtDesc(user.getId());
         if (schedules.isEmpty()) {
@@ -120,7 +144,7 @@ public class AiContextService {
         } else {
             int count = 0;
             for (Event e : upcomingEvents) {
-                if (count++ >= 8) break; // Limit to 8 items to prevent prompt bloat
+                if (count++ >= 8) break;
                 ZonedDateTime startLocal = e.getStartsAt().atZone(zoneId);
                 DateTimeFormatter dayFmt = DateTimeFormatter.ofPattern("EEE dd/MM HH:mm", Locale.forLanguageTag("vi-VN"));
                 sb.append("• ").append(startLocal.format(dayFmt)).append(": ").append(e.getTitle()).append("\n");
@@ -155,14 +179,16 @@ public class AiContextService {
     public String executeTool(String toolName, User user, Map<String, Object> arguments) {
         return switch (toolName) {
             case "get_today_schedule" -> getTodaySchedule(user);
-            case "get_upcoming_schedule" -> getUpcomingSchedule(user);
-            case "find_free_time" -> findFreeTime(user);
+            case "get_upcoming_schedule" -> getUpcomingSchedule(user, arguments);
+            case "find_free_time" -> findFreeTime(user, arguments);
+            case "check_schedule_conflict" -> checkScheduleConflict(user, arguments);
+            case "get_schedule_details" -> getScheduleDetails(user, arguments);
             default -> "Công cụ không được hỗ trợ: " + toolName;
         };
     }
 
     public String getTodaySchedule(User user) {
-        ZoneId zoneId = resolveZone(user.getTimezone());
+        ZoneId zoneId = resolveZone(user.getTimezone(), null);
         ZonedDateTime now = ZonedDateTime.now(zoneId);
         ZonedDateTime startOfDay = now.toLocalDate().atStartOfDay(zoneId);
         ZonedDateTime endOfDay = startOfDay.plusDays(1).minusNanos(1);
@@ -194,9 +220,20 @@ public class AiContextService {
     }
 
     public String getUpcomingSchedule(User user) {
-        ZoneId zoneId = resolveZone(user.getTimezone());
+        return getUpcomingSchedule(user, Collections.emptyMap());
+    }
+
+    public String getUpcomingSchedule(User user, Map<String, Object> arguments) {
+        ZoneId zoneId = resolveZone(user.getTimezone(), null);
         ZonedDateTime now = ZonedDateTime.now(zoneId);
-        ZonedDateTime endOfPeriod = now.plusDays(7);
+        int days = 7;
+        if (arguments != null && arguments.containsKey("days")) {
+            try {
+                days = Integer.parseInt(arguments.get("days").toString().trim());
+            } catch (Exception ignored) {}
+        }
+        days = Math.max(1, Math.min(30, days));
+        ZonedDateTime endOfPeriod = now.plusDays(days);
 
         List<Schedule> schedules = scheduleRepository.findAllByOwnerIdOrderByUpdatedAtDesc(user.getId());
         List<Event> upcomingEvents = new ArrayList<>();
@@ -207,11 +244,11 @@ public class AiContextService {
         upcomingEvents.sort(Comparator.comparing(Event::getStartsAt));
 
         if (upcomingEvents.isEmpty()) {
-            return "Bạn không có sự kiện nào sắp diễn ra trong 7 ngày tới.";
+            return String.format("Bạn không có sự kiện nào sắp diễn ra trong %d ngày tới.", days);
         }
 
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd/MM HH:mm", Locale.forLanguageTag("vi-VN"));
-        StringBuilder sb = new StringBuilder("Lịch trình 7 ngày tới:\n");
+        StringBuilder sb = new StringBuilder(String.format("Lịch trình %d ngày tới:\n", days));
         for (Event e : upcomingEvents) {
             ZonedDateTime start = e.getStartsAt().atZone(zoneId);
             sb.append("- ").append(start.format(fmt)).append(": ").append(e.getTitle()).append("\n");
@@ -220,84 +257,202 @@ public class AiContextService {
     }
 
     public String findFreeTime(User user) {
-        ZoneId zoneId = resolveZone(user.getTimezone());
+        return findFreeTime(user, Collections.emptyMap());
+    }
+
+    public String findFreeTime(User user, Map<String, Object> arguments) {
+        ZoneId zoneId = resolveZone(user.getTimezone(), null);
         ZonedDateTime now = ZonedDateTime.now(zoneId);
-        ZonedDateTime startOfDay = now.toLocalDate().atStartOfDay(zoneId);
+
+        LocalDate targetDate = now.toLocalDate();
+        if (arguments != null && arguments.containsKey("date")) {
+            try {
+                targetDate = LocalDate.parse(arguments.get("date").toString().trim());
+            } catch (Exception ignored) {}
+        }
+
+        ZonedDateTime startOfDay = targetDate.atStartOfDay(zoneId);
         ZonedDateTime endOfDay = startOfDay.plusDays(1).minusNanos(1);
 
         List<Schedule> schedules = scheduleRepository.findAllByOwnerIdOrderByUpdatedAtDesc(user.getId());
-        List<Event> todayEvents = new ArrayList<>();
+        List<Event> dayEvents = new ArrayList<>();
         for (Schedule s : schedules) {
             List<Event> events = eventRepository.search(s.getId(), startOfDay.toInstant(), endOfDay.toInstant(), null, null, null);
-            todayEvents.addAll(events);
+            dayEvents.addAll(events);
         }
-        todayEvents.sort(Comparator.comparing(Event::getStartsAt));
+        dayEvents.sort(Comparator.comparing(Event::getStartsAt));
 
-        List<String> freeSlots = computeFreeSlots(todayEvents, now, zoneId);
+        List<String> freeSlots = computeFreeSlotsForDate(dayEvents, targetDate, now, zoneId);
         if (freeSlots.isEmpty()) {
-            return "Dựa trên lịch hiện tại, bạn không còn khoảng trống đáng kể nào trong hôm nay.";
+            return String.format("Dựa trên lịch hiện tại, bạn không còn khoảng trống đáng kể nào vào ngày %s.", targetDate);
         }
-        return "Dựa trên lịch hiện tại, bạn có các khoảng trống:\n" + String.join("\n", freeSlots);
+        return String.format("Khoảng trống thời gian ngày %s:\n%s", targetDate, String.join("\n", freeSlots));
+    }
+
+    public String checkScheduleConflict(User user, Map<String, Object> arguments) {
+        ZoneId zoneId = resolveZone(user.getTimezone(), null);
+        Instant startsAt = parseInstant(arguments.get("start_time"), zoneId);
+        Instant endsAt = parseInstant(arguments.get("end_time"), zoneId);
+
+        if (startsAt == null || endsAt == null || !startsAt.isBefore(endsAt)) {
+            return "Khoảng thời gian kiểm tra không hợp lệ. Vui lòng cung cấp start_time và end_time hợp lệ.";
+        }
+
+        UUID excludeEventId = null;
+        if (arguments.containsKey("exclude_event_id")) {
+            try {
+                excludeEventId = UUID.fromString(arguments.get("exclude_event_id").toString().trim());
+            } catch (Exception ignored) {}
+        }
+
+        List<Schedule> schedules = scheduleRepository.findAllByOwnerIdOrderByUpdatedAtDesc(user.getId());
+        List<String> conflicts = new ArrayList<>();
+        DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("HH:mm");
+        DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("dd/MM");
+
+        for (Schedule s : schedules) {
+            List<Event> overlaps = eventRepository.search(s.getId(), startsAt, endsAt, null, null, null);
+            for (Event e : overlaps) {
+                if (excludeEventId != null && e.getId().equals(excludeEventId)) continue;
+                if (e.getStartsAt().isBefore(endsAt) && e.getEndsAt().isAfter(startsAt)) {
+                    ZonedDateTime st = e.getStartsAt().atZone(zoneId);
+                    ZonedDateTime en = e.getEndsAt().atZone(zoneId);
+                    conflicts.add(String.format("'%s' (%s %s–%s)", e.getTitle(), st.format(dateFmt), st.format(timeFmt), en.format(timeFmt)));
+                }
+            }
+        }
+
+        if (conflicts.isEmpty()) {
+            return "Không phát hiện xung đột nào trong khoảng thời gian này. Thời gian hoàn toàn trống!";
+        }
+        return "⚠️ Phát hiện xung đột với các lịch trình sau: " + String.join(", ", conflicts);
+    }
+
+    public String getScheduleDetails(User user, Map<String, Object> arguments) {
+        if (arguments == null || !arguments.containsKey("event_id_or_title")) {
+            return "Vui lòng cung cấp event_id_or_title để tra cứu chi tiết.";
+        }
+        String query = arguments.get("event_id_or_title").toString().trim();
+        ZoneId zoneId = resolveZone(user.getTimezone(), null);
+
+        List<Schedule> schedules = scheduleRepository.findAllByOwnerIdOrderByUpdatedAtDesc(user.getId());
+        DateTimeFormatter dtFmt = DateTimeFormatter.ofPattern("EEEE, dd/MM/yyyy HH:mm", Locale.forLanguageTag("vi-VN"));
+
+        for (Schedule s : schedules) {
+            List<Event> events = eventRepository.search(s.getId(),
+                    Instant.now().minusSeconds(86400L * 30),
+                    Instant.now().plusSeconds(86400L * 60),
+                    null, null, null);
+            for (Event e : events) {
+                boolean matchId = false;
+                try {
+                    matchId = e.getId().equals(UUID.fromString(query));
+                } catch (Exception ignored) {}
+
+                if (matchId || e.getTitle().equalsIgnoreCase(query) || e.getTitle().toLowerCase().contains(query.toLowerCase())) {
+                    ZonedDateTime st = e.getStartsAt().atZone(zoneId);
+                    ZonedDateTime en = e.getEndsAt().atZone(zoneId);
+                    return String.format("""
+                            Chi tiết sự kiện:
+                            - Tiêu đề: %s
+                            - Bắt đầu: %s
+                            - Kết thúc: %s
+                            - Địa điểm: %s
+                            - Mô tả: %s
+                            - Ưu tiên: %s
+                            - Trạng thái: %s
+                            """,
+                            e.getTitle(),
+                            st.format(dtFmt),
+                            en.format(dtFmt),
+                            e.getLocation() != null ? e.getLocation() : "Chưa có",
+                            e.getDescription() != null ? e.getDescription() : "Không có mô tả",
+                            e.getPriority(),
+                            e.getStatus()
+                    );
+                }
+            }
+        }
+
+        return "Không tìm thấy sự kiện nào khớp với: " + query;
     }
 
     private List<String> computeFreeSlots(List<Event> events, ZonedDateTime now, ZoneId zoneId) {
+        return computeFreeSlotsForDate(events, now.toLocalDate(), now, zoneId);
+    }
+
+    private List<String> computeFreeSlotsForDate(List<Event> events, LocalDate date, ZonedDateTime now, ZoneId zoneId) {
         List<String> result = new ArrayList<>();
         DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("HH:mm");
 
-        // Consider active daytime hours from 08:00 to 22:00
-        LocalDate today = now.toLocalDate();
-        ZonedDateTime dayStart = today.atTime(8, 0).atZone(zoneId);
-        ZonedDateTime dayEnd = today.atTime(22, 0).atZone(zoneId);
+        ZonedDateTime dayStart = date.atTime(8, 0).atZone(zoneId);
+        ZonedDateTime dayEnd = date.atTime(22, 0).atZone(zoneId);
 
-        // Start search from current time or dayStart, whichever is later
-        ZonedDateTime searchPointer = now.isAfter(dayStart) ? now : dayStart;
-        if (searchPointer.isAfter(dayEnd)) {
+        if (date.equals(now.toLocalDate()) && now.isAfter(dayStart)) {
+            dayStart = now.plusMinutes(15).withSecond(0).withNano(0);
+        }
+
+        if (!dayStart.isBefore(dayEnd)) {
             return result;
         }
 
-        for (Event event : events) {
-            ZonedDateTime eventStart = event.getStartsAt().atZone(zoneId);
-            ZonedDateTime eventEnd = event.getEndsAt().atZone(zoneId);
+        ZonedDateTime pointer = dayStart;
+        for (Event e : events) {
+            ZonedDateTime eventStart = e.getStartsAt().atZone(zoneId);
+            ZonedDateTime eventEnd = e.getEndsAt().atZone(zoneId);
 
-            if (eventEnd.isBefore(searchPointer)) {
-                continue;
-            }
+            if (eventEnd.isBefore(pointer)) continue;
 
-            if (eventStart.isAfter(searchPointer)) {
-                Duration gap = Duration.between(searchPointer, eventStart);
+            if (eventStart.isAfter(pointer)) {
+                Duration gap = Duration.between(pointer, eventStart);
                 if (gap.toMinutes() >= 30) {
-                    result.add(formatSlot(searchPointer, eventStart, gap, timeFmt));
+                    result.add(String.format("%s - %s (Khoảng trống %d phút)",
+                            pointer.format(timeFmt), eventStart.format(timeFmt), gap.toMinutes()));
                 }
             }
-
-            if (eventEnd.isAfter(searchPointer)) {
-                searchPointer = eventEnd;
+            if (eventEnd.isAfter(pointer)) {
+                pointer = eventEnd;
             }
         }
 
-        if (searchPointer.isBefore(dayEnd)) {
-            Duration gap = Duration.between(searchPointer, dayEnd);
+        if (pointer.isBefore(dayEnd)) {
+            Duration gap = Duration.between(pointer, dayEnd);
             if (gap.toMinutes() >= 30) {
-                result.add(formatSlot(searchPointer, dayEnd, gap, timeFmt));
+                result.add(String.format("%s - %s (Khoảng trống %d phút)",
+                        pointer.format(timeFmt), dayEnd.format(timeFmt), gap.toMinutes()));
             }
         }
 
         return result;
     }
 
-    private String formatSlot(ZonedDateTime start, ZonedDateTime end, Duration duration, DateTimeFormatter timeFmt) {
-        long hours = duration.toHours();
-        long minutes = duration.toMinutesPart();
-        String durationStr = hours > 0
-                ? (minutes > 0 ? hours + "h" + minutes + "p" : hours + " giờ")
-                : minutes + " phút";
-        return start.format(timeFmt) + " – " + end.format(timeFmt) + " (" + durationStr + " rảnh)";
+    private Instant parseInstant(Object raw, ZoneId zoneId) {
+        if (raw == null) return null;
+        String str = raw.toString().trim();
+        if (str.isEmpty()) return null;
+        try {
+            return Instant.parse(str);
+        } catch (Exception ignored) {}
+        try {
+            return OffsetDateTime.parse(str).toInstant();
+        } catch (Exception ignored) {}
+        try {
+            String norm = str.replace(' ', 'T');
+            if (norm.length() == 16) norm += ":00";
+            return LocalDateTime.parse(norm).atZone(zoneId).toInstant();
+        } catch (Exception ignored) {}
+        return null;
     }
 
-    private ZoneId resolveZone(String timezoneStr) {
-        if (timezoneStr != null && !timezoneStr.isBlank()) {
+    private ZoneId resolveZone(String timezone, AiDtos.ClientContextDto ctx) {
+        if (ctx != null && ctx.timezone() != null && !ctx.timezone().isBlank()) {
             try {
-                return ZoneId.of(timezoneStr.trim());
+                return ZoneId.of(ctx.timezone().trim());
+            } catch (Exception ignored) {}
+        }
+        if (timezone != null && !timezone.isBlank()) {
+            try {
+                return ZoneId.of(timezone.trim());
             } catch (Exception ignored) {}
         }
         return ZoneId.of("Asia/Ho_Chi_Minh");
