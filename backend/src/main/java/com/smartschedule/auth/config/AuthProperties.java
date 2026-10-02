@@ -11,22 +11,29 @@ public record AuthProperties(
         Duration refreshTokenTtl,
         String refreshCookieName,
         boolean secureCookie,
-        String registrationKey) {
+        String registrationKey,
+        String googleClientId) {
 
     @ConstructorBinding
     public AuthProperties(String jwtSecret, Duration accessTokenTtl, Duration refreshTokenTtl,
-                          String refreshCookieName, boolean secureCookie, String registrationKey) {
+                          String refreshCookieName, boolean secureCookie, String registrationKey,
+                          String googleClientId) {
         this.jwtSecret = jwtSecret;
         this.accessTokenTtl = accessTokenTtl;
         this.refreshTokenTtl = refreshTokenTtl;
         this.refreshCookieName = refreshCookieName;
         this.secureCookie = secureCookie;
         this.registrationKey = registrationKey;
+        this.googleClientId = googleClientId != null ? googleClientId : "";
+    }
+
+    public AuthProperties(String jwtSecret, Duration accessTokenTtl, Duration refreshTokenTtl,
+                          String refreshCookieName, boolean secureCookie, String registrationKey) {
+        this(jwtSecret, accessTokenTtl, refreshTokenTtl, refreshCookieName, secureCookie, registrationKey, "");
     }
 
     public AuthProperties(String jwtSecret, Duration accessTokenTtl, Duration refreshTokenTtl,
                           String refreshCookieName, boolean secureCookie) {
-        this(jwtSecret, accessTokenTtl, refreshTokenTtl, refreshCookieName, secureCookie, "SMART-DEPLOY-2026");
+        this(jwtSecret, accessTokenTtl, refreshTokenTtl, refreshCookieName, secureCookie, "SMART-DEPLOY-2026", "");
     }
 }
-

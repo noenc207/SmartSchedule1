@@ -12,7 +12,7 @@ import {
   getApiErrorMessage,
 } from '../services/apiClient';
 import { isDemoMode, setDemoMode } from '../services/demoMode';
-import type { AuthStatus, LoginInput, RegisterInput, User } from '../types/auth';
+import type { AuthStatus, GoogleAuthInput, GoogleAuthResponse, LoginInput, RegisterInput, User } from '../types/auth';
 
 function getStorage(): Storage | null {
   try {
@@ -106,6 +106,7 @@ export type AuthState = {
   authInitialized: boolean;
   error: string | null;
   login: (input: LoginInput) => Promise<void>;
+  googleAuth: (input: GoogleAuthInput) => Promise<GoogleAuthResponse>;
   demoLogin: () => void;
   exitDemoMode: () => void;
   register: (input: RegisterInput) => Promise<void>;
@@ -125,6 +126,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   status: initialAuth.status,
   authInitialized: initialAuth.authInitialized,
   error: null,
+
+  googleAuth: async (input) => {
+    set({ error: null });
+    try {
+      setDemoMode(false);
+      localStorage.removeItem('smartschedule-demo-mode');
+      const response = await authApi.googleAuth(input);
+      if (response.status === 'AUTHENTICATED' && response.accessToken) {
+        setStoredTokens(response.accessToken, response.refreshToken);
+        const user = response.user ? { ...response.user, tier: response.user.tier || 'PRO' } : null;
+        if (user) {
+          setStoredUser(user);
+        }
+        set({ user, status: 'AUTHENTICATED', authInitialized: true, error: null });
+      }
+      return response;
+    } catch (error) {
+      const msg = getApiErrorMessage(error);
+      set({ error: msg });
+      throw error;
+    }
+  },
 
   login: async (input) => {
     set({ error: null });

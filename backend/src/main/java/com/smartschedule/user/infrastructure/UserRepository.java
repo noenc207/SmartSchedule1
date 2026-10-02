@@ -8,4 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface UserRepository extends JpaRepository<User, UUID> {
     Optional<User> findByEmailIgnoreCaseAndDeletedAtIsNull(String email);
     boolean existsByEmailIgnoreCaseAndDeletedAtIsNull(String email);
+    Optional<User> findByGoogleIdAndDeletedAtIsNull(String googleId);
+    boolean existsByGoogleIdAndDeletedAtIsNull(String googleId);
 }

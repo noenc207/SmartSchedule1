@@ -47,6 +47,16 @@ public class AuthController {
         return session.response();
     }
 
+    @PostMapping("/google")
+    public AuthDtos.GoogleAuthResponse googleAuth(@Valid @RequestBody AuthDtos.GoogleAuthRequest request,
+                                                  HttpServletRequest httpRequest, HttpServletResponse response) {
+        AuthService.GoogleAuthResult result = authService.authenticateWithGoogle(request, userAgent(httpRequest), httpRequest.getRemoteAddr());
+        if (!result.keyRequired() && result.rawRefreshToken() != null) {
+            setRefreshCookie(response, result.rawRefreshToken());
+        }
+        return result.response();
+    }
+
     @PostMapping("/refresh")
     public AuthDtos.AuthResponse refresh(@RequestBody(required = false) AuthDtos.RefreshRequest body,
                                          HttpServletRequest request, HttpServletResponse response) {

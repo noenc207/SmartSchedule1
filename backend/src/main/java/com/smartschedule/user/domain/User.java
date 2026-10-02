@@ -18,8 +18,14 @@ public class User {
     @Column(nullable = false, unique = true, length = 320)
     private String email;
 
-    @Column(name = "password_hash", nullable = false)
+    @Column(name = "password_hash")
     private String passwordHash;
+
+    @Column(name = "google_id", unique = true, length = 255)
+    private String googleId;
+
+    @Column(name = "auth_provider", nullable = false, length = 32)
+    private String authProvider = "LOCAL";
 
     @Column(name = "display_name", nullable = false, length = 120)
     private String displayName;
@@ -56,7 +62,20 @@ public class User {
         this.email = email;
         this.passwordHash = passwordHash;
         this.displayName = displayName;
+        this.authProvider = "LOCAL";
         this.tier = "PRO";
+    }
+
+    public static User createGoogleUser(String email, String displayName, String googleId, String avatarUrl) {
+        User user = new User();
+        user.id = UUID.randomUUID();
+        user.email = email;
+        user.displayName = displayName;
+        user.googleId = googleId;
+        user.avatarUrl = avatarUrl;
+        user.authProvider = "GOOGLE";
+        user.tier = "PRO";
+        return user;
     }
 
     @PrePersist
@@ -85,6 +104,10 @@ public class User {
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
     public Instant getDeletedAt() { return deletedAt; }
+    public String getGoogleId() { return googleId; }
+    public void setGoogleId(String googleId) { this.googleId = googleId; }
+    public String getAuthProvider() { return authProvider; }
+    public void setAuthProvider(String authProvider) { this.authProvider = authProvider; }
 
     public void updateProfile(String displayName, String timezone, String locale, String avatarUrl) {
         this.displayName = displayName;

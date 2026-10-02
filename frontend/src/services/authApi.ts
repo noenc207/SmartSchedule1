@@ -1,7 +1,11 @@
 import apiClient, { getStoredRefreshToken } from './apiClient';
-import type { AuthResponse, LoginInput, RegisterInput, User } from '../types/auth';
+import type { AuthResponse, GoogleAuthInput, GoogleAuthResponse, LoginInput, RegisterInput, User } from '../types/auth';
 
 export const authApi = {
+  async googleAuth(input: GoogleAuthInput) {
+    const { data } = await apiClient.post<GoogleAuthResponse>('/auth/google', input);
+    return data;
+  },
   async login(input: LoginInput) {
     const { data } = await apiClient.post<AuthResponse>('/auth/login', input);
     return data;

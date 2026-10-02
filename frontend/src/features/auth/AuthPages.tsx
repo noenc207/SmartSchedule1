@@ -7,6 +7,9 @@ import { useAuth } from '../../hooks/useAuth';
 import type { LoginInput, RegisterInput } from '../../types/auth';
 import { BrandLogo } from '../../components/BrandLogo';
 import { isDemoMode, isRealMode } from '../../services/demoMode';
+import { GoogleSignInButton } from './GoogleSignInButton';
+import { GoogleRegistrationModal } from './GoogleRegistrationModal';
+import { getApiErrorMessage } from '../../services/apiClient';
 
 export const loginSchema = z.object({
   email: z.string().trim().email('Enter a valid email address.'),
@@ -28,77 +31,250 @@ export const registerSchema = z.object({
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, demoLogin, error, clearError } = useAuth();
+  const { login, googleAuth, demoLogin, error, clearError } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [pendingGoogleAuth, setPendingGoogleAuth] = useState<{
+    idToken: string;
+    email: string;
+    displayName?: string;
+    avatarUrl?: string;
+  } | null>(null);
+  const [keyModalError, setKeyModalError] = useState<string | null>(null);
+
   const form = useForm<LoginInput>({ resolver: zodResolver(loginSchema), defaultValues: { email: '', password: '' } });
   useEffect(() => clearError(), [clearError]);
+
   const onSubmit = async (values: LoginInput) => {
-    try { await login(values); navigate((location.state as { from?: string } | null)?.from ?? '/dashboard', { replace: true }); } catch { /* server error is rendered */ }
+    try {
+      await login(values);
+      navigate((location.state as { from?: string } | null)?.from ?? '/dashboard', { replace: true });
+    } catch {
+      /* server error is rendered */
+    }
   };
-  return <AuthLayout title="Welcome back" subtitle="Sign in to turn your academic commitments into a realistic study plan.">
-    <form className="auth-form" onSubmit={form.handleSubmit(onSubmit)} noValidate>
-      <Field label="Email" error={form.formState.errors.email?.message}><input type="email" autoComplete="email" {...form.register('email')} /></Field>
-      <Field label="Password" error={form.formState.errors.password?.message}><div className="password-field"><input type={showPassword ? 'text' : 'password'} autoComplete="current-password" {...form.register('password')} /><button type="button" onClick={() => setShowPassword(!showPassword)}>{showPassword ? 'Hide' : 'Show'}</button></div></Field>
-      {error && <div className="form-error" role="alert">{error}</div>}
-      <button className="primary-button auth-submit" disabled={form.formState.isSubmitting}>{form.formState.isSubmitting ? 'Signing in…' : 'Sign in'}</button>
-    </form>
-    {!isRealMode() && (import.meta.env.DEV || isDemoMode()) && (
-      <button
-        className="secondary-button auth-demo"
-        type="button"
-        onClick={() => { demoLogin(); navigate('/dashboard', { replace: true }); }}
-      >
-        Continue in demo mode (Alex Nguyen · FPT University Quy Nhơn)
-      </button>
-    )}
-    <p className="auth-switch">New to SmartSchedule? <Link to="/register">Create an account</Link></p>
-  </AuthLayout>;
+
+  const handleGoogleToken = async (idToken: string) => {
+    setGoogleLoading(true);
+    setKeyModalError(null);
+    clearError();
+    try {
+      const res = await googleAuth({ idToken });
+      if (res.status === 'AUTHENTICATED') {
+        navigate((location.state as { from?: string } | null)?.from ?? '/dashboard', { replace: true });
+      } else if (res.status === 'KEY_REQUIRED') {
+        setPendingGoogleAuth({
+          idToken,
+          email: res.email || '',
+          displayName: res.displayName,
+          avatarUrl: res.avatarUrl,
+        });
+      }
+    } catch {
+      /* error is set in authStore */
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleKeySubmit = async (registrationKey: string) => {
+    if (!pendingGoogleAuth) return;
+    setGoogleLoading(true);
+    setKeyModalError(null);
+    try {
+      const res = await googleAuth({
+        idToken: pendingGoogleAuth.idToken,
+        registrationKey,
+      });
+      if (res.status === 'AUTHENTICATED') {
+        setPendingGoogleAuth(null);
+        navigate((location.state as { from?: string } | null)?.from ?? '/dashboard', { replace: true });
+      }
+    } catch (err: any) {
+      setKeyModalError(getApiErrorMessage(err));
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  return (
+    <AuthLayout title="Welcome back" subtitle="Sign in to turn your academic commitments into a realistic study plan.">
+      <GoogleSignInButton onTokenReceived={handleGoogleToken} isLoading={googleLoading} />
+
+      <div className="auth-divider">
+        <span>or sign in with email</span>
+      </div>
+
+      <form className="auth-form" onSubmit={form.handleSubmit(onSubmit)} noValidate>
+        <Field label="Email" error={form.formState.errors.email?.message}>
+          <input type="email" autoComplete="email" {...form.register('email')} />
+        </Field>
+        <Field label="Password" error={form.formState.errors.password?.message}>
+          <div className="password-field">
+            <input type={showPassword ? 'text' : 'password'} autoComplete="current-password" {...form.register('password')} />
+            <button type="button" onClick={() => setShowPassword(!showPassword)}>{showPassword ? 'Hide' : 'Show'}</button>
+          </div>
+        </Field>
+        {error && <div className="form-error" role="alert">{error}</div>}
+        <button className="primary-button auth-submit" disabled={form.formState.isSubmitting || googleLoading}>
+          {form.formState.isSubmitting ? 'Signing in…' : 'Sign in'}
+        </button>
+      </form>
+
+      {!isRealMode() && (import.meta.env.DEV || isDemoMode()) && (
+        <button
+          className="secondary-button auth-demo"
+          type="button"
+          onClick={() => { demoLogin(); navigate('/dashboard', { replace: true }); }}
+        >
+          Continue in demo mode (Alex Nguyen · FPT University Quy Nhơn)
+        </button>
+      )}
+
+      <p className="auth-switch">New to SmartSchedule? <Link to="/register">Create an account</Link></p>
+
+      <GoogleRegistrationModal
+        isOpen={Boolean(pendingGoogleAuth)}
+        email={pendingGoogleAuth?.email || ''}
+        displayName={pendingGoogleAuth?.displayName}
+        avatarUrl={pendingGoogleAuth?.avatarUrl}
+        isLoading={googleLoading}
+        error={keyModalError}
+        onSubmit={handleKeySubmit}
+        onClose={() => setPendingGoogleAuth(null)}
+      />
+    </AuthLayout>
+  );
 }
 
 export function RegisterPage() {
   const navigate = useNavigate();
-  const { register, error, clearError } = useAuth();
+  const { register, googleAuth, error, clearError } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showActivationKey, setShowActivationKey] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [pendingGoogleAuth, setPendingGoogleAuth] = useState<{
+    idToken: string;
+    email: string;
+    displayName?: string;
+    avatarUrl?: string;
+  } | null>(null);
+  const [keyModalError, setKeyModalError] = useState<string | null>(null);
+
   const form = useForm<RegisterInput & { confirmPassword: string }>({
     resolver: zodResolver(registerSchema),
     defaultValues: { displayName: '', email: '', password: '', confirmPassword: '', activationKey: '' },
   });
   useEffect(() => clearError(), [clearError]);
+
   const onSubmit = async ({ confirmPassword: _confirmPassword, ...values }: RegisterInput & { confirmPassword: string }) => {
-    try { await register(values); navigate('/dashboard', { replace: true }); } catch { /* server error is rendered */ }
+    try {
+      await register(values);
+      navigate('/dashboard', { replace: true });
+    } catch {
+      /* server error is rendered */
+    }
   };
-  return <AuthLayout title="Create your workspace" subtitle="Start with your university timetable, then let the engine find the time.">
-    <form className="auth-form" onSubmit={form.handleSubmit(onSubmit)} noValidate>
-      <Field label="Display name" error={form.formState.errors.displayName?.message}><input autoComplete="name" {...form.register('displayName')} /></Field>
-      <Field label="Email" error={form.formState.errors.email?.message}><input type="email" autoComplete="email" {...form.register('email')} /></Field>
-      <Field label="Password" hint="At least 8 characters, one uppercase letter, and one number." error={form.formState.errors.password?.message}>
-        <div className="password-field">
-          <input type={showPassword ? 'text' : 'password'} autoComplete="new-password" {...form.register('password')} />
-          <button type="button" onClick={() => setShowPassword(!showPassword)}>{showPassword ? 'Hide' : 'Show'}</button>
-        </div>
-      </Field>
-      <Field label="Confirm password" error={form.formState.errors.confirmPassword?.message}>
-        <input type={showPassword ? 'text' : 'password'} autoComplete="new-password" {...form.register('confirmPassword')} />
-      </Field>
-      <Field label="Mã kích hoạt (Activation Key)" hint="Yêu cầu mã kích hoạt do ban quản trị cấp trong đợt thử nghiệm này." error={form.formState.errors.activationKey?.message}>
-        <div className="password-field">
-          <input
-            type={showActivationKey ? 'text' : 'password'}
-            autoComplete="off"
-            placeholder="Nhập mã kích hoạt của bạn"
-            {...form.register('activationKey')}
-          />
-          <button type="button" onClick={() => setShowActivationKey(!showActivationKey)}>
-            {showActivationKey ? 'Ẩn' : 'Hiện'}
-          </button>
-        </div>
-      </Field>
-      {error && <div className="form-error" role="alert">{error}</div>}
-      <button className="primary-button auth-submit" disabled={form.formState.isSubmitting}>{form.formState.isSubmitting ? 'Creating…' : 'Create account'}</button>
-    </form>
-    <p className="auth-switch">Already have an account? <Link to="/login">Sign in</Link></p>
-  </AuthLayout>;
+
+  const handleGoogleToken = async (idToken: string) => {
+    setGoogleLoading(true);
+    setKeyModalError(null);
+    clearError();
+    try {
+      const res = await googleAuth({ idToken });
+      if (res.status === 'AUTHENTICATED') {
+        navigate('/dashboard', { replace: true });
+      } else if (res.status === 'KEY_REQUIRED') {
+        setPendingGoogleAuth({
+          idToken,
+          email: res.email || '',
+          displayName: res.displayName,
+          avatarUrl: res.avatarUrl,
+        });
+      }
+    } catch {
+      /* error is set in authStore */
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleKeySubmit = async (registrationKey: string) => {
+    if (!pendingGoogleAuth) return;
+    setGoogleLoading(true);
+    setKeyModalError(null);
+    try {
+      const res = await googleAuth({
+        idToken: pendingGoogleAuth.idToken,
+        registrationKey,
+      });
+      if (res.status === 'AUTHENTICATED') {
+        setPendingGoogleAuth(null);
+        navigate('/dashboard', { replace: true });
+      }
+    } catch (err: any) {
+      setKeyModalError(getApiErrorMessage(err));
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  return (
+    <AuthLayout title="Create your workspace" subtitle="Start with your university timetable, then let the engine find the time.">
+      <GoogleSignInButton onTokenReceived={handleGoogleToken} isLoading={googleLoading} />
+
+      <div className="auth-divider">
+        <span>or register with email</span>
+      </div>
+
+      <form className="auth-form" onSubmit={form.handleSubmit(onSubmit)} noValidate>
+        <Field label="Display name" error={form.formState.errors.displayName?.message}>
+          <input autoComplete="name" {...form.register('displayName')} />
+        </Field>
+        <Field label="Email" error={form.formState.errors.email?.message}>
+          <input type="email" autoComplete="email" {...form.register('email')} />
+        </Field>
+        <Field label="Password" hint="At least 8 characters, one uppercase letter, and one number." error={form.formState.errors.password?.message}>
+          <div className="password-field">
+            <input type={showPassword ? 'text' : 'password'} autoComplete="new-password" {...form.register('password')} />
+            <button type="button" onClick={() => setShowPassword(!showPassword)}>{showPassword ? 'Hide' : 'Show'}</button>
+          </div>
+        </Field>
+        <Field label="Confirm password" error={form.formState.errors.confirmPassword?.message}>
+          <input type={showPassword ? 'text' : 'password'} autoComplete="new-password" {...form.register('confirmPassword')} />
+        </Field>
+        <Field label="Mã kích hoạt (Activation Key)" hint="Yêu cầu mã kích hoạt do ban quản trị cấp trong đợt thử nghiệm này." error={form.formState.errors.activationKey?.message}>
+          <div className="password-field">
+            <input
+              type={showActivationKey ? 'text' : 'password'}
+              autoComplete="off"
+              placeholder="Nhập mã kích hoạt của bạn"
+              {...form.register('activationKey')}
+            />
+            <button type="button" onClick={() => setShowActivationKey(!showActivationKey)}>
+              {showActivationKey ? 'Ẩn' : 'Hiện'}
+            </button>
+          </div>
+        </Field>
+        {error && <div className="form-error" role="alert">{error}</div>}
+        <button className="primary-button auth-submit" disabled={form.formState.isSubmitting || googleLoading}>
+          {form.formState.isSubmitting ? 'Creating…' : 'Create account'}
+        </button>
+      </form>
+      <p className="auth-switch">Already have an account? <Link to="/login">Sign in</Link></p>
+
+      <GoogleRegistrationModal
+        isOpen={Boolean(pendingGoogleAuth)}
+        email={pendingGoogleAuth?.email || ''}
+        displayName={pendingGoogleAuth?.displayName}
+        avatarUrl={pendingGoogleAuth?.avatarUrl}
+        isLoading={googleLoading}
+        error={keyModalError}
+        onSubmit={handleKeySubmit}
+        onClose={() => setPendingGoogleAuth(null)}
+      />
+    </AuthLayout>
+  );
 }
 
 function AuthLayout({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
@@ -120,5 +296,12 @@ function AuthLayout({ title, subtitle, children }: { title: string; subtitle: st
 }
 
 function Field({ label, hint, error, children }: { label: string; hint?: string; error?: string; children: React.ReactNode }) {
-  return <label className="field"><span>{label}</span>{children}{hint && !error && <small>{hint}</small>}{error && <small className="field-error">{error}</small>}</label>;
+  return (
+    <label className="field">
+      <span>{label}</span>
+      {children}
+      {hint && !error && <small>{hint}</small>}
+      {error && <small className="field-error">{error}</small>}
+    </label>
+  );
 }

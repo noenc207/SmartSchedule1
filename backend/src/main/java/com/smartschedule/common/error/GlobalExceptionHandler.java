@@ -18,7 +18,9 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AuthException.class)
     ResponseEntity<ApiError> auth(AuthException exception, HttpServletRequest request) {
         int status = switch (exception.getCode()) {
-            case "FORBIDDEN", "INVALID_ACTIVATION_KEY", "REGISTRATION_DISABLED" -> 403;
+            case "FORBIDDEN", "INVALID_ACTIVATION_KEY", "REGISTRATION_DISABLED",
+                 "INVALID_REGISTRATION_KEY", "REGISTRATION_KEY_REQUIRED",
+                 "REGISTRATION_KEY_ALREADY_USED", "REGISTRATION_KEY_EXPIRED" -> 403;
             case "EMAIL_ALREADY_REGISTERED" -> 409;
             case "TOO_MANY_REQUESTS" -> 429;
             default -> 401;

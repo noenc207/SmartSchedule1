@@ -19,8 +19,11 @@ public class CustomUserDetailsService implements UserDetailsService {
     public UserDetails loadUserByUsername(String email) {
         User user = users.findByEmailIgnoreCaseAndDeletedAtIsNull(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+        String password = (user.getPasswordHash() != null && !user.getPasswordHash().isBlank())
+                ? user.getPasswordHash()
+                : "{noop}*GOOGLE_OAUTH_NO_LOCAL_PASSWORD*";
         return org.springframework.security.core.userdetails.User.withUsername(user.getEmail())
-                .password(user.getPasswordHash())
+                .password(password)
                 .disabled(!user.isEnabled())
                 .authorities("ROLE_USER")
                 .build();

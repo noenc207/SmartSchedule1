@@ -30,3 +30,19 @@ export type RegisterInput = {
   password: string;
   activationKey: string;
 };
+
+export type GoogleAuthInput = {
+  idToken: string;
+  registrationKey?: string;
+};
+
+export type GoogleAuthResponse = {
+  status: 'AUTHENTICATED' | 'KEY_REQUIRED';
+  accessToken?: string;
+  expiresIn?: number;
+  user?: User;
+  refreshToken?: string;
+  email?: string;
+  displayName?: string;
+  avatarUrl?: string;
+};

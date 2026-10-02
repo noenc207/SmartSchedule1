@@ -28,6 +28,47 @@ public final class AuthDtos {
 
     public record LogoutRequest(String refreshToken) {}
 
+    public record GoogleAuthRequest(
+            @NotBlank String idToken,
+            String registrationKey) {}
+
+    public record GoogleAuthResponse(
+            String status, // "AUTHENTICATED" or "KEY_REQUIRED"
+            String accessToken,
+            Long expiresIn,
+            UserResponse user,
+            String refreshToken,
+            String email,
+            String displayName,
+            String avatarUrl) {
+
+        public static GoogleAuthResponse authenticated(AuthResponse auth) {
+            return new GoogleAuthResponse(
+                    "AUTHENTICATED",
+                    auth.accessToken(),
+                    auth.expiresIn(),
+                    auth.user(),
+                    auth.refreshToken(),
+                    auth.user() != null ? auth.user().email() : null,
+                    auth.user() != null ? auth.user().displayName() : null,
+                    auth.user() != null ? auth.user().avatarUrl() : null
+            );
+        }
+
+        public static GoogleAuthResponse keyRequired(String email, String displayName, String avatarUrl) {
+            return new GoogleAuthResponse(
+                    "KEY_REQUIRED",
+                    null,
+                    null,
+                    null,
+                    null,
+                    email,
+                    displayName,
+                    avatarUrl
+            );
+        }
+    }
+
     public record UserResponse(
             UUID id, String email, String displayName, String avatarUrl,
             boolean enabled, String timezone, String locale, Instant createdAt, String tier) {

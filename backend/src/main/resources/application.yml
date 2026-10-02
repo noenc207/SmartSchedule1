@@ -33,6 +33,7 @@ smartschedule:
     refresh-cookie-name: ${SMARTSCHEDULE_REFRESH_COOKIE_NAME:smartschedule_refresh}
     secure-cookie: ${SMARTSCHEDULE_SECURE_COOKIE:false}
     registration-key: ${SMARTSCHEDULE_REGISTRATION_KEY:SMART-DEPLOY-2026}
+    google-client-id: ${SMARTSCHEDULE_GOOGLE_CLIENT_ID:}
   plan:
     mode: ${SMARTSCHEDULE_PLAN_MODE:ALL_PRO}
   rate-limit:
