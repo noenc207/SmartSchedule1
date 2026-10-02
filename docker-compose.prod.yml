@@ -63,6 +63,7 @@ services:
       SMARTSCHEDULE_RATE_LIMIT_REGISTER_PER_MIN: 5
       SMARTSCHEDULE_RATE_LIMIT_LOGIN_PER_MIN: 15
       SMARTSCHEDULE_RATE_LIMIT_REFRESH_PER_MIN: 30
+      SMARTSCHEDULE_GOOGLE_CLIENT_ID: ${SMARTSCHEDULE_GOOGLE_CLIENT_ID:-}
       JAVA_TOOL_OPTIONS: "-Xms512m -Xmx1024m -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError"
     expose:
       - "8080"
@@ -89,6 +90,7 @@ services:
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api/v1}
         VITE_API_MODE: real
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
     container_name: smartschedule-web-prod
     restart: unless-stopped
     ports:

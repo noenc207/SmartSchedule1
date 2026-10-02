@@ -6,16 +6,32 @@ interface SocialAuthButtonsProps {
   onNotice?: (message: string) => void;
 }
 
+/**
+ * Validates whether a Google Client ID conforms to the official Google Cloud Platform format:
+ * <project-number>-<alphanumeric-hash>.apps.googleusercontent.com
+ */
+export function isRealGoogleClientId(clientId?: string): boolean {
+  if (!clientId) return false;
+  const trimmed = clientId.trim();
+  if (
+    trimmed.length === 0 ||
+    trimmed.includes('smartschedule-') ||
+    trimmed.includes('your-google-client-id') ||
+    trimmed.includes('replace-with')
+  ) {
+    return false;
+  }
+  return /^\d+-[a-zA-Z0-9_-]+\.apps\.googleusercontent\.com$/.test(trimmed);
+}
+
 export function SocialAuthButtons({ onGoogleToken, isLoading, onNotice }: SocialAuthButtonsProps) {
   const [socialLoading, setSocialLoading] = useState<string | null>(null);
   const popupRef = useRef<Window | null>(null);
   const pollTimerRef = useRef<number | null>(null);
 
+  // Single canonical source for Google Client ID
   const rawClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-  // Use configured Client ID or fallback to standard client ID for local dev
-  const clientId = (rawClientId && rawClientId.trim().length > 0)
-    ? rawClientId.trim()
-    : 'smartschedule-preview-client.apps.googleusercontent.com';
+  const clientId = rawClientId ? rawClientId.trim() : '';
 
   useEffect(() => {
     // Listen for postMessage from the popup window callback
@@ -50,8 +66,18 @@ export function SocialAuthButtons({ onGoogleToken, isLoading, onNotice }: Social
 
   const handleGoogleClick = () => {
     if (isLoading || socialLoading) return;
-    setSocialLoading('google');
 
+    // Validate that a real, registered Google Cloud Client ID is configured
+    if (!clientId || !isRealGoogleClientId(clientId)) {
+      if (onNotice) {
+        onNotice(
+          'Google OAuth Client ID chưa được cấu hình. Vui lòng thiết lập VITE_GOOGLE_CLIENT_ID (dạng <project-number>-<hash>.apps.googleusercontent.com) trong frontend/.env từ Google Cloud Console.'
+        );
+      }
+      return;
+    }
+
+    setSocialLoading('google');
     if (onNotice) onNotice('');
 
     // Compute standard redirect URI to official callback route
