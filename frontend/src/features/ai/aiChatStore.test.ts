@@ -142,4 +142,13 @@ describe('aiChatStore', () => {
     expect(state.isStreaming).toBe(false);
     expect(state.messages[1].content).toContain('Xin lỗi, tôi gặp sự cố');
   });
+
+  it('updates and persists bubble position', () => {
+    useAiChatStore.getState().setBubblePosition({ x: 150, y: 300 });
+    expect(useAiChatStore.getState().bubblePosition).toEqual({ x: 150, y: 300 });
+
+    useAiChatStore.getState().setBubblePosition(null);
+    expect(useAiChatStore.getState().bubblePosition).toBeNull();
+  });
 });
+

@@ -18,6 +18,8 @@ export function AIChatPanel() {
   const newConversation = useAiChatStore((s) => s.newConversation);
   const clearError = useAiChatStore((s) => s.clearError);
 
+  const bubblePosition = useAiChatStore((s) => s.bubblePosition);
+
   // Close on Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -33,6 +35,39 @@ export function AIChatPanel() {
 
   const isBusy = isThinking || isStreaming;
 
+  // Compute dynamic desktop positioning adjacent to the bubble
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 640;
+  let panelInlineStyle: React.CSSProperties | undefined = undefined;
+
+  if (!isMobile && bubblePosition) {
+    const panelWidth = 395;
+    const panelHeight = Math.min(590, window.innerHeight - 32);
+    const bubbleSize = 64;
+    const margin = 12;
+
+    let left: number;
+    if (bubblePosition.x > window.innerWidth / 2) {
+      left = Math.max(16, bubblePosition.x + bubbleSize - panelWidth);
+    } else {
+      left = Math.min(window.innerWidth - panelWidth - 16, Math.max(16, bubblePosition.x));
+    }
+
+    let top: number;
+    if (bubblePosition.y > window.innerHeight / 2) {
+      top = Math.max(16, bubblePosition.y - panelHeight - margin);
+    } else {
+      top = Math.min(window.innerHeight - panelHeight - 16, bubblePosition.y + bubbleSize + margin);
+    }
+
+    panelInlineStyle = {
+      position: 'fixed',
+      left: `${left}px`,
+      top: `${top}px`,
+      right: 'auto',
+      bottom: 'auto',
+    };
+  }
+
   return (
     <>
       {/* Mobile backdrop */}
@@ -44,6 +79,7 @@ export function AIChatPanel() {
 
       <div
         className="ai-chat-panel-container"
+        style={panelInlineStyle}
         role="dialog"
         aria-labelledby="ai-chat-title"
         aria-modal="true"

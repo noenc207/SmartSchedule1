@@ -4,6 +4,31 @@ import { getApiErrorMessage } from '../services/apiClient';
 
 export type MascotState = 'IDLE' | 'HOVER' | 'OPEN' | 'THINKING' | 'ERROR';
 
+export interface BubblePosition {
+  x: number;
+  y: number;
+}
+
+const loadInitialBubblePosition = (): BubblePosition | null => {
+  try {
+    if (typeof window === 'undefined') return null;
+    const raw = localStorage.getItem('smartschedule_ai_bubble_pos');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (typeof parsed?.x === 'number' && typeof parsed?.y === 'number') {
+      const maxX = Math.max(12, window.innerWidth - 76);
+      const maxY = Math.max(12, window.innerHeight - 76);
+      return {
+        x: Math.max(12, Math.min(maxX, parsed.x)),
+        y: Math.max(12, Math.min(maxY, parsed.y)),
+      };
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+};
+
 export interface AiChatState {
   isOpen: boolean;
   activeConversationId: string | null;
@@ -13,10 +38,12 @@ export interface AiChatState {
   error: string | null;
   unreadCount: number;
   mascotState: MascotState;
+  bubblePosition: BubblePosition | null;
 
   toggleOpen: () => void;
   setOpen: (open: boolean) => void;
   setMascotHover: (hover: boolean) => void;
+  setBubblePosition: (pos: BubblePosition | null) => void;
   loadHistory: () => Promise<void>;
   sendMessage: (text: string) => Promise<void>;
   newConversation: () => Promise<void>;
@@ -32,6 +59,20 @@ export const useAiChatStore = create<AiChatState>((set, get) => ({
   error: null,
   unreadCount: 0,
   mascotState: 'IDLE',
+  bubblePosition: loadInitialBubblePosition(),
+
+  setBubblePosition: (pos) => {
+    set({ bubblePosition: pos });
+    try {
+      if (pos) {
+        localStorage.setItem('smartschedule_ai_bubble_pos', JSON.stringify(pos));
+      } else {
+        localStorage.removeItem('smartschedule_ai_bubble_pos');
+      }
+    } catch {
+      /* ignore */
+    }
+  },
 
   toggleOpen: () => {
     const nextOpen = !get().isOpen;
