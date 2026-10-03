@@ -90,7 +90,7 @@ public class GeminiProvider implements AiProvider {
 
         for (int keyIdx = 0; keyIdx < candidateKeys.size(); keyIdx++) {
             String apiKey = candidateKeys.get(keyIdx);
-            boolean keyQuotaExceeded = false;
+            boolean keyFailed = false;
 
             for (int modelIndex = 0; modelIndex < candidateModels.size(); modelIndex++) {
                 String model = candidateModels.get(modelIndex);
@@ -140,11 +140,12 @@ public class GeminiProvider implements AiProvider {
                         boolean isRetriable = isRetriableStatus(status);
                         boolean isModelNotFound = (status == 404);
                         boolean isQuota = (status == 429);
+                        boolean isAuthError = (status == 401 || status == 403 || (status == 400 && body != null && body.contains("API_KEY_INVALID")));
 
-                        if (isQuota && keyIdx < candidateKeys.size() - 1) {
-                            log.info("Gemini key #{} hit quota 429, switching to next key #{} in pool",
-                                    keyIdx + 1, keyIdx + 2);
-                            keyQuotaExceeded = true;
+                        if ((isQuota || isAuthError) && keyIdx < candidateKeys.size() - 1) {
+                            log.info("Gemini key #{} hit status {} (quota/auth error), switching to next key in pool",
+                                    keyIdx + 1, status);
+                            keyFailed = true;
                             lastException = mapHttpResponseToAiException(status, body);
                             break;
                         }
@@ -182,7 +183,7 @@ public class GeminiProvider implements AiProvider {
                     }
                 }
 
-                if (keyQuotaExceeded) {
+                if (keyFailed) {
                     break;
                 }
             }
@@ -212,7 +213,7 @@ public class GeminiProvider implements AiProvider {
 
         for (int keyIdx = 0; keyIdx < candidateKeys.size(); keyIdx++) {
             String apiKey = candidateKeys.get(keyIdx);
-            boolean keyQuotaExceeded = false;
+            boolean keyFailed = false;
 
             for (int modelIndex = 0; modelIndex < candidateModels.size(); modelIndex++) {
                 String model = candidateModels.get(modelIndex);
@@ -252,11 +253,12 @@ public class GeminiProvider implements AiProvider {
                             boolean isRetriable = isRetriableStatus(responseCode);
                             boolean isModelNotFound = (responseCode == 404);
                             boolean isQuota = (responseCode == 429);
+                            boolean isAuthError = (responseCode == 401 || responseCode == 403 || (responseCode == 400 && errorBody.contains("API_KEY_INVALID")));
 
-                            if (isQuota && keyIdx < candidateKeys.size() - 1) {
-                                log.info("Gemini stream key #{} hit quota 429, switching to next key #{} in pool",
-                                        keyIdx + 1, keyIdx + 2);
-                                keyQuotaExceeded = true;
+                            if ((isQuota || isAuthError) && keyIdx < candidateKeys.size() - 1) {
+                                log.info("Gemini stream key #{} hit status {} (quota/auth error), switching to next key in pool",
+                                        keyIdx + 1, responseCode);
+                                keyFailed = true;
                                 lastException = mapHttpResponseToAiException(responseCode, errorBody);
                                 break;
                             }
@@ -324,6 +326,10 @@ public class GeminiProvider implements AiProvider {
                         if (modelIndex < candidateModels.size() - 1 && isTransient) {
                             break;
                         }
+                        if (keyIdx < candidateKeys.size() - 1) {
+                            keyFailed = true;
+                            break;
+                        }
                         if (!isTransient && keyIdx >= candidateKeys.size() - 1) {
                             onError.accept(ex);
                             return;
@@ -346,7 +352,7 @@ public class GeminiProvider implements AiProvider {
                     }
                 }
 
-                if (keyQuotaExceeded) {
+                if (keyFailed) {
                     break;
                 }
             }
@@ -369,13 +375,13 @@ public class GeminiProvider implements AiProvider {
             list.add(configured.trim());
         }
         List<String> fallbacks = List.of(
-                "gemini-1.5-flash",
-                "gemini-2.0-flash",
-                "gemini-1.5-flash-8b",
-                "gemini-flash-lite-latest",
-                "gemini-1.5-pro",
+                "gemini-3.8-flash",
                 "gemini-3.6-flash",
-                "gemini-3.5-flash"
+                "gemini-3.5-flash",
+                "gemini-flash-lite-latest",
+                "gemini-flash-latest",
+                "gemini-2.5-flash",
+                "gemini-2.5-pro"
         );
         for (String fb : fallbacks) {
             if (!list.contains(fb)) {
