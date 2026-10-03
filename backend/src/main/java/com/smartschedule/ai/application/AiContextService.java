@@ -54,26 +54,78 @@ public class AiContextService {
     public String buildContextSummary(User user, AiDtos.ClientContextDto clientContext) {
         ZoneId zoneId = resolveZone(user.getTimezone(), clientContext);
         ZonedDateTime now = ZonedDateTime.now(zoneId);
+
+        String lang = (clientContext != null && clientContext.preferredLanguage() != null && !clientContext.preferredLanguage().isBlank())
+                ? clientContext.preferredLanguage().trim().toLowerCase()
+                : (user.getLocale() != null ? user.getLocale().trim().toLowerCase() : "vi");
+        boolean isEnglish = "en".equals(lang) || lang.startsWith("en");
+
+        Locale locale = isEnglish ? Locale.ENGLISH : Locale.forLanguageTag("vi-VN");
         DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("HH:mm");
-        DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("EEEE, dd/MM/yyyy", Locale.forLanguageTag("vi-VN"));
+        DateTimeFormatter dateFmt = isEnglish
+                ? DateTimeFormatter.ofPattern("EEEE, MMMM dd, yyyy", locale)
+                : DateTimeFormatter.ofPattern("EEEE, dd/MM/yyyy", locale);
+
+        String mode = (clientContext != null && clientContext.activeContextMode() != null && !clientContext.activeContextMode().isBlank())
+                ? clientContext.activeContextMode().trim().toUpperCase()
+                : "ACADEMIC";
 
         StringBuilder sb = new StringBuilder();
-        sb.append("=== THÔNG TIN NGƯỜI DÙNG & NGỮ CẢNH THỜI GIAN HIỆN TẠI ===\n");
-        sb.append("- Người dùng: ").append(user.getDisplayName()).append(" (Email: ").append(user.getEmail()).append(")\n");
-        sb.append("- Thời gian hiện tại: ").append(now.format(timeFmt)).append("\n");
-        sb.append("- Ngày hiện tại: ").append(now.format(dateFmt)).append("\n");
-        sb.append("- Múi giờ: ").append(zoneId.getId()).append("\n");
+        sb.append(isEnglish ? "=== CURRENT USER & TEMPORAL CONTEXT ===\n" : "=== THÔNG TIN NGƯỜI DÙNG & NGỮ CẢNH THỜI GIAN HIỆN TẠI ===\n");
+        sb.append(isEnglish ? "- User: " : "- Người dùng: ").append(user.getDisplayName()).append(" (Email: ").append(user.getEmail()).append(")\n");
+        sb.append(isEnglish ? "- Current Time: " : "- Thời gian hiện tại: ").append(now.format(timeFmt)).append("\n");
+        sb.append(isEnglish ? "- Current Date: " : "- Ngày hiện tại: ").append(now.format(dateFmt)).append("\n");
+        sb.append(isEnglish ? "- Timezone: " : "- Múi giờ: ").append(zoneId.getId()).append("\n");
+        sb.append(isEnglish ? "- Preferred Language: English (EN)\n" : "- Ngôn ngữ ưu tiên: Tiếng Việt (VI)\n");
+        sb.append(isEnglish ? "- Active Context Focus: " + mode + "\n" : "- Chế độ ngữ cảnh: " + mode + "\n");
+
+        switch (mode) {
+            case "WORK" -> {
+                sb.append(isEnglish
+                        ? "\n=== ACTIVE CONTEXT FOCUS: WORK & PROJECTS ===\n" +
+                          "- Priority: Pending tasks, project deadlines, teamwork deliverables, and meeting commitments.\n" +
+                          "- Instruction: When answering general queries, prioritize work tasks and deadline deliverables.\n"
+                        : "\n=== CHẾ ĐỘ NGỮ CẢNH: DỰ ÁN & CÔNG VIỆC (WORK FOCUS) ===\n" +
+                          "- Ưu tiên: Danh sách nhiệm vụ (tasks), hạn nộp dự án, cuộc họp và tiến độ công việc.\n" +
+                          "- Chỉ dẫn: Khi người dùng hỏi chung, ưu tiên phân tích các task pending và hạn chót dự án.\n");
+            }
+            case "PERSONAL" -> {
+                sb.append(isEnglish
+                        ? "\n=== ACTIVE CONTEXT FOCUS: PERSONAL & WELLNESS ===\n" +
+                          "- Priority: Free time windows, wellness habits, exercise, rest, and study-life balance.\n" +
+                          "- Instruction: When answering general queries, highlight breaks, free slots, and healthy balance.\n"
+                        : "\n=== CHẾ ĐỘ NGỮ CẢNH: CÁ NHÂN & ĐỜI SỐNG (PERSONAL FOCUS) ===\n" +
+                          "- Ưu tiên: Khoảng trống thời gian rảnh, thói quen sinh hoạt, thể thao, nghỉ ngơi phục hồi năng lượng.\n" +
+                          "- Chỉ dẫn: Khi người dùng hỏi chung, tập trung vào thời gian rảnh và cân bằng sinh hoạt.\n");
+            }
+            case "GENERAL" -> {
+                sb.append(isEnglish
+                        ? "\n=== ACTIVE CONTEXT FOCUS: BALANCED MULTI-CONTEXT ===\n" +
+                          "- Priority: Balanced integration of academic classes, project tasks, and personal downtime.\n"
+                        : "\n=== CHẾ ĐỘ NGỮ CẢNH: ĐA MỤC TIÊU TỔNG HỢP (BALANCED MULTI-CONTEXT) ===\n" +
+                          "- Ưu tiên: Cân bằng toàn diện giữa lịch học, công việc dự án và thời gian cá nhân.\n");
+            }
+            default -> { // ACADEMIC
+                sb.append(isEnglish
+                        ? "\n=== ACTIVE CONTEXT FOCUS: ACADEMIC & STUDY ===\n" +
+                          "- Priority: Timetable classes, lecture slots, instructors, classrooms, syllabus, and exam schedules.\n" +
+                          "- Instruction: When answering general queries or schedule checks, prioritize academic classes and study sessions.\n"
+                        : "\n=== CHẾ ĐỘ NGỮ CẢNH: HỌC TẬP (ACADEMIC FOCUS) ===\n" +
+                          "- Ưu tiên: Lịch học, tiết học, phòng học, giảng viên, tín chỉ, syllabus và đề thi.\n" +
+                          "- Chỉ dẫn: Khi người dùng hỏi chung hoặc kiểm tra lịch, ưu tiên thời khóa biểu và các tiết học.\n");
+            }
+        }
 
         if (clientContext != null) {
-            sb.append("\n=== NGỮ CẢNH GIAO DIỆN HIỆN TẠI (CLIENT CONTEXT) ===\n");
+            sb.append(isEnglish ? "\n=== CLIENT UI CONTEXT ===\n" : "\n=== NGỮ CẢNH GIAO DIỆN HIỆN TẠI (CLIENT CONTEXT) ===\n");
             if (clientContext.page() != null && !clientContext.page().isBlank()) {
-                sb.append("- Màn hình đang mở: ").append(clientContext.page()).append("\n");
+                sb.append(isEnglish ? "- Active Screen: " : "- Màn hình đang mở: ").append(clientContext.page()).append("\n");
             }
             if (clientContext.selectedDate() != null && !clientContext.selectedDate().isBlank()) {
-                sb.append("- Ngày đang được xem/chọn trên lịch: ").append(clientContext.selectedDate()).append("\n");
+                sb.append(isEnglish ? "- Selected Date on Calendar: " : "- Ngày đang được xem/chọn trên lịch: ").append(clientContext.selectedDate()).append("\n");
             }
             if (clientContext.selectedEventTitle() != null && !clientContext.selectedEventTitle().isBlank()) {
-                sb.append("- Sự kiện đang được chọn/mở: ").append(clientContext.selectedEventTitle());
+                sb.append(isEnglish ? "- Selected Event: " : "- Sự kiện đang được chọn/mở: ").append(clientContext.selectedEventTitle());
                 if (clientContext.selectedEventId() != null) {
                     sb.append(" (ID: ").append(clientContext.selectedEventId()).append(")");
                 }

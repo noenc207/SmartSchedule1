@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { X, RotateCcw, AlertTriangle, Sparkles } from 'lucide-react';
+import { X, RotateCcw, AlertTriangle, Sparkles, GraduationCap, Briefcase, Heart, Globe, Languages } from 'lucide-react';
 import { useAiChatStore } from '../../stores/aiChatStore';
 import { AIMascot } from './AIMascot';
 import { AIChatMessages } from './AIChatMessages';
@@ -18,6 +18,11 @@ export function AIChatPanel() {
   const sendVisionFile = useAiChatStore((s) => s.sendVisionFile);
   const newConversation = useAiChatStore((s) => s.newConversation);
   const clearError = useAiChatStore((s) => s.clearError);
+
+  const activeContextMode = useAiChatStore((s) => s.activeContextMode);
+  const setContextMode = useAiChatStore((s) => s.setContextMode);
+  const preferredLanguage = useAiChatStore((s) => s.preferredLanguage);
+  const setPreferredLanguage = useAiChatStore((s) => s.setPreferredLanguage);
 
   const bubblePosition = useAiChatStore((s) => s.bubblePosition);
 
@@ -99,17 +104,29 @@ export function AIChatPanel() {
                 </h2>
                 <span className="ai-gemini-tag">Gemini</span>
               </div>
-              <p className="ai-chat-subtitle">Trợ lý học thuật thông minh</p>
+              <p className="ai-chat-subtitle">
+                {preferredLanguage === 'en' ? 'Autonomous Academic Copilot' : 'Trợ lý học thuật thông minh'}
+              </p>
             </div>
           </div>
 
           <div className="ai-chat-header-actions">
             <button
               type="button"
+              className="ai-header-btn ai-lang-toggle"
+              onClick={() => setPreferredLanguage(preferredLanguage === 'vi' ? 'en' : 'vi')}
+              title={preferredLanguage === 'vi' ? 'Chuyển sang tiếng Anh (Switch to English)' : 'Switch to Vietnamese (Chuyển sang tiếng Việt)'}
+              aria-label="Toggle Language"
+            >
+              <Languages size={13} />
+              <span className="ai-lang-label">{preferredLanguage.toUpperCase()}</span>
+            </button>
+            <button
+              type="button"
               className="ai-header-btn"
               onClick={newConversation}
               disabled={isBusy}
-              title="Bắt đầu cuộc trò chuyện mới"
+              title={preferredLanguage === 'en' ? 'New conversation' : 'Bắt đầu cuộc trò chuyện mới'}
               aria-label="Cuộc trò chuyện mới"
             >
               <RotateCcw size={15} />
@@ -118,12 +135,60 @@ export function AIChatPanel() {
               type="button"
               className="ai-header-btn ai-header-close"
               onClick={() => setOpen(false)}
-              title="Đóng / Thu nhỏ"
+              title={preferredLanguage === 'en' ? 'Close' : 'Đóng / Thu nhỏ'}
               aria-label="Đóng"
             >
               <X size={17} />
             </button>
           </div>
+        </div>
+
+        {/* Multi-Context Mode Bar */}
+        <div className="ai-context-modes-bar" role="tablist" aria-label="Context Mode">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeContextMode === 'ACADEMIC'}
+            className={`ai-context-mode-btn ${activeContextMode === 'ACADEMIC' ? 'active' : ''}`}
+            onClick={() => setContextMode('ACADEMIC')}
+            title={preferredLanguage === 'en' ? 'Study & Lectures Focus' : 'Ngữ cảnh Học tập & Thi cử'}
+          >
+            <GraduationCap size={13} />
+            <span>{preferredLanguage === 'en' ? 'Study' : 'Học tập'}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeContextMode === 'WORK'}
+            className={`ai-context-mode-btn ${activeContextMode === 'WORK' ? 'active' : ''}`}
+            onClick={() => setContextMode('WORK')}
+            title={preferredLanguage === 'en' ? 'Projects & Tasks Focus' : 'Ngữ cảnh Dự án & Công việc'}
+          >
+            <Briefcase size={13} />
+            <span>{preferredLanguage === 'en' ? 'Work' : 'Công việc'}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeContextMode === 'PERSONAL'}
+            className={`ai-context-mode-btn ${activeContextMode === 'PERSONAL' ? 'active' : ''}`}
+            onClick={() => setContextMode('PERSONAL')}
+            title={preferredLanguage === 'en' ? 'Personal & Wellness Focus' : 'Ngữ cảnh Cá nhân & Nghỉ ngơi'}
+          >
+            <Heart size={13} />
+            <span>{preferredLanguage === 'en' ? 'Life' : 'Cá nhân'}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeContextMode === 'GENERAL'}
+            className={`ai-context-mode-btn ${activeContextMode === 'GENERAL' ? 'active' : ''}`}
+            onClick={() => setContextMode('GENERAL')}
+            title={preferredLanguage === 'en' ? 'Balanced All Focus' : 'Ngữ cảnh Tổng hợp Đa nhiệm'}
+          >
+            <Globe size={13} />
+            <span>{preferredLanguage === 'en' ? 'All' : 'Tổng hợp'}</span>
+          </button>
         </div>
 
         {/* Error notification banner */}

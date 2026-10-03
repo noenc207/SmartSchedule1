@@ -106,14 +106,15 @@ public class GeminiProvider implements AiProvider {
 
                     boolean isRetriable = isRetriableStatus(status);
                     boolean isModelNotFound = (status == 404);
+                    boolean isQuotaExhausted = (status == 429 && body != null && body.contains("Quota exceeded"));
                     boolean hasMoreModels = modelIndex < candidateModels.size() - 1;
 
-                    if (isRetriable && attempt < maxAttempts) {
+                    if (isRetriable && !isQuotaExhausted && attempt < maxAttempts) {
                         sleepWithBackoff(attempt);
                         continue;
                     }
 
-                    if (hasMoreModels && (isRetriable || isModelNotFound)) {
+                    if (hasMoreModels && (isRetriable || isModelNotFound || isQuotaExhausted)) {
                         lastException = mapHttpResponseToAiException(status, body);
                         log.info("Gemini model {} failed with HTTP {}, switching to next candidate model", model, status);
                         break;
@@ -200,14 +201,15 @@ public class GeminiProvider implements AiProvider {
 
                         boolean isRetriable = isRetriableStatus(responseCode);
                         boolean isModelNotFound = (responseCode == 404);
+                        boolean isQuotaExhausted = (responseCode == 429 && errorBody != null && errorBody.contains("Quota exceeded"));
                         boolean hasMoreModels = modelIndex < candidateModels.size() - 1;
 
-                        if (isRetriable && attempt < maxAttempts) {
+                        if (isRetriable && !isQuotaExhausted && attempt < maxAttempts) {
                             sleepWithBackoff(attempt);
                             continue;
                         }
 
-                        if (hasMoreModels && (isRetriable || isModelNotFound)) {
+                        if (hasMoreModels && (isRetriable || isModelNotFound || isQuotaExhausted)) {
                             lastException = mapHttpResponseToAiException(responseCode, errorBody);
                             log.info("Gemini stream model {} failed with HTTP {}, switching to next candidate model", model, responseCode);
                             break;
@@ -304,11 +306,12 @@ public class GeminiProvider implements AiProvider {
             list.add(configured.trim());
         }
         List<String> fallbacks = List.of(
-                "gemini-3.7-flash",
                 "gemini-3.6-flash",
-                "gemini-3.8-flash",
-                "gemini-flash-latest",
-                "gemini-3.5-flash-lite"
+                "gemini-3.5-flash",
+                "gemini-flash-lite-latest",
+                "gemini-3.5-flash-lite",
+                "gemini-3.7-flash",
+                "gemini-3.8-flash"
         );
         for (String fb : fallbacks) {
             if (!list.contains(fb)) {

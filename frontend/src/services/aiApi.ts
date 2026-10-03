@@ -63,6 +63,8 @@ export interface ClientContextDto {
   selectedTaskId?: string;
   lastTargetId?: string;
   timezone?: string;
+  activeContextMode?: 'ACADEMIC' | 'WORK' | 'PERSONAL' | 'GENERAL';
+  preferredLanguage?: 'vi' | 'en';
 }
 
 export interface ChatMessageDto {

@@ -41,12 +41,16 @@ export interface AiChatState {
   mascotState: MascotState;
   bubblePosition: BubblePosition | null;
   clientContext: ClientContextDto;
+  activeContextMode: 'ACADEMIC' | 'WORK' | 'PERSONAL' | 'GENERAL';
+  preferredLanguage: 'vi' | 'en';
 
   toggleOpen: () => void;
   setOpen: (open: boolean) => void;
   setMascotHover: (hover: boolean) => void;
   setBubblePosition: (pos: BubblePosition | null) => void;
   setClientContext: (ctx: Partial<ClientContextDto>) => void;
+  setContextMode: (mode: 'ACADEMIC' | 'WORK' | 'PERSONAL' | 'GENERAL') => void;
+  setPreferredLanguage: (lang: 'vi' | 'en') => void;
   loadHistory: () => Promise<void>;
   sendMessage: (text: string) => Promise<void>;
   confirmAction: (actionId: string) => Promise<void>;
@@ -55,6 +59,14 @@ export interface AiChatState {
   newConversation: () => Promise<void>;
   clearError: () => void;
 }
+
+const getInitialLocale = (): 'vi' | 'en' => {
+  if (typeof localStorage !== 'undefined') {
+    const saved = localStorage.getItem('smartschedule_locale');
+    if (saved === 'en') return 'en';
+  }
+  return 'vi';
+};
 
 export const useAiChatStore = create<AiChatState>((set, get) => ({
   isOpen: false,
@@ -67,6 +79,21 @@ export const useAiChatStore = create<AiChatState>((set, get) => ({
   mascotState: 'IDLE',
   bubblePosition: loadInitialBubblePosition(),
   clientContext: {},
+  activeContextMode: 'ACADEMIC',
+  preferredLanguage: getInitialLocale(),
+
+  setContextMode: (mode) => {
+    set({ activeContextMode: mode });
+  },
+
+  setPreferredLanguage: (lang) => {
+    set({ preferredLanguage: lang });
+    try {
+      localStorage.setItem('smartschedule_locale', lang);
+    } catch {
+      /* ignore */
+    }
+  },
 
   setClientContext: (ctx) => {
     set((state) => ({
@@ -266,6 +293,8 @@ export const useAiChatStore = create<AiChatState>((set, get) => ({
       selectedEventId: currentContext.selectedEventId,
       selectedEventTitle: currentContext.selectedEventTitle,
       timezone: currentContext.timezone || (typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'Asia/Ho_Chi_Minh'),
+      activeContextMode: get().activeContextMode,
+      preferredLanguage: get().preferredLanguage,
     };
 
     try {

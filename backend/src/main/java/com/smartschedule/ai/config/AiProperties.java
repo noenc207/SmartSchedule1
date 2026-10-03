@@ -24,7 +24,7 @@ public record AiProperties(
             String visionServerUrl
     ) {
         this.geminiApiKey = geminiApiKey;
-        this.geminiModel = (geminiModel == null || geminiModel.isBlank()) ? "gemini-3.7-flash" : geminiModel;
+        this.geminiModel = (geminiModel == null || geminiModel.isBlank()) ? "gemini-3.6-flash" : geminiModel;
         this.maxMessageLength = maxMessageLength <= 0 ? 2000 : maxMessageLength;
         this.maxOutputTokens = maxOutputTokens <= 0 ? 1024 : maxOutputTokens;
         this.requestsPerMinute = requestsPerMinute <= 0 ? 20 : requestsPerMinute;

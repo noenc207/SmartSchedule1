@@ -158,4 +158,23 @@ class AiChatServiceTest {
         assertThat(response.content()).contains("Thay lịch: Xóa 'Tiết Vật lý' và thay bằng 'toán'");
         assertThat(response.content()).doesNotContain("Lịch trình 7 ngày tới:");
     }
+
+    @Test
+    void testHasMutationIntent_distinguishesReadQueriesFromMutations() {
+        // Read queries should NOT be mutation intents
+        assertThat(chatService.hasMutationIntent("check xem ngày hôm nay tôi có tiết học nào ko")).isFalse();
+        assertThat(chatService.hasMutationIntent("hôm nay tôi có tiết gì không?")).isFalse();
+        assertThat(chatService.hasMutationIntent("xem lịch học hôm nay")).isFalse();
+        assertThat(chatService.hasMutationIntent("kiểm tra deadline tuần này")).isFalse();
+        assertThat(chatService.hasMutationIntent("What classes do I have today?")).isFalse();
+        assertThat(chatService.hasMutationIntent("Find free time slots")).isFalse();
+
+        // Write mutations should BE mutation intents
+        assertThat(chatService.hasMutationIntent("xoá lịch lý đi thay giúp tôi thành toán")).isTrue();
+        assertThat(chatService.hasMutationIntent("tạo lịch học giải tích lúc 8h sáng mai")).isTrue();
+        assertThat(chatService.hasMutationIntent("sửa giờ học môn toán")).isTrue();
+        assertThat(chatService.hasMutationIntent("hoàn thành bài tập lab 2")).isTrue();
+        assertThat(chatService.hasMutationIntent("tối ưu ngày hôm nay")).isTrue();
+        assertThat(chatService.hasMutationIntent("lập kế hoạch ôn thi môn AI")).isTrue();
+    }
 }

@@ -147,8 +147,13 @@ public class AiChatService {
                             }
                         }
                     }
-                } else if (turn2Response.content() != null && !turn2Response.content().isBlank()) {
-                    replyContent = turn2Response.content();
+                }
+                if (proposedActions.isEmpty()) {
+                    if (turn2Response.content() != null && !turn2Response.content().isBlank()) {
+                        replyContent = turn2Response.content().trim();
+                    } else if (!toolResults.isEmpty()) {
+                        replyContent = toolResults.toString().trim();
+                    }
                 }
             } else {
                 if (replyContent.isBlank()) {
@@ -220,10 +225,10 @@ public class AiChatService {
                     },
                     streamedToolCalls -> {
                         List<AiDtos.ProposedActionDto> proposedActions = new ArrayList<>();
+                        StringBuilder toolResults = new StringBuilder();
 
                         if (streamedToolCalls != null && !streamedToolCalls.isEmpty()) {
                             boolean hasWriteTool = false;
-                            StringBuilder toolResults = new StringBuilder();
                             for (AiProvider.ToolCall tool : streamedToolCalls) {
                                 if (isWriteTool(tool.name()) && actionService != null) {
                                     hasWriteTool = true;
@@ -285,21 +290,38 @@ public class AiChatService {
                                             }
                                         }
                                     }
-                                } else if (turn2Response.content() != null && !turn2Response.content().isBlank()) {
-                                    accumulatedResponse.setLength(0);
-                                    accumulatedResponse.append(turn2Response.content());
-                                    onChunk.accept(turn2Response.content());
+                                }
+                                if (proposedActions.isEmpty()) {
+                                    if (turn2Response.content() != null && !turn2Response.content().isBlank()) {
+                                        accumulatedResponse.setLength(0);
+                                        accumulatedResponse.append(turn2Response.content().trim());
+                                        onChunk.accept(turn2Response.content().trim());
+                                    } else if (!toolResults.isEmpty()) {
+                                        String readOutput = toolResults.toString().trim();
+                                        accumulatedResponse.setLength(0);
+                                        accumulatedResponse.append(readOutput);
+                                        onChunk.accept(readOutput);
+                                    }
                                 }
                             } else if (!hasWriteTool) {
-                                String readOutput = "\n\n" + toolResults.toString().trim();
-                                accumulatedResponse.append(readOutput);
-                                onChunk.accept(readOutput);
+                                String readOutput = toolResults.toString().trim();
+                                if (!readOutput.isBlank()) {
+                                    if (accumulatedResponse.length() > 0) {
+                                        accumulatedResponse.append("\n\n");
+                                    }
+                                    accumulatedResponse.append(readOutput);
+                                    onChunk.accept("\n\n" + readOutput);
+                                }
                             }
                         }
 
                         String fullContent = accumulatedResponse.toString().trim();
                         if (fullContent.isEmpty()) {
-                            fullContent = "Tôi đã ghi nhận nhưng không nhận được nội dung phản hồi từ mô hình.";
+                            if (!toolResults.isEmpty()) {
+                                fullContent = toolResults.toString().trim();
+                            } else {
+                                fullContent = "Tôi đã ghi nhận câu hỏi của bạn. Bạn có thể cung cấp thêm chi tiết để tôi hỗ trợ nhé!";
+                            }
                         }
 
                         AiMessage modelMessage = new AiMessage(conversation, "model", fullContent);
@@ -385,25 +407,46 @@ public class AiChatService {
 
     public boolean hasMutationIntent(String prompt) {
         if (prompt == null || prompt.isBlank()) return false;
-        if (agentRouter != null) {
-            Set<AiIntent> intents = agentRouter.route(prompt);
-            if (intents.contains(AiIntent.SCHEDULE) || intents.contains(AiIntent.TASK)
-                    || intents.contains(AiIntent.DEADLINE) || intents.contains(AiIntent.REMINDER)
-                    || intents.contains(AiIntent.PLANNING) || intents.contains(AiIntent.OPTIMIZATION)
-                    || intents.contains(AiIntent.NAVIGATION) || intents.contains(AiIntent.SETTINGS)) {
-                return true;
-            }
-        }
-        String p = prompt.toLowerCase();
-        return p.contains("xóa") || p.contains("xoá") || p.contains("xoa")
+        String p = prompt.toLowerCase().trim();
+
+        // Check if this is an explicit read/query/view question
+        boolean isExplicitQuery = p.startsWith("check") || p.startsWith("xem") || p.startsWith("kiểm tra")
+                || p.startsWith("tìm") || p.startsWith("tra cứu") || p.startsWith("hôm nay có")
+                || p.startsWith("ngày mai có") || p.startsWith("cho tôi xem") || p.startsWith("show")
+                || p.startsWith("what") || p.startsWith("when") || p.startsWith("is there")
+                || p.startsWith("list") || p.startsWith("view") || p.contains("có tiết học nào")
+                || p.contains("có lớp nào") || p.contains("có môn nào") || p.contains("có task nào")
+                || p.contains("có deadline nào") || p.contains("rảnh lúc nào") || p.contains("mấy giờ");
+
+        boolean hasWriteKeyword = p.contains("xóa") || p.contains("xoá") || p.contains("xoa")
                 || p.contains("thay") || p.contains("đổi") || p.contains("doi")
                 || p.contains("dời") || p.contains("hủy") || p.contains("huy")
                 || p.contains("chuyển") || p.contains("chuyen")
                 || p.contains("tạo") || p.contains("tao") || p.contains("thêm") || p.contains("them")
-                || p.contains("sửa") || p.contains("sua") || p.contains("hoàn thành")
+                || p.contains("sửa") || p.contains("sua") || p.contains("hoàn thành") || p.contains("xong")
                 || p.contains("mở") || p.contains("đi tới") || p.contains("cài đặt")
+                || p.contains("tối ưu") || p.contains("lập kế hoạch") || p.contains("xếp lịch") || p.contains("đặt lịch")
                 || p.contains("delete") || p.contains("replace") || p.contains("reschedule")
-                || p.contains("update") || p.contains("create") || p.contains("cancel");
+                || p.contains("update") || p.contains("create") || p.contains("cancel") || p.contains("done")
+                || p.contains("optimize") || p.contains("plan");
+
+        if (isExplicitQuery && !hasWriteKeyword) {
+            return false;
+        }
+
+        if (hasWriteKeyword) {
+            return true;
+        }
+
+        if (agentRouter != null) {
+            Set<AiIntent> intents = agentRouter.route(prompt);
+            if (intents.contains(AiIntent.PLANNING) || intents.contains(AiIntent.OPTIMIZATION)
+                    || intents.contains(AiIntent.NAVIGATION) || intents.contains(AiIntent.SETTINGS)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void validateRequest(User user, String message) {
@@ -520,6 +563,17 @@ public class AiChatService {
                      * Kiểm tra dữ liệu thị giác đã được số hóa trong ngữ cảnh bên dưới.
                      * Gọi tool `import_vision_schedule` để hệ thống tự động tạo kế hoạch nhập các môn học đã trích xuất, hoặc gọi `create_schedule` cho môn học cụ thể được yêu cầu.
                      * Tuyệt đối không tự bịa các môn học khác ngoài dữ liệu đã được trích xuất từ ảnh.
+
+                10. HỖ TRỢ ĐA NGÔN NGỮ & ĐA NGỮ CẢNH (MULTI-LINGUAL & MULTI-CONTEXT INTELLIGENCE):
+                   - TỰ ĐỘNG THÍCH ỨNG THEO NGÔN NGỮ (LANGUAGE ADAPTATION):
+                     * Nếu người dùng hỏi bằng tiếng Anh (hoặc ngữ cảnh Preferred Language = English), bạn PHẢI trả lời hoàn toàn bằng tiếng Anh chuẩn mực, tự nhiên và chuyên nghiệp.
+                     * Nếu người dùng hỏi bằng tiếng Việt, bạn phản hồi bằng tiếng Việt thân thiện, rõ ràng.
+                     * Hỗ trợ tự nhiên khi sinh viên dùng từ mượn tiếng Anh / code-switching ("check schedule", "deadline lab", "slot học", "syllabus môn AI").
+                   - THÍCH ỨNG THEO CHẾ ĐỘ NGỮ CẢNH (ACTIVE CONTEXT FOCUS):
+                     * Chế độ Học tập (ACADEMIC): Tập trung môn học, slot thời khóa biểu, phòng học, giảng viên, syllabus, bài tập và đề thi.
+                     * Chế độ Công việc / Dự án (WORK): Tập trung nhiệm vụ, công việc nhóm, sprint, hạn nộp dự án và tiến độ.
+                     * Chế độ Cá nhân (PERSONAL): Tập trung thời gian rảnh, thói quen sinh hoạt, tập thể dục, nghỉ ngơi phục hồi.
+                     * Chế độ Tổng hợp (GENERAL): Tích hợp toàn diện học tập, công việc và đời sống.
 
                 NGỮ CẢNH DỮ LIỆU THỰC TẾ CỦA NGƯỜI DÙNG:
                 """ + scheduleContext;

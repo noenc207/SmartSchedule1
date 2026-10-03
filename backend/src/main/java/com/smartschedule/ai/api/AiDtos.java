@@ -15,10 +15,17 @@ public class AiDtos {
             String selectedEventTitle,
             String timezone,
             String selectedTaskId,
-            String lastTargetId
+            String lastTargetId,
+            String activeContextMode,
+            String preferredLanguage
     ) {
         public ClientContextDto(String page, String selectedDate, String selectedEventId, String selectedEventTitle, String timezone) {
-            this(page, selectedDate, selectedEventId, selectedEventTitle, timezone, null, null);
+            this(page, selectedDate, selectedEventId, selectedEventTitle, timezone, null, null, null, null);
+        }
+
+        public ClientContextDto(String page, String selectedDate, String selectedEventId, String selectedEventTitle,
+                                String timezone, String selectedTaskId, String lastTargetId) {
+            this(page, selectedDate, selectedEventId, selectedEventTitle, timezone, selectedTaskId, lastTargetId, null, null);
         }
     }
 

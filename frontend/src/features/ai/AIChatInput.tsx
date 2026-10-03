@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Paperclip, X, Image as ImageIcon } from 'lucide-react';
+import { useAiChatStore } from '../../stores/aiChatStore';
 
 interface AIChatInputProps {
   onSend: (text: string) => void;
@@ -12,8 +13,14 @@ export function AIChatInput({
   onSend,
   onSendFile,
   disabled = false,
-  placeholder = 'Hỏi SmartSchedule AI về lịch trình, giờ rảnh...',
+  placeholder,
 }: AIChatInputProps) {
+  const preferredLanguage = useAiChatStore((s) => s.preferredLanguage);
+  const isEn = preferredLanguage === 'en';
+
+  const defaultPlaceholder = placeholder || (isEn
+    ? 'Ask SmartSchedule AI about schedules, free slots, tasks...'
+    : 'Hỏi SmartSchedule AI về lịch trình, giờ rảnh...');
   const [text, setText] = useState('');
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -175,8 +182,8 @@ export function AIChatInput({
           onKeyDown={handleKeyDown}
           placeholder={
             attachedFile
-              ? 'Thêm yêu cầu xử lý ảnh (hoặc Enter để quét)...'
-              : placeholder
+              ? (isEn ? 'Add instruction for image (or Enter to scan)...' : 'Thêm yêu cầu xử lý ảnh (hoặc Enter để quét)...')
+              : defaultPlaceholder
           }
           disabled={disabled}
           rows={1}
@@ -187,15 +194,17 @@ export function AIChatInput({
           className="ai-chat-send-btn"
           onClick={handleSubmit}
           disabled={(!text.trim() && !attachedFile) || disabled}
-          aria-label="Gửi tin nhắn"
-          title="Gửi (Enter)"
+          aria-label={isEn ? 'Send message' : 'Gửi tin nhắn'}
+          title={isEn ? 'Send (Enter)' : 'Gửi (Enter)'}
         >
           <Send size={15} strokeWidth={2.4} />
         </button>
       </div>
       <div className="ai-chat-input-hints">
         <span>
-          Nhấn <kbd>Enter</kbd> để gửi, <kbd>Shift + Enter</kbd> xuống dòng • Hỗ trợ tải ảnh thời khóa biểu
+          {isEn
+            ? <>Press <kbd>Enter</kbd> to send, <kbd>Shift + Enter</kbd> for new line • Supports timetable image upload</>
+            : <>Nhấn <kbd>Enter</kbd> để gửi, <kbd>Shift + Enter</kbd> xuống dòng • Hỗ trợ tải ảnh thời khóa biểu</>}
         </span>
       </div>
     </div>
