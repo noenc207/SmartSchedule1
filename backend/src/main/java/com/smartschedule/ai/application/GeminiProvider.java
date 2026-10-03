@@ -368,18 +368,34 @@ public class GeminiProvider implements AiProvider {
         }
     }
 
+    private static final Set<String> RETIRED_MODELS = Set.of(
+            "gemini-1.5-flash",
+            "gemini-1.5-flash-8b",
+            "gemini-1.5-pro",
+            "gemini-2.0-flash",
+            "gemini-2.0-flash-lite",
+            "gemini-pro",
+            "gemini-pro-vision",
+            "gemini-1.0-pro"
+    );
+
     private List<String> getCandidateModels() {
         List<String> list = new ArrayList<>();
         String configured = properties.geminiModel();
         if (configured != null && !configured.isBlank()) {
-            list.add(configured.trim());
+            String trimmed = configured.trim();
+            if (!RETIRED_MODELS.contains(trimmed)) {
+                list.add(trimmed);
+            } else {
+                log.warn("Configured model '{}' is retired/unsupported by Google API. Falling back to active models.", trimmed);
+            }
         }
         List<String> fallbacks = List.of(
-                "gemini-3.8-flash",
                 "gemini-3.6-flash",
                 "gemini-3.5-flash",
                 "gemini-flash-lite-latest",
                 "gemini-flash-latest",
+                "gemini-3.8-flash",
                 "gemini-2.5-flash",
                 "gemini-2.5-pro"
         );
