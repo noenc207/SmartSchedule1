@@ -9,7 +9,7 @@ import { BrandLogo } from '../../components/BrandLogo';
 import { isDemoMode, isRealMode } from '../../services/demoMode';
 import { SocialAuthButtons, type SocialAuthPayload } from './SocialAuthButtons';
 import { SocialRegistrationView } from './GoogleRegistrationView';
-import { getApiErrorMessage } from '../../services/apiClient';
+import { getApiErrorMessage, getRawApiUrl, setCustomApiUrl } from '../../services/apiClient';
 
 export const loginSchema = z.object({
   email: z.string().trim().email('Enter a valid email address.'),
@@ -228,7 +228,7 @@ export function LoginPage() {
             <button type="button" onClick={() => setShowPassword(!showPassword)}>{showPassword ? 'Hide' : 'Show'}</button>
           </div>
         </Field>
-        {error && <div className="form-error" role="alert">{error}</div>}
+        <BackendConnectionAlert error={error} onClearError={clearError} />
         <button className="primary-button auth-submit" disabled={form.formState.isSubmitting || socialLoading}>
           {form.formState.isSubmitting ? 'Signing in…' : 'Sign in'}
         </button>
@@ -422,13 +422,125 @@ export function RegisterPage() {
             </button>
           </div>
         </Field>
-        {error && <div className="form-error" role="alert">{error}</div>}
+        <BackendConnectionAlert error={error} onClearError={clearError} />
         <button className="primary-button auth-submit" disabled={form.formState.isSubmitting || socialLoading}>
           {form.formState.isSubmitting ? 'Creating…' : 'Create account'}
         </button>
       </form>
       <p className="auth-switch">Already have an account? <Link to="/login">Sign in</Link></p>
     </AuthLayout>
+  );
+}
+
+function BackendConnectionAlert({ error, onClearError }: { error: string | null; onClearError: () => void }) {
+  const [customUrl, setCustomUrl] = useState('');
+  const [showConfig, setShowConfig] = useState(false);
+  const isProduction =
+    typeof window !== 'undefined' &&
+    window.location.hostname !== 'localhost' &&
+    window.location.hostname !== '127.0.0.1';
+  const rawUrl = getRawApiUrl();
+  const isLocalhost = rawUrl.includes('localhost') || rawUrl.includes('127.0.0.1');
+
+  if (!error && !(isProduction && isLocalhost)) return null;
+
+  return (
+    <div
+      className="form-error"
+      role="alert"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+        textAlign: 'left',
+        margin: '12px 0',
+      }}
+    >
+      {error && <div>{error}</div>}
+
+      {isProduction && (
+        <div
+          style={{
+            marginTop: error ? '4px' : '0px',
+            padding: '10px 12px',
+            background: 'rgba(255, 255, 255, 0.95)',
+            borderRadius: '8px',
+            border: '1px solid #fed7aa',
+            color: '#1e293b',
+            fontSize: '13px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontWeight: 600, color: '#c2410c' }}>⚙️ Kết nối Backend Render</span>
+            <button
+              type="button"
+              onClick={() => setShowConfig(!showConfig)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#2563eb',
+                fontSize: '12px',
+                cursor: 'pointer',
+                textDecoration: 'underline',
+                padding: 0,
+              }}
+            >
+              {showConfig ? 'Đóng' : 'Nhập URL kết nối ngay'}
+            </button>
+          </div>
+
+          {(showConfig || error) && (
+            <div style={{ marginTop: '8px' }}>
+              <p style={{ margin: '0 0 6px 0', fontSize: '12px', color: '#64748b', lineHeight: 1.4 }}>
+                Dán URL máy chủ Render (ví dụ: <code style={{ color: '#0f172a' }}>https://xxx.onrender.com</code>) để kết nối trực tiếp:
+              </p>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <input
+                  type="url"
+                  placeholder="https://your-backend.onrender.com"
+                  value={customUrl}
+                  onChange={(e) => setCustomUrl(e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: '6px 8px',
+                    fontSize: '12px',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '4px',
+                    outline: 'none',
+                    color: '#0f172a',
+                    background: '#fff',
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (customUrl.trim()) {
+                      setCustomApiUrl(customUrl.trim());
+                      onClearError();
+                      window.location.reload();
+                    }
+                  }}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    background: '#ea580c',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  Lưu & Thử lại
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

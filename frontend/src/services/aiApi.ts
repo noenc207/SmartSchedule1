@@ -1,4 +1,4 @@
-import apiClient, { getStoredAccessToken } from './apiClient';
+import apiClient, { getApiBaseUrl, getStoredAccessToken } from './apiClient';
 
 export type ActionStatus = 'PROPOSED' | 'CONFIRMED' | 'EXECUTING' | 'SUCCESS' | 'FAILED' | 'CANCELLED';
 
@@ -110,14 +110,7 @@ export const aiApi = {
     onError: (err: any) => void,
     context?: ClientContextDto
   ): Promise<void> {
-    const rawApiUrl =
-      import.meta.env.VITEAPIURL ||
-      import.meta.env.VITE_API_URL ||
-      import.meta.env.VITE_API_BASE_URL ||
-      'http://localhost:8080';
-    const baseUrl = rawApiUrl.endsWith('/api/v1')
-      ? rawApiUrl
-      : `${rawApiUrl.replace(/\/+$/, '')}/api/v1`;
+    const baseUrl = getApiBaseUrl();
 
     const token = getStoredAccessToken();
 
