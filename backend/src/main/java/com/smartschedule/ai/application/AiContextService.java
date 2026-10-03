@@ -184,10 +184,17 @@ public class AiContextService {
     public String executeTool(String toolName, User user, Map<String, Object> arguments, AiDtos.ClientContextDto clientContext) {
         return switch (toolName) {
             case "get_today_schedule" -> getTodaySchedule(user, clientContext);
+            case "get_week_schedule" -> getWeekSchedule(user, arguments, clientContext);
             case "get_upcoming_schedule" -> getUpcomingSchedule(user, arguments, clientContext);
             case "find_free_time" -> findFreeTime(user, arguments, clientContext);
             case "check_schedule_conflict" -> checkScheduleConflict(user, arguments, clientContext);
             case "get_schedule_details" -> getScheduleDetails(user, arguments, clientContext);
+            case "search_schedule" -> searchSchedule(user, arguments, clientContext);
+            case "get_tasks" -> getTasks(user, arguments);
+            case "get_deadlines" -> getDeadlines(user, arguments, clientContext);
+            case "get_user_preferences" -> getUserPreferences(user);
+            case "get_analytics_summary" -> getAnalyticsSummary(user, clientContext);
+            case "analyze_document" -> analyzeDocument(arguments);
             default -> "Công cụ không được hỗ trợ: " + toolName;
         };
     }
@@ -481,5 +488,153 @@ public class AiContextService {
             } catch (Exception ignored) {}
         }
         return AiDateTimeUtils.DEFAULT_ZONE;
+    }
+
+    public String getWeekSchedule(User user, Map<String, Object> arguments, AiDtos.ClientContextDto clientContext) {
+        int days = 7;
+        if (arguments != null && arguments.containsKey("days")) {
+            try { days = Integer.parseInt(arguments.get("days").toString().trim()); } catch (Exception ignored) {}
+        }
+        return getUpcomingSchedule(user, Map.of("days", days), clientContext);
+    }
+
+    public String searchSchedule(User user, Map<String, Object> arguments, AiDtos.ClientContextDto clientContext) {
+        String query = arguments != null && arguments.containsKey("query") ? arguments.get("query").toString().trim() : "";
+        if (query.isBlank()) return "Vui lòng cung cấp từ khóa tìm kiếm.";
+        ZoneId zoneId = resolveZone(user.getTimezone(), clientContext);
+        List<Schedule> schedules = scheduleRepository.findAllByOwnerIdOrderByUpdatedAtDesc(user.getId());
+        Instant from = Instant.now().minusSeconds(86400L * 14);
+        Instant to = Instant.now().plusSeconds(86400L * 60);
+        List<Event> matches = new ArrayList<>();
+        for (Schedule s : schedules) {
+            List<Event> events = eventRepository.search(s.getId(), from, to, null, null, null);
+            for (Event e : events) {
+                if (AiActionService.isSubjectMatch(e.getTitle(), query) || e.getTitle().toLowerCase().contains(query.toLowerCase())) {
+                    matches.add(e);
+                }
+            }
+        }
+        if (matches.isEmpty()) {
+            return "Không tìm thấy sự kiện nào khớp với từ khóa: '" + query + "'.";
+        }
+        DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("EEEE dd/MM HH:mm", Locale.forLanguageTag("vi-VN"));
+        StringBuilder sb = new StringBuilder("Kết quả tìm kiếm cho '" + query + "':\n");
+        for (Event e : matches) {
+            ZonedDateTime start = e.getStartsAt().atZone(zoneId);
+            sb.append("- ").append(start.format(dateFmt)).append(": ").append(e.getTitle());
+            if (e.getLocation() != null && !e.getLocation().isBlank()) sb.append(" (").append(e.getLocation()).append(")");
+            sb.append("\n");
+        }
+        return sb.toString();
+    }
+
+    public String getTasks(User user, Map<String, Object> arguments) {
+        List<Task> tasks = taskRepository.findAllByOwnerId(user.getId());
+        String filter = arguments != null && arguments.containsKey("status") ? arguments.get("status").toString().toUpperCase() : "TODO";
+        List<Task> filtered = tasks.stream()
+                .filter(t -> "ALL".equals(filter) || ("TODO".equals(filter) && !"COMPLETED".equalsIgnoreCase(t.getStatus())) || filter.equalsIgnoreCase(t.getStatus()))
+                .sorted(Comparator.comparing(Task::getDeadline, Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
+        if (filtered.isEmpty()) {
+            return "Bạn hiện không có công việc nào trong danh sách (" + filter + ").";
+        }
+        StringBuilder sb = new StringBuilder("Danh sách công việc (" + filter + "):\n");
+        for (Task t : filtered) {
+            sb.append("- [").append(t.getStatus()).append("] ").append(t.getTitle());
+            if (t.getEstimatedMinutes() > 0) sb.append(" (").append(t.getEstimatedMinutes()).append(" phút)");
+            if (t.getPriority() != null) sb.append(" [Ưu tiên: ").append(t.getPriority()).append("]");
+            if (t.getDeadline() != null) sb.append(" - Hạn chót: ").append(t.getDeadline().toString().substring(0, 16).replace("T", " "));
+            sb.append("\n");
+        }
+        return sb.toString();
+    }
+
+    public String getDeadlines(User user, Map<String, Object> arguments, AiDtos.ClientContextDto clientContext) {
+        ZoneId zoneId = resolveZone(user.getTimezone(), clientContext);
+        List<Task> tasks = taskRepository.findAllByOwnerId(user.getId());
+        Instant now = Instant.now();
+        int days = 14;
+        if (arguments != null && arguments.containsKey("days")) {
+            try { days = Integer.parseInt(arguments.get("days").toString().trim()); } catch (Exception ignored) {}
+        }
+        Instant limit = now.plusSeconds(86400L * days);
+        List<Task> deadlines = tasks.stream()
+                .filter(t -> t.getDeadline() != null && !"COMPLETED".equalsIgnoreCase(t.getStatus()))
+                .filter(t -> !t.getDeadline().isBefore(now.minusSeconds(86400)) && t.getDeadline().isBefore(limit))
+                .sorted(Comparator.comparing(Task::getDeadline))
+                .toList();
+        if (deadlines.isEmpty()) {
+            return String.format("Bạn không có hạn chót (deadline) nào cần nộp trong %d ngày tới. Thời gian rất an toàn!", days);
+        }
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd/MM HH:mm");
+        StringBuilder sb = new StringBuilder(String.format("⚠️ Các deadline quan trọng trong %d ngày tới:\n", days));
+        for (Task t : deadlines) {
+            ZonedDateTime dl = t.getDeadline().atZone(zoneId);
+            long hoursLeft = Duration.between(now, t.getDeadline()).toHours();
+            String urgency = hoursLeft < 24 ? "🚨 GẤP (<24h)" : hoursLeft < 72 ? "⚡ Sắp tới" : "⏳ Bình thường";
+            sb.append("- ").append(urgency).append(" ").append(t.getTitle())
+                    .append(" (Hạn: ").append(dl.format(fmt)).append(")");
+            sb.append("\n");
+        }
+        return sb.toString();
+    }
+
+    public String getUserPreferences(User user) {
+        return String.format("Thông tin tài khoản & Cài đặt:\n- Tên hiển thị: %s\n- Email: %s\n- Múi giờ: %s\n- Ngôn ngữ: %s\n- Hạng tài khoản: %s",
+                user.getDisplayName(), user.getEmail(), user.getTimezone(), user.getLocale(), user.getTier());
+    }
+
+    public String getAnalyticsSummary(User user, AiDtos.ClientContextDto clientContext) {
+        ZoneId zoneId = resolveZone(user.getTimezone(), clientContext);
+        ZonedDateTime now = ZonedDateTime.now(zoneId);
+        ZonedDateTime startOfWeek = now.with(java.time.DayOfWeek.MONDAY).toLocalDate().atStartOfDay(zoneId);
+        ZonedDateTime endOfWeek = startOfWeek.plusDays(7).minusNanos(1);
+
+        List<Schedule> schedules = scheduleRepository.findAllByOwnerIdOrderByUpdatedAtDesc(user.getId());
+        long totalStudyMinutes = 0;
+        int eventCount = 0;
+        for (Schedule s : schedules) {
+            List<Event> weekEvents = eventRepository.search(s.getId(), startOfWeek.toInstant(), endOfWeek.toInstant(), null, null, null);
+            for (Event e : weekEvents) {
+                totalStudyMinutes += Duration.between(e.getStartsAt(), e.getEndsAt()).toMinutes();
+                eventCount++;
+            }
+        }
+
+        List<Task> tasks = taskRepository.findAllByOwnerId(user.getId());
+        long completedTasks = tasks.stream().filter(t -> "COMPLETED".equalsIgnoreCase(t.getStatus())).count();
+        long pendingTasks = tasks.stream().filter(t -> !"COMPLETED".equalsIgnoreCase(t.getStatus())).count();
+
+        return String.format("""
+                📊 THỐNG KÊ HỌC TẬP TUẦN NÀY (%s đến %s):
+                - Tổng số tiết học/phiên ôn tập: %d sự kiện
+                - Tổng thời gian học tập: %.1f giờ (%d phút)
+                - Công việc đã hoàn thành: %d task
+                - Công việc đang chờ xử lý: %d task
+                - Đánh giá phân bổ thời gian: %s
+                """,
+                startOfWeek.toLocalDate().toString(), endOfWeek.toLocalDate().toString(),
+                eventCount, (totalStudyMinutes / 60.0), totalStudyMinutes,
+                completedTasks, pendingTasks,
+                totalStudyMinutes > 1800 ? "Lịch học khá dày, hãy chú ý nghỉ ngơi hợp lý." : "Thời gian học tập phân bổ vừa phải, có nhiều khoảng trống để tự học thêm.");
+    }
+
+    public String analyzeDocument(Map<String, Object> arguments) {
+        String text = arguments != null && arguments.containsKey("document_text") ? arguments.get("document_text").toString() : "";
+        if (text.isBlank()) return "Vui lòng cung cấp nội dung tài liệu để phân tích.";
+
+        String[] lines = text.split("\n");
+        List<String> keyItems = new ArrayList<>();
+        for (String line : lines) {
+            String l = line.toLowerCase();
+            if (l.contains("deadline") || l.contains("hạn nộp") || l.contains("kiểm tra") || l.contains("thi")
+                    || l.contains("assignment") || l.contains("project") || l.contains("bài tập") || l.contains("chương")) {
+                keyItems.add(line.trim());
+            }
+        }
+        if (keyItems.isEmpty()) {
+            return "Đã đọc tài liệu (" + lines.length + " dòng). Không phát hiện mốc thời gian hay deadline rõ ràng nào.";
+        }
+        return "📄 Đã phân tích tài liệu, phát hiện các mốc quan trọng sau:\n" + String.join("\n", keyItems);
     }
 }

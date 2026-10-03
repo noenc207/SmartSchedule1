@@ -130,6 +130,16 @@ function Shell() {
     void notificationApi.list(true).then((page) => setUnreadNotifications(page.totalElements)).catch(() => setUnreadNotifications(0));
   }, []);
   useEffect(() => {
+    const handleNavigate = (e: Event) => {
+      const customEvent = e as CustomEvent<{ route: string }>;
+      if (customEvent.detail?.route) {
+        navigate(customEvent.detail.route);
+      }
+    };
+    window.addEventListener('smartschedule:navigate', handleNavigate);
+    return () => window.removeEventListener('smartschedule:navigate', handleNavigate);
+  }, [navigate]);
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'b') {
         event.preventDefault();

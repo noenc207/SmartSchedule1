@@ -30,10 +30,16 @@ public class GeminiProvider implements AiProvider {
     private final AiProperties properties;
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
+    private final AiToolRegistry toolRegistry;
 
     public GeminiProvider(AiProperties properties, ObjectMapper objectMapper) {
+        this(properties, objectMapper, new AiToolRegistry());
+    }
+
+    public GeminiProvider(AiProperties properties, ObjectMapper objectMapper, AiToolRegistry toolRegistry) {
         this.properties = properties;
         this.objectMapper = objectMapper;
+        this.toolRegistry = toolRegistry != null ? toolRegistry : new AiToolRegistry();
 
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofSeconds(properties.timeoutSeconds()));
@@ -368,145 +374,10 @@ public class GeminiProvider implements AiProvider {
                 "maxOutputTokens", properties.maxOutputTokens()
         ));
 
-        // Read & Write Tools declarations
-        if (includeTools) {
+        // Read & Write Tools declarations from centralized Tool Registry
+        if (includeTools && toolRegistry != null) {
             payload.put("tools", List.of(
-                    Map.of("function_declarations", List.of(
-                            // 1. Read: Today's schedule
-                            Map.of(
-                                    "name", "get_today_schedule",
-                                    "description", "Lấy toàn bộ danh sách lớp học và sự kiện trong ngày hôm nay của người dùng.",
-                                    "parameters", Map.of("type", "OBJECT", "properties", Map.of())
-                            ),
-                            // 2. Read: Upcoming schedule
-                            Map.of(
-                                    "name", "get_upcoming_schedule",
-                                    "description", "Lấy toàn bộ lịch trình các lớp học và sự kiện sắp tới trong các ngày tiếp theo.",
-                                    "parameters", Map.of(
-                                            "type", "OBJECT",
-                                            "properties", Map.of(
-                                                    "days", Map.of("type", "INTEGER", "description", "Số ngày cần xem (mặc định 7 ngày, tối đa 30 ngày)")
-                                            )
-                                    )
-                            ),
-                            // 3. Read: Find free time
-                            Map.of(
-                                    "name", "find_free_time",
-                                    "description", "Tìm các khoảng thời gian trống giữa các tiết học và cam kết để người dùng sắp xếp ôn tập, làm việc hoặc nghỉ ngơi.",
-                                    "parameters", Map.of(
-                                            "type", "OBJECT",
-                                            "properties", Map.of(
-                                                    "date", Map.of("type", "STRING", "description", "Ngày cần tìm giờ rảnh dạng YYYY-MM-DD (mặc định là hôm nay)"),
-                                                    "duration_minutes", Map.of("type", "INTEGER", "description", "Thời lượng cần tìm tính theo phút (ví dụ 60, 120)")
-                                            )
-                                    )
-                            ),
-                            // 4. Read: Check schedule conflict
-                            Map.of(
-                                    "name", "check_schedule_conflict",
-                                    "description", "Kiểm tra xem một khung thời gian cụ thể có bị trùng lịch hoặc xung đột với các sự kiện hiện có của người dùng không.",
-                                    "parameters", Map.of(
-                                            "type", "OBJECT",
-                                            "properties", Map.of(
-                                                    "start_time", Map.of("type", "STRING", "description", "Thời gian bắt đầu (ISO 8601 hoặc YYYY-MM-DDTHH:mm hoặc HH:mm)"),
-                                                    "end_time", Map.of("type", "STRING", "description", "Thời gian kết thúc (ISO 8601 hoặc YYYY-MM-DDTHH:mm hoặc HH:mm)"),
-                                                    "exclude_event_id", Map.of("type", "STRING", "description", "ID sự kiện bỏ qua khi kiểm tra trùng")
-                                            ),
-                                            "required", List.of("start_time", "end_time")
-                                    )
-                            ),
-                            // 5. Read: Get schedule details
-                            Map.of(
-                                    "name", "get_schedule_details",
-                                    "description", "Tra cứu thông tin chi tiết của một sự kiện/tiết học theo tên hoặc mã ID.",
-                                    "parameters", Map.of(
-                                            "type", "OBJECT",
-                                            "properties", Map.of(
-                                                    "event_id_or_title", Map.of("type", "STRING", "description", "Tên sự kiện hoặc ID sự kiện cần tra cứu")
-                                            ),
-                                            "required", List.of("event_id_or_title")
-                                    )
-                            ),
-                            // 6. Write: Create schedule
-                            Map.of(
-                                    "name", "create_schedule",
-                                    "description", "Đề xuất tạo mới một sự kiện/lịch học/lịch ôn tập trên thời khóa biểu. CHỈ GỌI CÔNG CỤ NÀY khi người dùng ĐÃ CUNG CẤP ĐỦ: tên sự kiện, ngày diễn ra, giờ bắt đầu và thời lượng (hoặc giờ kết thúc). NẾU THIẾU giờ bắt đầu hoặc thiếu cả (thời lượng và giờ kết thúc), TUYỆT ĐỐI KHÔNG GỌI TOOL mà phải hỏi người dùng để làm rõ. TUYỆT ĐỐI KHÔNG tự bịa giờ học, địa điểm hoặc mô tả.",
-                                    "parameters", Map.of(
-                                            "type", "OBJECT",
-                                            "properties", Map.of(
-                                                    "title", Map.of("type", "STRING", "description", "Tên môn học hoặc sự kiện người dùng đã chỉ định (ví dụ: Physics, Ôn thi Giải tích)"),
-                                                    "date", Map.of("type", "STRING", "description", "Ngày diễn ra định dạng YYYY-MM-DD (người dùng nói hoặc suy từ ngày đang xem)"),
-                                                    "start_time", Map.of("type", "STRING", "description", "Thời gian bắt đầu người dùng đã chỉ định (ví dụ: 08:00, 14:30)"),
-                                                    "end_time", Map.of("type", "STRING", "description", "Thời gian kết thúc nếu người dùng đã chỉ định (ví dụ: 09:30, 16:00)"),
-                                                    "duration_minutes", Map.of("type", "INTEGER", "description", "Thời lượng bằng phút nếu người dùng đã chỉ định (ví dụ: 60, 90, 120)"),
-                                                    "location", Map.of("type", "STRING", "description", "Địa điểm hoặc phòng học NẾU VÀ CHỈ NẾU người dùng đã đề cập. Để trống/null nếu không có."),
-                                                    "description", Map.of("type", "STRING", "description", "Ghi chú hoặc mô tả NẾU người dùng đã đề cập. Để trống/null nếu không có.")
-                                            ),
-                                            "required", List.of("title", "date", "start_time")
-                                    )
-                            ),
-                            // 7. Write: Update schedule
-                            Map.of(
-                                    "name", "update_schedule",
-                                    "description", "Đề xuất cập nhật tiêu đề, thời gian, phòng học hoặc mô tả của một sự kiện đã có. Cần người dùng xác nhận trước khi thực thi.",
-                                    "parameters", Map.of(
-                                            "type", "OBJECT",
-                                            "properties", Map.of(
-                                                    "event_id", Map.of("type", "STRING", "description", "ID sự kiện cần cập nhật"),
-                                                    "title", Map.of("type", "STRING", "description", "Tên sự kiện để tìm hoặc đổi tên mới"),
-                                                    "start_time", Map.of("type", "STRING", "description", "Thời gian bắt đầu mới"),
-                                                    "end_time", Map.of("type", "STRING", "description", "Thời gian kết thúc mới"),
-                                                    "location", Map.of("type", "STRING", "description", "Phòng học hoặc địa điểm mới"),
-                                                    "description", Map.of("type", "STRING", "description", "Mô tả mới")
-                                            )
-                                    )
-                            ),
-                            // 8. Write: Delete schedule
-                            Map.of(
-                                    "name", "delete_schedule",
-                                    "description", "Đề xuất xóa một sự kiện/tiết học khỏi lịch trình. Cần người dùng xác nhận trước khi thực thi.",
-                                    "parameters", Map.of(
-                                            "type", "OBJECT",
-                                            "properties", Map.of(
-                                                    "event_id", Map.of("type", "STRING", "description", "ID sự kiện cần xóa"),
-                                                    "title", Map.of("type", "STRING", "description", "Tên sự kiện cần xóa nếu không có ID")
-                                            )
-                                    )
-                            ),
-                            // 9. Write: Reschedule event
-                            Map.of(
-                                    "name", "reschedule_event",
-                                    "description", "Đề xuất dời thời gian của một sự kiện đã có sang một khung giờ hoặc ngày khác. Cần người dùng xác nhận trước khi thực thi.",
-                                    "parameters", Map.of(
-                                            "type", "OBJECT",
-                                            "properties", Map.of(
-                                                    "event_id", Map.of("type", "STRING", "description", "ID sự kiện cần dời"),
-                                                    "title", Map.of("type", "STRING", "description", "Tên sự kiện cần dời"),
-                                                    "new_start_time", Map.of("type", "STRING", "description", "Thời gian bắt đầu mới"),
-                                                    "new_end_time", Map.of("type", "STRING", "description", "Thời gian kết thúc mới"),
-                                                    "date", Map.of("type", "STRING", "description", "Ngày mới dạng YYYY-MM-DD nếu dời sang ngày khác")
-                                            ),
-                                            "required", List.of("new_start_time")
-                                    )
-                            ),
-                            // 10. Write: Replace schedule (thay môn, đổi lịch)
-                            Map.of(
-                                    "name", "replace_schedule",
-                                    "description", "Đề xuất thay thế một lịch học/tiết học đã có bằng một môn học hoặc lịch mới (ví dụ: 'xóa lịch lý thay thành toán', 'đổi môn Vật lý thành Toán'). Tự động kế thừa ngày, giờ bắt đầu và thời lượng từ sự kiện cũ nếu sự kiện mới không chỉ định giờ mới.",
-                                    "parameters", Map.of(
-                                            "type", "OBJECT",
-                                            "properties", Map.of(
-                                                    "target_title", Map.of("type", "STRING", "description", "Tên môn học hoặc từ khóa sự kiện cần thay thế/xóa (ví dụ: Tiết Vật lý, Lý, Physics)"),
-                                                    "new_title", Map.of("type", "STRING", "description", "Tên môn học hoặc sự kiện thay thế mới (ví dụ: Tiết Toán, Toán, Math)"),
-                                                    "date", Map.of("type", "STRING", "description", "Ngày mới định dạng YYYY-MM-DD nếu muốn đổi ngày (để trống nếu giữ nguyên ngày cũ)"),
-                                                    "start_time", Map.of("type", "STRING", "description", "Giờ bắt đầu mới HH:mm nếu muốn đổi giờ (để trống nếu giữ nguyên giờ cũ)"),
-                                                    "end_time", Map.of("type", "STRING", "description", "Giờ kết thúc mới HH:mm nếu muốn đổi giờ (để trống nếu giữ nguyên giờ cũ)"),
-                                                    "duration_minutes", Map.of("type", "INTEGER", "description", "Thời lượng mới theo phút (để trống nếu giữ nguyên thời lượng cũ)")
-                                            ),
-                                            "required", List.of("target_title", "new_title")
-                                    )
-                            )
-                    ))
+                    Map.of("function_declarations", toolRegistry.getGeminiFunctionDeclarations())
             ));
         }
 

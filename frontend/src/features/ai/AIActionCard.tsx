@@ -12,9 +12,17 @@ import {
   FileText,
   Loader2,
   Search,
+  CheckSquare,
+  AlertCircle,
+  Bell,
+  ArrowRight,
+  Settings,
+  BookOpen,
+  Sparkles,
+  Layers,
 } from 'lucide-react';
-import type { ProposedActionDto, ActionStatus } from '../../services/aiApi';
-import { formatDate, formatTimeRange, formatTime } from '../../utils/dateTime';
+import { aiApi, type ProposedActionDto, type ActionStatus } from '../../services/aiApi';
+import { formatDate, formatTimeRange } from '../../utils/dateTime';
 
 interface AIActionCardProps {
   action: ProposedActionDto;
@@ -89,9 +97,76 @@ export function AIActionCard({
           icon: Trash2,
           colorClass: 'ai-tool-delete',
         };
+      case 'create_task':
+        return {
+          title: 'Tạo công việc',
+          icon: CheckSquare,
+          colorClass: 'ai-tool-task',
+        };
+      case 'update_task':
+        return {
+          title: 'Cập nhật việc',
+          icon: Edit3,
+          colorClass: 'ai-tool-task',
+        };
+      case 'complete_task':
+        return {
+          title: 'Hoàn thành việc',
+          icon: CheckCircle2,
+          colorClass: 'ai-tool-task',
+        };
+      case 'delete_task':
+        return {
+          title: 'Xóa công việc',
+          icon: Trash2,
+          colorClass: 'ai-tool-delete',
+        };
+      case 'create_deadline':
+        return {
+          title: 'Tạo hạn chót',
+          icon: AlertCircle,
+          colorClass: 'ai-tool-deadline',
+        };
+      case 'update_reminder':
+        return {
+          title: 'Cài nhắc nhở',
+          icon: Bell,
+          colorClass: 'ai-tool-reminder',
+        };
+      case 'navigate_to':
+        return {
+          title: 'Điều hướng',
+          icon: ArrowRight,
+          colorClass: 'ai-tool-nav',
+        };
+      case 'update_user_preferences':
+        return {
+          title: 'Cài đặt cá nhân',
+          icon: Settings,
+          colorClass: 'ai-tool-settings',
+        };
+      case 'create_study_plan':
+        return {
+          title: 'Lập kế hoạch ôn tập',
+          icon: BookOpen,
+          colorClass: 'ai-tool-plan',
+        };
+      case 'optimize_day':
+      case 'optimize_week':
+        return {
+          title: 'Tối ưu lịch trình',
+          icon: Sparkles,
+          colorClass: 'ai-tool-opt',
+        };
+      case 'batch_action':
+        return {
+          title: 'Kế hoạch hành động',
+          icon: Layers,
+          colorClass: 'ai-tool-batch',
+        };
       default:
         return {
-          title: 'Thao tác lịch',
+          title: 'Thao tác hệ thống',
           icon: CalendarPlus,
           colorClass: 'ai-tool-default',
         };
@@ -106,8 +181,19 @@ export function AIActionCard({
     setIsProcessing(true);
     setLocalStatus('EXECUTING');
     try {
-      await onConfirm(action.id);
+      if (action.planId && tool === 'batch_action') {
+        await aiApi.confirmPlan(action.planId);
+      } else {
+        await onConfirm(action.id);
+      }
       setLocalStatus('SUCCESS');
+
+      // If navigation action, dispatch event for immediate transition
+      if (tool === 'navigate_to' && params.route) {
+        window.dispatchEvent(
+          new CustomEvent('smartschedule:navigate', { detail: { route: params.route } })
+        );
+      }
     } catch {
       setLocalStatus('FAILED');
     } finally {
@@ -119,7 +205,11 @@ export function AIActionCard({
     if (isProcessing || localStatus !== 'PROPOSED' || isExpired) return;
     setIsProcessing(true);
     try {
-      await onCancel(action.id);
+      if (action.planId && tool === 'batch_action') {
+        await aiApi.cancelPlan(action.planId);
+      } else {
+        await onCancel(action.id);
+      }
       setLocalStatus('CANCELLED');
     } catch {
       setLocalStatus('FAILED');
@@ -224,7 +314,7 @@ export function AIActionCard({
           {localStatus === 'EXECUTING' && (
             <span className="status-flex">
               <Loader2 size={11} className="spin-icon" />
-              <span>Đang lưu...</span>
+              <span>Đang xử lý...</span>
             </span>
           )}
           {localStatus === 'SUCCESS' && (
@@ -262,6 +352,19 @@ export function AIActionCard({
             <span className="description-text">{description}</span>
           </div>
         )}
+
+        {/* Sub actions list for batch action plans */}
+        {action.subActions && action.subActions.length > 0 && (
+          <div className="ai-subactions-list">
+            <div className="ai-subactions-header">Các bước trong kế hoạch:</div>
+            {action.subActions.map((sub, idx) => (
+              <div key={sub.id || idx} className="ai-subaction-item">
+                <span className="ai-step-badge">{idx + 1}</span>
+                <span className="ai-step-text">{sub.summary}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Conflict Detection Banner */}
@@ -279,14 +382,14 @@ export function AIActionCard({
       {localStatus === 'SUCCESS' && (
         <div className="ai-action-result-banner success">
           <CheckCircle2 size={14} />
-          <span>{action.resultDetails || 'Đã cập nhật thời khóa biểu thành công.'}</span>
+          <span>{action.resultDetails || 'Thực hiện hành động thành công.'}</span>
         </div>
       )}
 
       {localStatus === 'FAILED' && (
         <div className="ai-action-result-banner failed">
           <XCircle size={14} />
-          <span>{action.errorMessage || 'Lỗi khi áp dụng thay đổi lịch.'}</span>
+          <span>{action.errorMessage || 'Lỗi khi áp dụng thay đổi.'}</span>
         </div>
       )}
 
@@ -322,7 +425,9 @@ export function AIActionCard({
 
           <button
             type="button"
-            className={`ai-btn-confirm ${action.hasConflict ? 'warn' : ''}`}
+            className={`ai-btn-confirm ${tool === 'batch_action' ? 'plan-btn' : ''} ${
+              action.hasConflict ? 'warn' : ''
+            }`}
             onClick={handleConfirm}
             disabled={isProcessing}
           >
@@ -333,6 +438,12 @@ export function AIActionCard({
               </>
             ) : action.hasConflict ? (
               tool === 'reschedule_event' ? 'Vẫn dời' : tool === 'replace_schedule' ? 'Vẫn thay' : 'Vẫn tạo'
+            ) : tool === 'batch_action' ? (
+              'Xác nhận tất cả (Do it)'
+            ) : tool === 'navigate_to' ? (
+              'Mở màn hình'
+            ) : tool === 'complete_task' ? (
+              'Đánh dấu xong'
             ) : (
               'Xác nhận'
             )}
@@ -342,7 +453,7 @@ export function AIActionCard({
 
       {localStatus === 'PROPOSED' && isExpired && (
         <div className="ai-action-expired-banner">
-          Thao tác này đã hết hạn sau 15 phút. Vui lòng yêu cầu AI xếp lại lịch mới.
+          Thao tác này đã hết hạn sau 15 phút. Vui lòng yêu cầu AI thực hiện lại.
         </div>
       )}
     </div>

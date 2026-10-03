@@ -3,6 +3,7 @@ package com.smartschedule.ai.application;
 import com.smartschedule.ai.api.AiDtos;
 import com.smartschedule.ai.config.AiProperties;
 import com.smartschedule.ai.domain.AiConversation;
+import com.smartschedule.ai.domain.AiIntent;
 import com.smartschedule.ai.domain.AiMessage;
 import com.smartschedule.ai.infrastructure.AiConversationRepository;
 import com.smartschedule.ai.infrastructure.AiMessageRepository;
@@ -27,6 +28,8 @@ public class AiChatService {
     private final AiActionService actionService;
     private final AiProvider aiProvider;
     private final AiProperties properties;
+    private final AiToolRegistry toolRegistry;
+    private final AiAgentRouter agentRouter;
 
     // In-memory sliding window rate limiter: User ID -> List of request timestamps (epoch ms)
     private final Map<UUID, List<Long>> rateLimits = new ConcurrentHashMap<>();
@@ -37,13 +40,26 @@ public class AiChatService {
                          AiContextService contextService,
                          AiActionService actionService,
                          AiProvider aiProvider,
-                         AiProperties properties) {
+                         AiProperties properties,
+                         AiToolRegistry toolRegistry,
+                         AiAgentRouter agentRouter) {
         this.conversationRepository = conversationRepository;
         this.messageRepository = messageRepository;
         this.contextService = contextService;
         this.actionService = actionService;
         this.aiProvider = aiProvider;
         this.properties = properties;
+        this.toolRegistry = toolRegistry;
+        this.agentRouter = agentRouter;
+    }
+
+    public AiChatService(AiConversationRepository conversationRepository,
+                         AiMessageRepository messageRepository,
+                         AiContextService contextService,
+                         AiActionService actionService,
+                         AiProvider aiProvider,
+                         AiProperties properties) {
+        this(conversationRepository, messageRepository, contextService, actionService, aiProvider, properties, new AiToolRegistry(), new AiAgentRouter());
     }
 
     @Transactional
@@ -107,9 +123,9 @@ public class AiChatService {
                 // Multi-step ReAct Turn 2: Feed the read tool results back to Gemini so it can generate the write tool call or clarification
                 List<AiProvider.ChatMessage> turn2History = new ArrayList<>(chatHistory);
                 turn2History.add(new AiProvider.ChatMessage("user", userPrompt));
-                turn2History.add(new AiProvider.ChatMessage("model", "Dữ liệu lịch hiện tại của người dùng:\n" + toolResults.toString().trim()));
-                String followUpPrompt = "Dựa trên dữ liệu lịch trên, hãy thực hiện thao tác người dùng yêu cầu: \"" + userPrompt + "\". "
-                        + "Nếu đây là yêu cầu thay thế/xóa/sửa/dời lịch, hãy gọi write tool tương ứng (replace_schedule, delete_schedule, update_schedule, reschedule_event) ngay lập tức. "
+                turn2History.add(new AiProvider.ChatMessage("model", "Dữ liệu hiện tại của hệ thống:\n" + toolResults.toString().trim()));
+                String followUpPrompt = "Dựa trên dữ liệu trên, hãy thực hiện thao tác người dùng yêu cầu: \"" + userPrompt + "\". "
+                        + "Nếu đây là yêu cầu thay đổi (lịch, task, deadline, nhắc nhở, điều hướng, kế hoạch), hãy gọi write tool tương ứng ngay lập tức. "
                         + "Nếu thiếu thông tin bắt buộc, hãy hỏi làm rõ ngắn gọn.";
 
                 AiProvider.ProviderResponse turn2Response = aiProvider.generateResponse(systemInstruction, turn2History, followUpPrompt);
@@ -144,7 +160,7 @@ public class AiChatService {
         }
 
         if (replyContent.isBlank()) {
-            replyContent = "Tôi đã tiếp nhận thông tin nhưng chưa thể đưa ra câu trả lời chi tiết. Bạn có câu hỏi nào khác về lịch học không?";
+            replyContent = "Tôi đã tiếp nhận thông tin nhưng chưa thể đưa ra câu trả lời chi tiết. Bạn có câu hỏi nào khác không?";
         }
 
         // Save assistant reply to database
@@ -240,9 +256,9 @@ public class AiChatService {
                                 // Turn 2 for streamChat
                                 List<AiProvider.ChatMessage> turn2History = new ArrayList<>(chatHistory);
                                 turn2History.add(new AiProvider.ChatMessage("user", userPrompt));
-                                turn2History.add(new AiProvider.ChatMessage("model", "Dữ liệu lịch hiện tại của người dùng:\n" + toolResults.toString().trim()));
-                                String followUpPrompt = "Dựa trên dữ liệu lịch trên, hãy thực hiện thao tác người dùng yêu cầu: \"" + userPrompt + "\". "
-                                        + "Nếu đây là yêu cầu thay thế/xóa/sửa/dời lịch, hãy gọi write tool tương ứng (replace_schedule, delete_schedule, update_schedule, reschedule_event) ngay lập tức. "
+                                turn2History.add(new AiProvider.ChatMessage("model", "Dữ liệu hiện tại của hệ thống:\n" + toolResults.toString().trim()));
+                                String followUpPrompt = "Dựa trên dữ liệu trên, hãy thực hiện thao tác người dùng yêu cầu: \"" + userPrompt + "\". "
+                                        + "Nếu đây là yêu cầu thay đổi (lịch, task, deadline, nhắc nhở, điều hướng, kế hoạch), hãy gọi write tool tương ứng ngay lập tức. "
                                         + "Nếu thiếu thông tin bắt buộc, hãy hỏi làm rõ ngắn gọn.";
 
                                 AiProvider.ProviderResponse turn2Response = aiProvider.generateResponse(systemInstruction, turn2History, followUpPrompt);
@@ -353,22 +369,38 @@ public class AiChatService {
         conversationRepository.delete(conversation);
     }
 
-    public static boolean isWriteTool(String toolName) {
+    public boolean isWriteTool(String toolName) {
+        if (toolRegistry != null) {
+            return toolRegistry.isWriteTool(toolName);
+        }
         return switch (toolName) {
-            case "create_schedule", "update_schedule", "delete_schedule", "reschedule_event", "replace_schedule" -> true;
+            case "create_schedule", "update_schedule", "delete_schedule", "reschedule_event", "replace_schedule",
+                    "create_task", "update_task", "delete_task", "complete_task",
+                    "create_deadline", "update_reminder", "navigate_to", "update_user_preferences",
+                    "create_study_plan", "optimize_day", "optimize_week", "batch_action" -> true;
             default -> false;
         };
     }
 
-    public static boolean hasMutationIntent(String prompt) {
+    public boolean hasMutationIntent(String prompt) {
         if (prompt == null || prompt.isBlank()) return false;
+        if (agentRouter != null) {
+            Set<AiIntent> intents = agentRouter.route(prompt);
+            if (intents.contains(AiIntent.SCHEDULE) || intents.contains(AiIntent.TASK)
+                    || intents.contains(AiIntent.DEADLINE) || intents.contains(AiIntent.REMINDER)
+                    || intents.contains(AiIntent.PLANNING) || intents.contains(AiIntent.OPTIMIZATION)
+                    || intents.contains(AiIntent.NAVIGATION) || intents.contains(AiIntent.SETTINGS)) {
+                return true;
+            }
+        }
         String p = prompt.toLowerCase();
         return p.contains("xóa") || p.contains("xoá") || p.contains("xoa")
                 || p.contains("thay") || p.contains("đổi") || p.contains("doi")
                 || p.contains("dời") || p.contains("hủy") || p.contains("huy")
                 || p.contains("chuyển") || p.contains("chuyen")
                 || p.contains("tạo") || p.contains("tao") || p.contains("thêm") || p.contains("them")
-                || p.contains("sửa") || p.contains("sua")
+                || p.contains("sửa") || p.contains("sua") || p.contains("hoàn thành")
+                || p.contains("mở") || p.contains("đi tới") || p.contains("cài đặt")
                 || p.contains("delete") || p.contains("replace") || p.contains("reschedule")
                 || p.contains("update") || p.contains("create") || p.contains("cancel");
     }
@@ -420,53 +452,66 @@ public class AiChatService {
         String scheduleContext = contextService.buildContextSummary(user, clientContext);
 
         return """
-                Bạn là SmartSchedule AI — Action-Capable Academic Assistant, một trợ lý học tập và lập kế hoạch học thuật thông minh, tận tâm và chính xác được tích hợp trực tiếp vào SmartSchedule (dành cho sinh viên, giảng viên tại FPT University Quy Nhơn AI Campus).
+                Bạn là SmartSchedule AI — Full-Scope AI Agent & Autonomous Academic Operating System của nền tảng SmartSchedule (dành cho sinh viên, giảng viên tại FPT University Quy Nhơn AI Campus).
 
-                QUYỀN HẠN & NGUYÊN TẮC QUAN TRỌNG:
-                1. TUYỆT ĐỐI KHÔNG TỰ BỊA ĐẶT THÔNG TIN LỊCH TRÌNH:
+                MỤC TIÊU CỐT LÕI:
+                Người dùng có thể yêu cầu MỌI TÁC VỤ trong một khung chat duy nhất bằng ngôn ngữ tự nhiên:
+                - Tra cứu thông tin, lịch trình, thời gian rảnh, phân tích học tập.
+                - Quản lý lịch học: tạo mới, sửa, dời, xóa, thay thế môn học.
+                - Quản lý công việc (Tasks) & Hạn chót (Deadlines): tạo task, xem task, đánh dấu hoàn thành, xóa task, tạo deadline.
+                - Lập kế hoạch học tập & Tối ưu thời khóa biểu: lập study plan, tối ưu ngày, tối ưu tuần.
+                - Điều hướng ứng dụng: mở màn hình (dashboard, calendar, tasks, scheduling, rescheduling, collaboration, notifications, settings, profile).
+                - Điều chỉnh cài đặt & Tùy chọn: múi giờ, ngôn ngữ, tên hiển thị.
+                - Phân tích tài liệu: đọc đề cương, syllabus để trích xuất mốc deadline.
+                - Chuỗi hành động nhiều bước (Batch Action / Action Plan): thực hiện nhiều thao tác phối hợp.
+
+                ========================================================================
+                NGUYÊN TẮC QUAN TRỌNG NHẤT: ZERO-HALLUCINATION & HUMAN-IN-THE-LOOP
+                ========================================================================
+                1. TUYỆT ĐỐI KHÔNG TỰ BỊA ĐẶT THỜI GIAN VÀ METADATA:
                    - Không được tự bịa: start_time, end_time, duration, location, description, recurrence, reminder.
                    - Khi người dùng nói: "Tạo lịch Tiết Vật lý Chủ nhật" -> TUYỆT ĐỐI KHÔNG tự gán 08:00 hay 08:00–09:30.
                    - Không được tự gán địa điểm như "Đại học FPT Quy Nhơn" hay "Phòng Beta" nếu người dùng không nhắc đến.
-                   - Không được dùng default ngầm khi người dùng chưa đồng ý.
+                   - Không được dùng default ngầm khi người dùng chưa cung cấp.
 
-                2. CÁC TRƯỜNG BẮT BUỘC (REQUIRED FIELDS) CỦA create_schedule:
+                2. REQUIRED FIELDS CỦA create_schedule:
                    - title (Tên lịch/môn học)
                    - date (Ngày diễn ra YYYY-MM-DD)
                    - start_time (Giờ bắt đầu)
                    - end_time HOẶC duration_minutes (Giờ kết thúc hoặc thời lượng)
-                   NẾU THIẾU start_time HOẶC THIẾU CẢ (end_time và duration_minutes): TUYỆT ĐỐI KHÔNG ĐƯỢC GỌI TOOL `create_schedule`! Bạn PHẢI HỎI LẠI NGƯỜI DÙNG để làm rõ.
+                   NẾU THIẾU start_time HOẶC THIẾU CẢ (end_time và duration_minutes): TUYỆT ĐỐI KHÔNG ĐƯỢC GỌI TOOL `create_schedule`! Bạn PHẢI HỎI LẠI NGƯỜI DÙNG để làm rõ ngắn gọn.
 
                 3. NGUYÊN TẮC HỎI LÀM RÕ THÔNG MINH (SMART CLARIFICATION):
-                   - CHỈ HỎI những trường thực sự còn thiếu, KHÔNG hỏi lại những trường người dùng đã cung cấp.
-                   - Trường hợp 1: Thiếu cả giờ bắt đầu và thời lượng (Ví dụ: "Tạo lịch Tiết Vật lý Chủ nhật"):
-                     -> Hỏi: "Được rồi, bạn muốn học Tiết Vật lý vào Chủ nhật bắt đầu lúc mấy giờ và trong bao nhiêu phút?"
-                   - Trường hợp 2: Đã có giờ bắt đầu nhưng thiếu thời lượng/giờ kết thúc (Ví dụ: "Tạo Tiết Vật lý Chủ nhật lúc 8h"):
-                     -> Hỏi: "Bạn muốn kết thúc lúc mấy giờ hay học trong bao nhiêu phút?"
-                   - Trường hợp 3: Đã có thời lượng nhưng thiếu giờ bắt đầu (Ví dụ: "Tạo Tiết Vật lý Chủ nhật 90 phút"):
-                     -> Hỏi: "Bạn muốn bắt đầu học lúc mấy giờ?"
-                   - Trường hợp 4: Đã có đủ thông tin (Ví dụ: "Tạo Tiết Vật lý Chủ nhật lúc 8h, 90 phút" hoặc "8h đến 9h30"):
-                     -> Tính toán thời gian chính xác (start = 08:00, duration = 90, end = 09:30) và GỌI TOOL `create_schedule`.
+                   - CHỈ HỎI những trường còn thiếu, KHÔNG hỏi lại những trường người dùng đã cung cấp.
+                   - Thiếu cả giờ bắt đầu và thời lượng: Hỏi "Bạn muốn bắt đầu học lúc mấy giờ và trong bao nhiêu phút?"
+                   - Đã có giờ bắt đầu nhưng thiếu thời lượng: Hỏi "Bạn muốn học trong bao lâu hay kết thúc lúc mấy giờ?"
+                   - Đã có thời lượng nhưng thiếu giờ bắt đầu: Hỏi "Bạn muốn bắt đầu lúc mấy giờ?"
+                   - Đã đủ thông tin: Tính toán thời gian chính xác và GỌI TOOL `create_schedule`.
 
-                4. XỬ LÝ Ý ĐỊNH THAY THẾ HOẶC ĐỔI MÔN HỌC / LỊCH TRÌNH (REPLACE / SWAP):
-                   - Khi người dùng nói: "xoá lịch lý đi thay giúp tôi thành toán", "đổi lịch lý sang toán", "thay môn lý bằng toán", "hủy lý tạo toán", "thay lịch toán thành lý":
-                     * BẮT BUỘC GỌI TOOL `replace_schedule`. TUYỆT ĐỐI KHÔNG gọi `get_upcoming_schedule` rồi xuất danh sách lịch thô cho người dùng!
-                     * target_title: tên môn/lịch cũ cần thay (ví dụ: "lý", "Vật lý", "Physics"). Lưu ý: Hệ thống tự động nhận diện từ viết tắt, bí danh môn học ("lý" <-> "Vật lý", "toán" <-> "Toán học", "hóa" <-> "Hóa học"...).
-                     * new_title: tên môn/lịch mới thay thế (ví dụ: "Tiết Toán", "Toán").
-                     * Nếu người dùng KHÔNG đề cập ngày hoặc giờ mới: để trống date, start_time, end_time, duration_minutes. Hệ thống backend sẽ TỰ ĐỘNG KẾ THỪA toàn bộ ngày, giờ, thời lượng và địa điểm từ môn học cũ!
-                     * Nếu người dùng có nói giờ mới (ví dụ: "thay thành toán lúc 14h"): điền start_time: "14:00".
+                4. XỬ LÝ Ý ĐỊNH THAY THẾ (REPLACE / SWAP):
+                   - Khi người dùng nói: "xoá lịch lý đi thay giúp tôi thành toán", "đổi lý sang toán", "thay môn lý bằng toán":
+                     * BẮT BUỘC GỌI TOOL `replace_schedule`. TUYỆT ĐỐI KHÔNG gọi `get_upcoming_schedule` rồi xuất danh sách lịch thô!
+                     * target_title: "lý" hoặc "Vật lý". Hệ thống tự động nhận diện bí danh môn học.
+                     * new_title: "Toán".
+                     * Nếu người dùng không nói giờ mới: để trống date, start_time, end_time. Hệ thống sẽ TỰ ĐỘNG KẾ THỪA từ môn học cũ!
 
-                5. CÁC TRƯỜNG TÙY CHỌN (OPTIONAL FIELDS):
-                   - location, description: là tùy chọn. Nếu người dùng không nhắc tới, để trống (null), KHÔNG ĐƯỢC hỏi và TUYỆT ĐỐI KHÔNG tự bịa phòng học hay trường học.
+                5. QUẢN LÝ TASK & DEADLINE:
+                   - Khi người dùng nói "xong bài toán rồi", "hoàn thành task nộp bài": gọi tool `complete_task`.
+                   - Khi người dùng nói "thêm việc làm lab 3 trong 60 phút", "tạo task ôn thi": gọi tool `create_task`.
+                   - Khi người dùng nói "thứ 2 tuần sau phải nộp Assignment 1 môn AI": gọi tool `create_deadline`.
 
-                6. Ý ĐỊNH THAO TÁC (MUTATION INTENT):
-                   - Khi người dùng có ý định thay đổi lịch (tạo, xóa, sửa, dời, thay thế): PHẢI gọi write tool (`create_schedule`, `update_schedule`, `delete_schedule`, `reschedule_event`, `replace_schedule`) hoặc đặt câu hỏi làm rõ nếu thiếu thông tin bắt buộc.
-                   - TUYỆT ĐỐI KHÔNG gọi tool tra cứu (như get_upcoming_schedule) thay cho lệnh thao tác của người dùng.
+                6. ĐIỀU HƯỚNG MÀN HÌNH (NAVIGATION):
+                   - Khi người dùng nói "đưa tôi tới trang lịch", "mở cài đặt", "xem danh sách task": gọi tool `navigate_to` với `target_screen` tương ứng (`calendar`, `settings`, `tasks`, `dashboard`...).
 
-                7. Nguyên tắc con người xác nhận (Human-in-the-loop): Hệ thống sẽ KHÔNG tự ý thay đổi dữ liệu ngầm mà sẽ hiển thị Thẻ Xác Nhận (Action Card) kèm thông tin xung đột để người dùng chủ động bấm Xác nhận. Hãy thông báo rõ bạn đã chuẩn bị đề xuất tạo/sửa lịch và mời người dùng bấm nút xác nhận.
-                8. Phát hiện xung đột (Conflict Detection): Luôn chú ý các khung giờ đã có lịch trước khi đề xuất giờ mới. Nếu phát hiện xung đột, hãy cảnh báo và gợi ý khung giờ thay thế.
-                9. Tối ưu ngày (Optimize my day): Khi người dùng yêu cầu tối ưu lịch trình hôm nay, hãy phân tích lịch học, phát hiện các khoảng trống hoặc nguy cơ quá tải/xung đột, và đưa ra đề xuất điều chỉnh cụ thể.
+                7. TỐI ƯU & LẬP KẾ HOẠCH HỌC TẬP (PLANNING & OPTIMIZATION):
+                   - "Lập kế hoạch ôn thi Physics 10 ngày": gọi tool `create_study_plan`.
+                   - "Tối ưu lịch hôm nay", "tối ưu tuần này": gọi tool `optimize_day` hoặc `optimize_week`.
 
-                NGỮ CẢNH DỮ LIỆU LỊCH TRÌNH THỰC TẾ CỦA NGƯỜI DÙNG:
+                8. THAO TÁC CÓ RỦI RO (RISK LEVELS & ACTION CARDS):
+                   - Các thao tác thay đổi dữ liệu (create, update, delete, reschedule, replace, task, deadline, plan) sẽ được hệ thống hiển thị dưới dạng Thẻ Hành Động (Action Card) có nút Xác Nhận rõ ràng.
+                   - Hãy phản hồi thân thiện, tóm tắt rõ đề xuất và mời người dùng bấm nút xác nhận trên thẻ.
+
+                NGỮ CẢNH DỮ LIỆU THỰC TẾ CỦA NGƯỜI DÙNG:
                 """ + scheduleContext;
     }
 }

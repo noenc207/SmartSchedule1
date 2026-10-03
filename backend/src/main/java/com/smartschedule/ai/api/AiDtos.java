@@ -13,8 +13,14 @@ public class AiDtos {
             String selectedDate,
             String selectedEventId,
             String selectedEventTitle,
-            String timezone
-    ) {}
+            String timezone,
+            String selectedTaskId,
+            String lastTargetId
+    ) {
+        public ClientContextDto(String page, String selectedDate, String selectedEventId, String selectedEventTitle, String timezone) {
+            this(page, selectedDate, selectedEventId, selectedEventTitle, timezone, null, null);
+        }
+    }
 
     public record ChatRequest(
             String conversationId,
@@ -42,7 +48,30 @@ public class AiDtos {
             Instant expiresAt,
             Instant createdAt,
             String resultDetails,
-            String errorMessage
+            String errorMessage,
+            String riskLevel,
+            UUID planId,
+            Integer stepOrder,
+            List<ProposedActionDto> subActions
+    ) {
+        public ProposedActionDto(UUID id, UUID conversationId, String tool, String status, String summary,
+                                 Map<String, Object> parameters, boolean hasConflict, String conflictDetails,
+                                 UUID targetEventId, Instant expiresAt, Instant createdAt, String resultDetails,
+                                 String errorMessage) {
+            this(id, conversationId, tool, status, summary, parameters, hasConflict, conflictDetails, targetEventId,
+                    expiresAt, createdAt, resultDetails, errorMessage, "IMPORTANT_WRITE", null, 1, List.of());
+        }
+    }
+
+    public record ActionPlanDto(
+            UUID planId,
+            UUID conversationId,
+            String title,
+            String summary,
+            String status,
+            int actionCount,
+            List<ProposedActionDto> actions,
+            Instant createdAt
     ) {}
 
     public record ChatResponse(
@@ -51,10 +80,15 @@ public class AiDtos {
             String role,
             String content,
             Instant createdAt,
-            List<ProposedActionDto> proposedActions
+            List<ProposedActionDto> proposedActions,
+            ActionPlanDto proposedPlan
     ) {
+        public ChatResponse(UUID conversationId, UUID messageId, String role, String content, Instant createdAt, List<ProposedActionDto> proposedActions) {
+            this(conversationId, messageId, role, content, createdAt, proposedActions, null);
+        }
+
         public ChatResponse(UUID conversationId, UUID messageId, String role, String content, Instant createdAt) {
-            this(conversationId, messageId, role, content, createdAt, List.of());
+            this(conversationId, messageId, role, content, createdAt, List.of(), null);
         }
     }
 
@@ -70,10 +104,15 @@ public class AiDtos {
             String role,
             String content,
             Instant createdAt,
-            List<ProposedActionDto> proposedActions
+            List<ProposedActionDto> proposedActions,
+            ActionPlanDto proposedPlan
     ) {
+        public MessageResponse(UUID id, String role, String content, Instant createdAt, List<ProposedActionDto> proposedActions) {
+            this(id, role, content, createdAt, proposedActions, null);
+        }
+
         public MessageResponse(UUID id, String role, String content, Instant createdAt) {
-            this(id, role, content, createdAt, List.of());
+            this(id, role, content, createdAt, List.of(), null);
         }
     }
 
@@ -81,10 +120,15 @@ public class AiDtos {
             String chunk,
             boolean done,
             UUID messageId,
-            List<ProposedActionDto> proposedActions
+            List<ProposedActionDto> proposedActions,
+            ActionPlanDto proposedPlan
     ) {
+        public StreamChunk(String chunk, boolean done, UUID messageId, List<ProposedActionDto> proposedActions) {
+            this(chunk, done, messageId, proposedActions, null);
+        }
+
         public StreamChunk(String chunk, boolean done, UUID messageId) {
-            this(chunk, done, messageId, List.of());
+            this(chunk, done, messageId, List.of(), null);
         }
     }
 
@@ -94,5 +138,12 @@ public class AiDtos {
             String message,
             UUID targetEventId,
             Map<String, Object> data
+    ) {}
+
+    public record PlanConfirmResponse(
+            UUID planId,
+            String status,
+            String message,
+            List<ActionConfirmResponse> results
     ) {}
 }

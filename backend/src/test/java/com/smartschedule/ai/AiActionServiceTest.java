@@ -31,8 +31,12 @@ class AiActionServiceTest {
     @Mock private AiActionRepository actionRepository;
     @Mock private EventRepository eventRepository;
     @Mock private ScheduleRepository scheduleRepository;
+    @Mock private com.smartschedule.task.infrastructure.TaskRepository taskRepository;
+    @Mock private com.smartschedule.user.infrastructure.UserRepository userRepository;
+    @Mock private com.smartschedule.ai.infrastructure.AiActionPlanRepository actionPlanRepository;
 
     private AiActionService actionService;
+    private com.smartschedule.ai.application.AiRiskEngine riskEngine;
     private ObjectMapper objectMapper;
     private User testUser;
     private User attackerUser;
@@ -42,7 +46,12 @@ class AiActionServiceTest {
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
-        actionService = new AiActionService(actionRepository, eventRepository, scheduleRepository, objectMapper);
+        riskEngine = new com.smartschedule.ai.application.AiRiskEngine();
+        actionService = new AiActionService(
+                actionRepository, eventRepository, scheduleRepository,
+                taskRepository, userRepository, actionPlanRepository,
+                riskEngine, objectMapper
+        );
 
         testUser = new User("student@fpt.edu.vn", "hashed", "Nguyen Van A");
         attackerUser = new User("attacker@fpt.edu.vn", "hashed", "Bad Actor");
@@ -383,5 +392,112 @@ class AiActionServiceTest {
         assertThat(physicsEvent.getTitle()).isEqualTo("Toán");
         assertThat(physicsEvent.getStartsAt()).isEqualTo(physicsStart);
         assertThat(physicsEvent.getEndsAt()).isEqualTo(physicsEnd);
+    }
+
+    @Test
+    void testProposeAndConfirmCreateTask() {
+        Map<String, Object> args = Map.of(
+                "title", "Làm bài tập Physics Chapter 4",
+                "estimated_minutes", 90,
+                "priority", "HIGH"
+        );
+
+        AiDtos.ProposedActionDto proposed = actionService.proposeAction(
+                testUser, conversation, "create_task", args, null
+        );
+
+        assertThat(proposed.tool()).isEqualTo("create_task");
+        assertThat(proposed.summary()).contains("Làm bài tập Physics Chapter 4");
+        assertThat(proposed.summary()).contains("90 phút");
+
+        AiAction savedAction = new AiAction(
+                testUser, conversation, "create_task", proposed.summary(),
+                new ObjectMapper().valueToTree(proposed.parameters()).toString(),
+                false, null, null, Instant.now().plusSeconds(900)
+        );
+
+        when(actionRepository.findByIdAndUserId(savedAction.getId(), testUser.getId()))
+                .thenReturn(Optional.of(savedAction));
+        when(scheduleRepository.findAllByOwnerIdOrderByUpdatedAtDesc(testUser.getId()))
+                .thenReturn(List.of(testSchedule));
+
+        AiDtos.ActionConfirmResponse confirmResp = actionService.confirmAction(testUser, savedAction.getId());
+        assertThat(confirmResp.status()).isEqualTo(AiAction.STATUS_SUCCESS);
+        assertThat(confirmResp.message()).contains("Làm bài tập Physics Chapter 4");
+        verify(taskRepository).save(any());
+    }
+
+    @Test
+    void testProposeAndConfirmCompleteTask() {
+        com.smartschedule.task.domain.Task task = new com.smartschedule.task.domain.Task(
+                testSchedule, testUser, null, "Làm Assignment 1", "Mô tả", 60, 60, "HIGH",
+                Instant.now().plusSeconds(86400), "TODO", null, null, 15, 60
+        );
+
+        when(taskRepository.findAllByOwnerId(testUser.getId())).thenReturn(List.of(task));
+
+        Map<String, Object> args = Map.of("task_id_or_title", "Assignment 1");
+        AiDtos.ProposedActionDto proposed = actionService.proposeAction(
+                testUser, conversation, "complete_task", args, null
+        );
+
+        assertThat(proposed.tool()).isEqualTo("complete_task");
+        assertThat(proposed.summary()).contains("Assignment 1");
+
+        AiAction savedAction = new AiAction(
+                testUser, conversation, "complete_task", proposed.summary(),
+                new ObjectMapper().valueToTree(proposed.parameters()).toString(),
+                false, null, null, Instant.now().plusSeconds(900)
+        );
+
+        when(actionRepository.findByIdAndUserId(savedAction.getId(), testUser.getId()))
+                .thenReturn(Optional.of(savedAction));
+
+        AiDtos.ActionConfirmResponse confirmResp = actionService.confirmAction(testUser, savedAction.getId());
+        assertThat(confirmResp.status()).isEqualTo(AiAction.STATUS_SUCCESS);
+        assertThat(confirmResp.message()).contains("Đã hoàn thành công việc");
+        assertThat(task.getStatus()).isEqualTo("COMPLETED");
+        verify(taskRepository).save(task);
+    }
+
+    @Test
+    void testProposeNavigateTo() {
+        Map<String, Object> args = Map.of("target_screen", "calendar");
+        AiDtos.ProposedActionDto proposed = actionService.proposeAction(
+                testUser, conversation, "navigate_to", args, null
+        );
+
+        assertThat(proposed.tool()).isEqualTo("navigate_to");
+        assertThat(proposed.parameters().get("route")).isEqualTo("/calendar");
+    }
+
+    @Test
+    void testProposeHighRiskAction_throwsAiException() {
+        Map<String, Object> args = Map.of();
+        assertThatThrownBy(() -> actionService.proposeAction(
+                testUser, conversation, "delete_account", args, null
+        )).isInstanceOf(AiException.class)
+          .hasMessageContaining("Thao tác nguy hiểm cao");
+    }
+
+    @Test
+    void testConfirmPlan_executesAllSubActions() {
+        UUID planId = UUID.randomUUID();
+        com.smartschedule.ai.domain.AiActionPlan plan = new com.smartschedule.ai.domain.AiActionPlan(
+                testUser, conversation, "Ôn tập tuần này", "Kế hoạch 2 môn", 2
+        );
+
+        when(actionPlanRepository.findByIdAndUserId(planId, testUser.getId())).thenReturn(Optional.of(plan));
+
+        AiAction sub1 = new AiAction(testUser, conversation, "navigate_to", "Mở calendar", "{\"route\":\"/calendar\"}", false, null, null, Instant.now().plusSeconds(900));
+        sub1.setPlanId(planId);
+        sub1.setStepOrder(1);
+
+        when(actionRepository.findAllByPlanIdOrderByStepOrderAsc(planId)).thenReturn(List.of(sub1));
+        when(actionRepository.findByIdAndUserId(sub1.getId(), testUser.getId())).thenReturn(Optional.of(sub1));
+
+        AiDtos.PlanConfirmResponse planResp = actionService.confirmPlan(testUser, planId);
+        assertThat(planResp.status()).isEqualTo(com.smartschedule.ai.domain.AiActionPlan.STATUS_SUCCESS);
+        assertThat(planResp.results()).hasSize(1);
     }
 }

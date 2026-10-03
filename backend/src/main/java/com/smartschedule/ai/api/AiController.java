@@ -127,6 +127,20 @@ public class AiController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/plans/{planId}/confirm")
+    public ResponseEntity<AiDtos.PlanConfirmResponse> confirmPlan(@PathVariable UUID planId) {
+        User user = currentUserService.requireUser();
+        AiDtos.PlanConfirmResponse response = actionService.confirmPlan(user, planId);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/plans/{planId}/cancel")
+    public ResponseEntity<AiDtos.PlanConfirmResponse> cancelPlan(@PathVariable UUID planId) {
+        User user = currentUserService.requireUser();
+        AiDtos.PlanConfirmResponse response = actionService.cancelPlan(user, planId);
+        return ResponseEntity.ok(response);
+    }
+
     // =========================================================================
     // Conversation History Management
     // =========================================================================

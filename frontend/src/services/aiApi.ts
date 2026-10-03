@@ -5,7 +5,25 @@ export type ActionStatus = 'PROPOSED' | 'CONFIRMED' | 'EXECUTING' | 'SUCCESS' | 
 export interface ProposedActionDto {
   id: string;
   conversationId: string;
-  tool: 'create_schedule' | 'update_schedule' | 'delete_schedule' | 'reschedule_event' | 'replace_schedule' | string;
+  tool:
+    | 'create_schedule'
+    | 'update_schedule'
+    | 'delete_schedule'
+    | 'reschedule_event'
+    | 'replace_schedule'
+    | 'create_task'
+    | 'update_task'
+    | 'delete_task'
+    | 'complete_task'
+    | 'create_deadline'
+    | 'update_reminder'
+    | 'navigate_to'
+    | 'update_user_preferences'
+    | 'create_study_plan'
+    | 'optimize_day'
+    | 'optimize_week'
+    | 'batch_action'
+    | string;
   status: ActionStatus;
   summary: string;
   parameters: Record<string, any>;
@@ -16,6 +34,10 @@ export interface ProposedActionDto {
   createdAt: string;
   resultDetails?: string;
   errorMessage?: string;
+  riskLevel?: 'READ' | 'LOW_WRITE' | 'IMPORTANT_WRITE' | 'HIGH_RISK' | string;
+  planId?: string;
+  stepOrder?: number;
+  subActions?: ProposedActionDto[];
 }
 
 export interface ActionConfirmResponse {
@@ -26,11 +48,20 @@ export interface ActionConfirmResponse {
   data?: Record<string, any>;
 }
 
+export interface PlanConfirmResponse {
+  planId: string;
+  status: ActionStatus;
+  message: string;
+  results: ActionConfirmResponse[];
+}
+
 export interface ClientContextDto {
   page?: string;
   selectedDate?: string;
   selectedEventId?: string;
   selectedEventTitle?: string;
+  selectedTaskId?: string;
+  lastTargetId?: string;
   timezone?: string;
 }
 
@@ -179,6 +210,16 @@ export const aiApi = {
 
   async cancelAction(actionId: string): Promise<ActionConfirmResponse> {
     const { data } = await apiClient.post<ActionConfirmResponse>(`/ai/actions/${actionId}/cancel`);
+    return data;
+  },
+
+  async confirmPlan(planId: string): Promise<PlanConfirmResponse> {
+    const { data } = await apiClient.post<PlanConfirmResponse>(`/ai/plans/${planId}/confirm`);
+    return data;
+  },
+
+  async cancelPlan(planId: string): Promise<PlanConfirmResponse> {
+    const { data } = await apiClient.post<PlanConfirmResponse>(`/ai/plans/${planId}/cancel`);
     return data;
   },
 

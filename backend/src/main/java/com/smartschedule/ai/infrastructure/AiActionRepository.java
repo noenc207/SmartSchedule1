@@ -15,4 +15,6 @@ public interface AiActionRepository extends JpaRepository<AiAction, UUID> {
     List<AiAction> findAllByConversationIdOrderByCreatedAtAsc(UUID conversationId);
 
     List<AiAction> findAllByUserIdAndStatusOrderByCreatedAtDesc(UUID userId, String status);
+
+    List<AiAction> findAllByPlanIdOrderByStepOrderAsc(UUID planId);
 }

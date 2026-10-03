@@ -13,6 +13,10 @@ import jakarta.persistence.LockModeType;
 public interface TaskRepository extends JpaRepository<Task, UUID> {
     List<Task> findAllByScheduleId(UUID scheduleId);
 
+    List<Task> findAllByOwnerId(UUID ownerId);
+
+    java.util.Optional<Task> findByIdAndOwnerId(UUID id, UUID ownerId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select t from Task t where t.id = :id")
     java.util.Optional<Task> findByIdWithLock(@Param("id") UUID id);

@@ -143,6 +143,9 @@ public class User {
     public String getAuthProvider() { return authProvider; }
     public void setAuthProvider(String authProvider) { this.authProvider = authProvider; }
 
+    public void setTimezone(String timezone) { if (timezone != null && !timezone.isBlank()) this.timezone = timezone.trim(); }
+    public void setDisplayName(String displayName) { if (displayName != null && !displayName.isBlank()) this.displayName = displayName.trim(); }
+
     public void updateProfile(String displayName, String timezone, String locale, String avatarUrl) {
         this.displayName = displayName;
         this.timezone = timezone;

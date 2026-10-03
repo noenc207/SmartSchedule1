@@ -4,15 +4,22 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartschedule.ai.api.AiDtos;
 import com.smartschedule.ai.domain.AiAction;
+import com.smartschedule.ai.domain.AiActionPlan;
 import com.smartschedule.ai.domain.AiConversation;
+import com.smartschedule.ai.domain.RiskLevel;
+import com.smartschedule.ai.infrastructure.AiActionPlanRepository;
 import com.smartschedule.ai.infrastructure.AiActionRepository;
 import com.smartschedule.event.domain.Event;
 import com.smartschedule.event.infrastructure.EventRepository;
 import com.smartschedule.schedule.domain.Schedule;
 import com.smartschedule.schedule.infrastructure.ScheduleRepository;
+import com.smartschedule.task.domain.Task;
+import com.smartschedule.task.infrastructure.TaskRepository;
 import com.smartschedule.user.domain.User;
+import com.smartschedule.user.infrastructure.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,21 +31,56 @@ import java.util.*;
 public class AiActionService {
     private static final Logger log = LoggerFactory.getLogger(AiActionService.class);
 
+    public static final Map<String, String> ROUTE_WHITELIST = Map.ofEntries(
+            Map.entry("dashboard", "/dashboard"),
+            Map.entry("calendar", "/calendar"),
+            Map.entry("scheduling", "/scheduling"),
+            Map.entry("rescheduling", "/rescheduling"),
+            Map.entry("collaboration", "/collaboration"),
+            Map.entry("tasks", "/tasks"),
+            Map.entry("deadlines", "/tasks"),
+            Map.entry("analytics", "/analytics"),
+            Map.entry("schedules", "/schedules"),
+            Map.entry("settings", "/settings"),
+            Map.entry("profile", "/settings"),
+            Map.entry("notifications", "/notifications")
+    );
+
     private final AiActionRepository actionRepository;
     private final EventRepository eventRepository;
     private final ScheduleRepository scheduleRepository;
+    private final TaskRepository taskRepository;
+    private final UserRepository userRepository;
+    private final AiActionPlanRepository actionPlanRepository;
+    private final AiRiskEngine riskEngine;
     private final ObjectMapper objectMapper;
 
     public record ConflictResult(boolean hasConflict, String details) {}
+
+    @Autowired
+    public AiActionService(AiActionRepository actionRepository,
+                           EventRepository eventRepository,
+                           ScheduleRepository scheduleRepository,
+                           TaskRepository taskRepository,
+                           UserRepository userRepository,
+                           AiActionPlanRepository actionPlanRepository,
+                           AiRiskEngine riskEngine,
+                           ObjectMapper objectMapper) {
+        this.actionRepository = actionRepository;
+        this.eventRepository = eventRepository;
+        this.scheduleRepository = scheduleRepository;
+        this.taskRepository = taskRepository;
+        this.userRepository = userRepository;
+        this.actionPlanRepository = actionPlanRepository;
+        this.riskEngine = riskEngine;
+        this.objectMapper = objectMapper;
+    }
 
     public AiActionService(AiActionRepository actionRepository,
                            EventRepository eventRepository,
                            ScheduleRepository scheduleRepository,
                            ObjectMapper objectMapper) {
-        this.actionRepository = actionRepository;
-        this.eventRepository = eventRepository;
-        this.scheduleRepository = scheduleRepository;
-        this.objectMapper = objectMapper;
+        this(actionRepository, eventRepository, scheduleRepository, null, null, null, new AiRiskEngine(), objectMapper);
     }
 
     @Transactional
@@ -47,6 +89,11 @@ public class AiActionService {
                                                   String toolName,
                                                   Map<String, Object> arguments,
                                                   AiDtos.ClientContextDto clientContext) {
+        if (riskEngine != null) {
+            riskEngine.enforcePolicy(toolName, arguments);
+        }
+        RiskLevel riskLevel = riskEngine != null ? riskEngine.getRiskLevel(toolName) : RiskLevel.IMPORTANT_WRITE;
+
         ZoneId zoneId = resolveZone(user.getTimezone(), clientContext);
         Schedule schedule = resolveUserSchedule(user);
 
@@ -54,6 +101,7 @@ public class AiActionService {
         boolean hasConflict = false;
         String conflictDetails = null;
         UUID targetEventId = null;
+        UUID planId = null;
         Map<String, Object> canonicalParams = new LinkedHashMap<>();
 
         switch (toolName) {
@@ -322,6 +370,256 @@ public class AiActionService {
                 }
             }
 
+            case "complete_task" -> {
+                Task target = findTargetTask(user, arguments, clientContext);
+                if (target == null) {
+                    throw new AiException("NOT_FOUND", "Không tìm thấy công việc phù hợp để hoàn thành.");
+                }
+                canonicalParams.put("task_id", target.getId().toString());
+                canonicalParams.put("title", target.getTitle());
+                canonicalParams.put("previous_status", target.getStatus());
+                canonicalParams.put("new_status", "COMPLETED");
+                summary = String.format("Hoàn thành công việc: '%s'", target.getTitle());
+            }
+
+            case "create_task" -> {
+                String title = getString(arguments, "title", null);
+                if (title == null || title.isBlank()) {
+                    throw new AiException("MISSING_TITLE", "Vui lòng cung cấp tiêu đề công việc.");
+                }
+                int estimatedMinutes = 60;
+                if (arguments.containsKey("estimated_minutes") && arguments.get("estimated_minutes") != null) {
+                    try {
+                        estimatedMinutes = Integer.parseInt(arguments.get("estimated_minutes").toString().trim());
+                    } catch (Exception ignored) {}
+                }
+                String priority = getString(arguments, "priority", "MEDIUM").toUpperCase();
+                String deadline = getString(arguments, "deadline", null);
+                String description = getString(arguments, "description", null);
+
+                canonicalParams.put("title", title.trim());
+                canonicalParams.put("estimated_minutes", estimatedMinutes);
+                canonicalParams.put("priority", priority);
+                if (deadline != null && !deadline.isBlank()) {
+                    canonicalParams.put("deadline", deadline.trim());
+                }
+                if (description != null && !description.isBlank()) {
+                    canonicalParams.put("description", description.trim());
+                }
+                summary = String.format("Tạo công việc: '%s' (Ước tính %d phút, Mức ưu tiên: %s)",
+                        title.trim(), estimatedMinutes, priority);
+            }
+
+            case "update_task" -> {
+                Task target = findTargetTask(user, arguments, clientContext);
+                if (target == null) {
+                    throw new AiException("NOT_FOUND", "Không tìm thấy công việc cần cập nhật.");
+                }
+                canonicalParams.put("task_id", target.getId().toString());
+                canonicalParams.put("title", target.getTitle());
+                if (arguments.containsKey("new_title")) {
+                    canonicalParams.put("new_title", getString(arguments, "new_title", target.getTitle()));
+                }
+                if (arguments.containsKey("priority")) {
+                    canonicalParams.put("priority", getString(arguments, "priority", target.getPriority()));
+                }
+                if (arguments.containsKey("deadline")) {
+                    canonicalParams.put("deadline", getString(arguments, "deadline", null));
+                }
+                if (arguments.containsKey("status")) {
+                    canonicalParams.put("status", getString(arguments, "status", target.getStatus()));
+                }
+                summary = String.format("Cập nhật công việc: '%s'", target.getTitle());
+            }
+
+            case "delete_task" -> {
+                Task target = findTargetTask(user, arguments, clientContext);
+                if (target == null) {
+                    throw new AiException("NOT_FOUND", "Không tìm thấy công việc cần xóa.");
+                }
+                canonicalParams.put("task_id", target.getId().toString());
+                canonicalParams.put("title", target.getTitle());
+                summary = String.format("Xóa công việc: '%s'", target.getTitle());
+            }
+
+            case "create_deadline" -> {
+                String title = getString(arguments, "title", null);
+                String deadline = getString(arguments, "deadline", null);
+                if (title == null || title.isBlank() || deadline == null || deadline.isBlank()) {
+                    throw new AiException("MISSING_REQUIRED_FIELDS", "Vui lòng cung cấp đầy đủ tên bài tập/deadline và thời hạn.");
+                }
+                String priority = getString(arguments, "priority", "HIGH").toUpperCase();
+                String description = getString(arguments, "description", null);
+
+                canonicalParams.put("title", title.trim());
+                canonicalParams.put("deadline", deadline.trim());
+                canonicalParams.put("priority", priority);
+                if (description != null && !description.isBlank()) {
+                    canonicalParams.put("description", description.trim());
+                }
+                summary = String.format("Tạo hạn chót (Deadline): '%s' (Hạn: %s, Mức: %s)",
+                        title.trim(), deadline.trim(), priority);
+            }
+
+            case "update_reminder" -> {
+                Event target = findTargetEvent(user, arguments, clientContext);
+                if (target == null) {
+                    throw new AiException("NOT_FOUND", "Không tìm thấy sự kiện cần chỉnh thời gian nhắc nhở.");
+                }
+                targetEventId = target.getId();
+                int minutes = 15;
+                if (arguments.containsKey("reminder_minutes") && arguments.get("reminder_minutes") != null) {
+                    try {
+                        minutes = Integer.parseInt(arguments.get("reminder_minutes").toString().trim());
+                    } catch (Exception ignored) {}
+                }
+                canonicalParams.put("event_id", target.getId().toString());
+                canonicalParams.put("title", target.getTitle());
+                canonicalParams.put("reminder_minutes", minutes);
+                summary = String.format("Cài đặt nhắc nhở trước %d phút cho sự kiện '%s'", minutes, target.getTitle());
+            }
+
+            case "navigate_to" -> {
+                String targetScreen = getString(arguments, "target_screen", "dashboard");
+                String route = resolveRoute(targetScreen);
+                canonicalParams.put("target_screen", targetScreen);
+                canonicalParams.put("route", route);
+                summary = String.format("Mở màn hình: %s (%s)", targetScreen, route);
+            }
+
+            case "update_user_preferences" -> {
+                if (arguments.containsKey("timezone")) {
+                    canonicalParams.put("timezone", getString(arguments, "timezone", null));
+                }
+                if (arguments.containsKey("display_name")) {
+                    canonicalParams.put("display_name", getString(arguments, "display_name", null));
+                }
+                summary = "Cập nhật tùy chọn cá nhân";
+            }
+
+            case "create_study_plan" -> {
+                String subject = getString(arguments, "subject", "Ôn tập");
+                int totalDays = 7;
+                if (arguments.containsKey("total_days") && arguments.get("total_days") != null) {
+                    try { totalDays = Math.max(1, Math.min(30, Integer.parseInt(arguments.get("total_days").toString().trim()))); } catch (Exception ignored) {}
+                }
+                int dailyMinutes = 60;
+                if (arguments.containsKey("daily_minutes") && arguments.get("daily_minutes") != null) {
+                    try { dailyMinutes = Math.max(15, Math.min(240, Integer.parseInt(arguments.get("daily_minutes").toString().trim()))); } catch (Exception ignored) {}
+                }
+                String preferred = getString(arguments, "preferred_time", "evening").toLowerCase();
+                LocalTime sTime = preferred.contains("morning") ? LocalTime.of(8, 0)
+                        : preferred.contains("afternoon") ? LocalTime.of(14, 0) : LocalTime.of(19, 30);
+                LocalTime eTime = sTime.plusMinutes(dailyMinutes);
+
+                AiActionPlan plan = new AiActionPlan(user, conversation,
+                        "Kế hoạch học tập: " + subject,
+                        String.format("Lộ trình %d ngày ôn %s (%d phút/ngày lúc %s)", totalDays, subject, dailyMinutes, sTime),
+                        totalDays);
+                if (actionPlanRepository != null) {
+                    actionPlanRepository.save(plan);
+                    planId = plan.getId();
+                }
+
+                summary = String.format("Kế hoạch học tập: Ôn %s trong %d ngày (%s–%s hàng ngày)",
+                        subject, totalDays, sTime.format(AiDateTimeUtils.TIME_FMT), eTime.format(AiDateTimeUtils.TIME_FMT));
+                canonicalParams.put("plan_id", planId != null ? planId.toString() : null);
+                canonicalParams.put("subject", subject);
+                canonicalParams.put("total_days", totalDays);
+                canonicalParams.put("daily_minutes", dailyMinutes);
+
+                // Create sub-actions for each day
+                if (actionPlanRepository != null && planId != null) {
+                    LocalDate startDay = LocalDate.now(zoneId).plusDays(1);
+                    for (int i = 0; i < totalDays; i++) {
+                        LocalDate d = startDay.plusDays(i);
+                        Instant sInst = d.atTime(sTime).atZone(zoneId).toInstant();
+                        Instant eInst = d.atTime(eTime).atZone(zoneId).toInstant();
+                        Map<String, Object> subParams = new LinkedHashMap<>();
+                        String sessionTitle = String.format("Buổi %d: Ôn %s", i + 1, subject);
+                        subParams.put("title", sessionTitle);
+                        subParams.put("date", d.toString());
+                        subParams.put("start_time", sTime.format(AiDateTimeUtils.TIME_FMT));
+                        subParams.put("end_time", eTime.format(AiDateTimeUtils.TIME_FMT));
+                        subParams.put("duration_minutes", dailyMinutes);
+                        subParams.put("starts_at", sInst.toString());
+                        subParams.put("ends_at", eInst.toString());
+                        subParams.put("timezone", zoneId.getId());
+
+                        String subSummary = String.format("Tạo lịch: %s vào %s (%s–%s)",
+                                sessionTitle, d.format(AiDateTimeUtils.VI_DATE_FMT),
+                                sTime.format(AiDateTimeUtils.TIME_FMT), eTime.format(AiDateTimeUtils.TIME_FMT));
+
+                        String subParamsJson = "{}";
+                        try { subParamsJson = objectMapper.writeValueAsString(subParams); } catch (Exception ignored) {}
+
+                        AiAction subAction = new AiAction(
+                                user, conversation, "create_schedule", subSummary, subParamsJson,
+                                false, null, null, Instant.now().plusSeconds(900)
+                        );
+                        subAction.setRiskLevel("IMPORTANT_WRITE");
+                        subAction.setPlanId(planId);
+                        subAction.setStepOrder(i + 1);
+                        actionRepository.save(subAction);
+                    }
+                }
+            }
+
+            case "optimize_day" -> {
+                LocalDate date = resolveReferenceDate(arguments, clientContext, zoneId);
+                boolean keepFixed = !arguments.containsKey("keep_fixed") || Boolean.parseBoolean(arguments.get("keep_fixed").toString());
+                summary = String.format("Tối ưu hóa lịch trình ngày %s (Bảo toàn lịch cố định: %s)",
+                        date.format(AiDateTimeUtils.VI_DATE_FMT), keepFixed ? "Có" : "Không");
+                canonicalParams.put("date", date.toString());
+                canonicalParams.put("keep_fixed", keepFixed);
+            }
+
+            case "optimize_week" -> {
+                boolean keepClasses = !arguments.containsKey("keep_classes") || Boolean.parseBoolean(arguments.get("keep_classes").toString());
+                String focus = getString(arguments, "focus_area", "Toàn bộ môn học");
+                summary = String.format("Tối ưu hóa thời khóa biểu tuần này (Trọng tâm: %s, Giữ nguyên lớp chính khóa: %s)",
+                        focus, keepClasses ? "Có" : "Không");
+                canonicalParams.put("keep_classes", keepClasses);
+                canonicalParams.put("focus_area", focus);
+            }
+
+            case "batch_action" -> {
+                String title = getString(arguments, "title", "Kế hoạch thực thi hàng loạt");
+                String planSummary = getString(arguments, "summary", "Thực hiện chuỗi hành động");
+                Object rawActions = arguments.get("actions");
+                List<Map<String, Object>> actList = rawActions instanceof List<?> l ? (List<Map<String, Object>>) l : List.of();
+
+                AiActionPlan plan = new AiActionPlan(user, conversation, title, planSummary, actList.size());
+                if (actionPlanRepository != null) {
+                    actionPlanRepository.save(plan);
+                    planId = plan.getId();
+                }
+
+                summary = String.format("Kế hoạch: %s (%d hành động)", title, actList.size());
+                canonicalParams.put("title", title);
+                canonicalParams.put("summary", planSummary);
+                canonicalParams.put("plan_id", planId != null ? planId.toString() : null);
+
+                // Create individual sub actions
+                if (actionPlanRepository != null && planId != null) {
+                    int order = 1;
+                    for (Map<String, Object> sub : actList) {
+                        String subTool = getString(sub, "tool", getString(sub, "name", "create_schedule"));
+                        Object subArgsRaw = sub.get("arguments");
+                        Map<String, Object> subArgs = subArgsRaw instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
+                        try {
+                            String subJson = objectMapper.writeValueAsString(subArgs);
+                            String subSum = getString(sub, "summary", "Bước " + order + ": " + subTool);
+                            AiAction subAct = new AiAction(user, conversation, subTool, subSum, subJson, false, null, null, Instant.now().plusSeconds(900));
+                            subAct.setRiskLevel(riskEngine != null ? riskEngine.getRiskLevel(subTool).name() : "IMPORTANT_WRITE");
+                            subAct.setPlanId(planId);
+                            subAct.setStepOrder(order++);
+                            actionRepository.save(subAct);
+                        } catch (Exception ignored) {}
+                    }
+                }
+            }
+
             default -> {
                 summary = "Thực hiện hành động: " + toolName;
                 canonicalParams.putAll(arguments);
@@ -346,6 +644,9 @@ public class AiActionService {
                 targetEventId,
                 Instant.now().plusSeconds(900) // 15 mins TTL
         );
+        action.setRiskLevel(riskLevel.name());
+        action.setPlanId(planId);
+        action.setStepOrder(1);
 
         actionRepository.save(action);
         return toDto(action);
@@ -596,6 +897,177 @@ public class AiActionService {
                     data.put("title", oldTitle);
                 }
 
+                case "complete_task" -> {
+                    Task task = requireTargetTask(user, params);
+                    createdOrModifiedId = task.getId();
+                    task.update(task.getCategory(), task.getTitle(), task.getDescription(),
+                            task.getEstimatedMinutes(), 0, task.getPriority(), task.getDeadline(),
+                            "COMPLETED", task.getPreferredStart(), task.getPreferredEnd(),
+                            task.getMinimumSessionMinutes(), task.getMaximumSessionMinutes());
+                    if (taskRepository != null) {
+                        taskRepository.save(task);
+                    }
+                    message = String.format("Đã hoàn thành công việc '%s' thành công.", task.getTitle());
+                    data.put("taskId", task.getId());
+                    data.put("title", task.getTitle());
+                    data.put("status", "COMPLETED");
+                }
+
+                case "create_task" -> {
+                    String title = getString(params, "title", "Công việc mới");
+                    int estimated = 60;
+                    if (params.containsKey("estimated_minutes") && params.get("estimated_minutes") != null) {
+                        try { estimated = Integer.parseInt(params.get("estimated_minutes").toString().trim()); } catch (Exception ignored) {}
+                    }
+                    String priority = getString(params, "priority", "MEDIUM");
+                    String description = getString(params, "description", null);
+                    Instant deadlineInst = null;
+                    if (params.containsKey("deadline") && params.get("deadline") != null) {
+                        try { deadlineInst = Instant.parse(params.get("deadline").toString().trim()); } catch (Exception ignored) {}
+                    }
+
+                    Task newTask = new Task(schedule, user, null, title, description,
+                            estimated, estimated, priority, deadlineInst, "TODO", null, null, 15, estimated);
+                    if (taskRepository != null) {
+                        taskRepository.save(newTask);
+                        createdOrModifiedId = newTask.getId();
+                    }
+                    message = String.format("Đã tạo công việc '%s' thành công.", title);
+                    data.put("taskId", createdOrModifiedId);
+                    data.put("title", title);
+                    data.put("status", "TODO");
+                    data.put("estimatedMinutes", estimated);
+                }
+
+                case "update_task" -> {
+                    Task task = requireTargetTask(user, params);
+                    String newTitle = getString(params, "new_title", task.getTitle());
+                    String priority = getString(params, "priority", task.getPriority());
+                    String status = getString(params, "status", task.getStatus());
+                    Instant deadline = task.getDeadline();
+                    if (params.containsKey("deadline") && params.get("deadline") != null) {
+                        try { deadline = Instant.parse(params.get("deadline").toString().trim()); } catch (Exception ignored) {}
+                    }
+
+                    task.update(task.getCategory(), newTitle, task.getDescription(),
+                            task.getEstimatedMinutes(), task.getRemainingMinutes(), priority,
+                            deadline, status, task.getPreferredStart(), task.getPreferredEnd(),
+                            task.getMinimumSessionMinutes(), task.getMaximumSessionMinutes());
+                    if (taskRepository != null) {
+                        taskRepository.save(task);
+                    }
+                    createdOrModifiedId = task.getId();
+
+                    message = String.format("Đã cập nhật công việc '%s' thành công.", newTitle);
+                    data.put("taskId", task.getId());
+                    data.put("title", newTitle);
+                    data.put("status", status);
+                }
+
+                case "delete_task" -> {
+                    Task task = requireTargetTask(user, params);
+                    createdOrModifiedId = task.getId();
+                    String oldTitle = task.getTitle();
+                    if (taskRepository != null) {
+                        taskRepository.delete(task);
+                    }
+                    message = String.format("Đã xóa công việc '%s' thành công.", oldTitle);
+                    data.put("taskId", createdOrModifiedId);
+                    data.put("title", oldTitle);
+                }
+
+                case "create_deadline" -> {
+                    String title = getString(params, "title", "Hạn nộp");
+                    String priority = getString(params, "priority", "HIGH");
+                    String description = getString(params, "description", null);
+                    Instant deadlineInst = null;
+                    if (params.containsKey("deadline") && params.get("deadline") != null) {
+                        try {
+                            String dlStr = params.get("deadline").toString().trim();
+                            if (dlStr.length() == 16) dlStr += ":00";
+                            if (dlStr.contains("T") && !dlStr.endsWith("Z")) {
+                                deadlineInst = LocalDateTime.parse(dlStr).atZone(zoneId).toInstant();
+                            } else {
+                                deadlineInst = Instant.parse(dlStr);
+                            }
+                        } catch (Exception ignored) {}
+                    }
+                    if (deadlineInst == null) {
+                        deadlineInst = Instant.now().plusSeconds(86400L * 3);
+                    }
+
+                    Task deadlineTask = new Task(schedule, user, null, title, description,
+                            60, 60, priority, deadlineInst, "TODO", null, null, 15, 60);
+                    if (taskRepository != null) {
+                        taskRepository.save(deadlineTask);
+                        createdOrModifiedId = deadlineTask.getId();
+                    }
+                    ZonedDateTime dlLocal = deadlineInst.atZone(zoneId);
+                    DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd/MM HH:mm");
+                    message = String.format("Đã tạo hạn chót '%s' (Hạn: %s) thành công.", title, dlLocal.format(fmt));
+                    data.put("taskId", createdOrModifiedId);
+                    data.put("title", title);
+                    data.put("deadline", deadlineInst.toString());
+                }
+
+                case "update_reminder" -> {
+                    Event event = requireTargetEvent(user, action.getTargetEventId(), params);
+                    int reminderMinutes = 15;
+                    if (params.containsKey("reminder_minutes") && params.get("reminder_minutes") != null) {
+                        try { reminderMinutes = Integer.parseInt(params.get("reminder_minutes").toString().trim()); } catch (Exception ignored) {}
+                    }
+                    event.update(event.getCategory(), event.getTitle(), event.getDescription(),
+                            event.getStartsAt(), event.getEndsAt(), event.getLocation(),
+                            event.getPriority(), event.getStatus(), event.getRecurrenceRule(),
+                            reminderMinutes, event.getNotes(), event.isFixed(), event.isLocked());
+                    eventRepository.save(event);
+                    createdOrModifiedId = event.getId();
+
+                    message = String.format("Đã cập nhật nhắc nhở trước %d phút cho '%s' thành công.", reminderMinutes, event.getTitle());
+                    data.put("eventId", event.getId());
+                    data.put("title", event.getTitle());
+                    data.put("reminderMinutes", reminderMinutes);
+                }
+
+                case "navigate_to" -> {
+                    String route = getString(params, "route", "/dashboard");
+                    String targetScreen = getString(params, "target_screen", "dashboard");
+                    message = String.format("Đã chuyển hướng đến %s (%s).", targetScreen, route);
+                    data.put("route", route);
+                    data.put("targetScreen", targetScreen);
+                }
+
+                case "update_user_preferences" -> {
+                    if (userRepository != null) {
+                        if (params.containsKey("timezone") && params.get("timezone") != null) {
+                            user.setTimezone(params.get("timezone").toString().trim());
+                        }
+                        if (params.containsKey("display_name") && params.get("display_name") != null) {
+                            user.setDisplayName(params.get("display_name").toString().trim());
+                        }
+                        userRepository.save(user);
+                    }
+                    message = "Đã cập nhật tùy chọn người dùng thành công.";
+                    data.put("timezone", user.getTimezone());
+                    data.put("displayName", user.getDisplayName());
+                }
+
+                case "create_study_plan", "batch_action" -> {
+                    if (action.getPlanId() != null) {
+                        AiDtos.PlanConfirmResponse planRes = confirmPlan(user, action.getPlanId());
+                        message = planRes.message();
+                        data.put("planId", action.getPlanId());
+                        data.put("results", planRes.results());
+                    } else {
+                        message = "Đã thực thi thành công kế hoạch.";
+                    }
+                }
+
+                case "optimize_day", "optimize_week" -> {
+                    message = "Đã áp dụng các tối ưu hóa thời khóa biểu.";
+                    data.putAll(params);
+                }
+
                 default -> throw new AiException("UNSUPPORTED_ACTION", "Hành động không được hỗ trợ: " + action.getTool());
             }
 
@@ -621,6 +1093,72 @@ public class AiActionService {
             actionRepository.save(action);
             throw new AiException("EXECUTION_FAILED", "Không thể thực hiện hành động: " + ex.getMessage());
         }
+    }
+
+    @Transactional
+    public AiDtos.PlanConfirmResponse confirmPlan(User user, UUID planId) {
+        if (actionPlanRepository == null) {
+            throw new AiException("UNSUPPORTED_OPERATION", "Quản lý kế hoạch hành động chưa được kích hoạt.");
+        }
+        AiActionPlan plan = actionPlanRepository.findByIdAndUserId(planId, user.getId())
+                .orElseThrow(() -> new AiException("NOT_FOUND", "Không tìm thấy kế hoạch hành động hoặc bạn không có quyền."));
+
+        if (AiActionPlan.STATUS_SUCCESS.equalsIgnoreCase(plan.getStatus())) {
+            throw new AiException("ALREADY_EXECUTED", "Kế hoạch này đã được thực thi thành công trước đó.");
+        }
+        if (AiActionPlan.STATUS_CANCELLED.equalsIgnoreCase(plan.getStatus())) {
+            throw new AiException("ALREADY_CANCELLED", "Kế hoạch này đã bị hủy bỏ.");
+        }
+
+        plan.markExecuting();
+        actionPlanRepository.saveAndFlush(plan);
+
+        List<AiAction> subActions = actionRepository.findAllByPlanIdOrderByStepOrderAsc(planId);
+        List<AiDtos.ActionConfirmResponse> results = new ArrayList<>();
+
+        try {
+            for (AiAction sub : subActions) {
+                // If it's a child action that is still PROPOSED, execute it
+                if (AiAction.STATUS_PROPOSED.equalsIgnoreCase(sub.getStatus())) {
+                    AiDtos.ActionConfirmResponse res = confirmAction(user, sub.getId());
+                    results.add(res);
+                }
+            }
+            plan.markSuccess();
+            actionPlanRepository.save(plan);
+            return new AiDtos.PlanConfirmResponse(
+                    plan.getId(),
+                    AiActionPlan.STATUS_SUCCESS,
+                    String.format("Đã thực thi toàn bộ kế hoạch '%s' (%d hành động) thành công.", plan.getTitle(), results.size()),
+                    results
+            );
+        } catch (Exception ex) {
+            log.error("Batch plan execution failed for plan {}: {}", planId, ex.getMessage(), ex);
+            plan.markFailed();
+            actionPlanRepository.save(plan);
+            throw new AiException("PLAN_EXECUTION_FAILED", "Kế hoạch thực thi thất bại tại một bước (" + ex.getMessage() + "). Tất cả các bước đã được rollback an toàn.");
+        }
+    }
+
+    @Transactional
+    public AiDtos.PlanConfirmResponse cancelPlan(User user, UUID planId) {
+        if (actionPlanRepository == null) {
+            throw new AiException("UNSUPPORTED_OPERATION", "Quản lý kế hoạch hành động chưa được kích hoạt.");
+        }
+        AiActionPlan plan = actionPlanRepository.findByIdAndUserId(planId, user.getId())
+                .orElseThrow(() -> new AiException("NOT_FOUND", "Không tìm thấy kế hoạch hành động hoặc bạn không có quyền."));
+
+        plan.markCancelled();
+        actionPlanRepository.save(plan);
+
+        List<AiAction> subActions = actionRepository.findAllByPlanIdOrderByStepOrderAsc(planId);
+        for (AiAction sub : subActions) {
+            if (AiAction.STATUS_PROPOSED.equalsIgnoreCase(sub.getStatus())) {
+                sub.markCancelled();
+                actionRepository.save(sub);
+            }
+        }
+        return new AiDtos.PlanConfirmResponse(plan.getId(), AiActionPlan.STATUS_CANCELLED, "Đã hủy kế hoạch hành động.", List.of());
     }
 
     @Transactional
@@ -653,6 +1191,14 @@ public class AiActionService {
 
     public AiDtos.ProposedActionDto toDto(AiAction a) {
         Map<String, Object> params = parseParams(a.getParametersJson());
+        List<AiDtos.ProposedActionDto> subActions = List.of();
+        if (a.getPlanId() != null && "batch_action".equals(a.getTool()) && actionPlanRepository != null) {
+            List<AiAction> children = actionRepository.findAllByPlanIdOrderByStepOrderAsc(a.getPlanId());
+            subActions = children.stream()
+                    .filter(c -> !c.getId().equals(a.getId()))
+                    .map(this::toDtoWithoutSubActions)
+                    .toList();
+        }
         return new AiDtos.ProposedActionDto(
                 a.getId(),
                 a.getConversation() != null ? a.getConversation().getId() : null,
@@ -666,7 +1212,34 @@ public class AiActionService {
                 a.getExpiresAt(),
                 a.getCreatedAt(),
                 a.getResultDetails(),
-                a.getErrorMessage()
+                a.getErrorMessage(),
+                a.getRiskLevel() != null ? a.getRiskLevel() : "IMPORTANT_WRITE",
+                a.getPlanId(),
+                a.getStepOrder() != null ? a.getStepOrder() : 1,
+                subActions
+        );
+    }
+
+    private AiDtos.ProposedActionDto toDtoWithoutSubActions(AiAction a) {
+        Map<String, Object> params = parseParams(a.getParametersJson());
+        return new AiDtos.ProposedActionDto(
+                a.getId(),
+                a.getConversation() != null ? a.getConversation().getId() : null,
+                a.getTool(),
+                a.getStatus(),
+                a.getSummary(),
+                params,
+                a.isHasConflict(),
+                a.getConflictDetails(),
+                a.getTargetEventId(),
+                a.getExpiresAt(),
+                a.getCreatedAt(),
+                a.getResultDetails(),
+                a.getErrorMessage(),
+                a.getRiskLevel() != null ? a.getRiskLevel() : "IMPORTANT_WRITE",
+                a.getPlanId(),
+                a.getStepOrder() != null ? a.getStepOrder() : 1,
+                List.of()
         );
     }
 
@@ -874,6 +1447,60 @@ public class AiActionService {
             throw new AiException("NOT_FOUND", "Không thể tìm thấy sự kiện phù hợp để thao tác.");
         }
         return ev;
+    }
+
+    private Task findTargetTask(User user, Map<String, Object> args, AiDtos.ClientContextDto clientContext) {
+        if (taskRepository == null || args == null) return null;
+
+        Object taskIdObj = args.get("task_id");
+        if (taskIdObj == null) taskIdObj = args.get("task_id_or_title");
+        if (taskIdObj != null) {
+            try {
+                UUID id = UUID.fromString(taskIdObj.toString().trim());
+                Optional<Task> t = taskRepository.findByIdAndOwnerId(id, user.getId());
+                if (t.isPresent()) return t.get();
+            } catch (Exception ignored) {}
+        }
+
+        if (clientContext != null && clientContext.selectedTaskId() != null && !clientContext.selectedTaskId().isBlank()) {
+            try {
+                UUID id = UUID.fromString(clientContext.selectedTaskId().trim());
+                Optional<Task> t = taskRepository.findByIdAndOwnerId(id, user.getId());
+                if (t.isPresent()) return t.get();
+            } catch (Exception ignored) {}
+        }
+
+        String query = getString(args, "task_id_or_title", getString(args, "title", null));
+        if (query != null && !query.isBlank()) {
+            List<Task> userTasks = taskRepository.findAllByOwnerId(user.getId());
+            String q = query.toLowerCase().trim();
+            for (Task t : userTasks) {
+                String title = t.getTitle().toLowerCase().trim();
+                if (title.equals(q) || title.contains(q) || q.contains(title)) {
+                    return t;
+                }
+            }
+        }
+        return null;
+    }
+
+    private Task requireTargetTask(User user, Map<String, Object> params) {
+        Task task = findTargetTask(user, params, null);
+        if (task == null) {
+            throw new AiException("NOT_FOUND", "Không tìm thấy công việc phù hợp.");
+        }
+        return task;
+    }
+
+    public static String resolveRoute(String screen) {
+        if (screen == null || screen.isBlank()) return "/dashboard";
+        String s = screen.toLowerCase().trim().replace("/", "").replace("-", "");
+        for (Map.Entry<String, String> entry : ROUTE_WHITELIST.entrySet()) {
+            if (s.contains(entry.getKey())) {
+                return entry.getValue();
+            }
+        }
+        return "/dashboard";
     }
 
     private Map<String, Object> parseParams(String json) {

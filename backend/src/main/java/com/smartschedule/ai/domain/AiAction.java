@@ -53,6 +53,15 @@ public class AiAction {
     @Column(name = "error_message", columnDefinition = "TEXT")
     private String errorMessage;
 
+    @Column(name = "risk_level", nullable = false, length = 32)
+    private String riskLevel = "IMPORTANT_WRITE";
+
+    @Column(name = "plan_id")
+    private UUID planId;
+
+    @Column(name = "step_order")
+    private Integer stepOrder = 1;
+
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
@@ -184,5 +193,29 @@ public class AiAction {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public String getRiskLevel() {
+        return riskLevel;
+    }
+
+    public void setRiskLevel(String riskLevel) {
+        this.riskLevel = riskLevel;
+    }
+
+    public UUID getPlanId() {
+        return planId;
+    }
+
+    public void setPlanId(UUID planId) {
+        this.planId = planId;
+    }
+
+    public Integer getStepOrder() {
+        return stepOrder;
+    }
+
+    public void setStepOrder(Integer stepOrder) {
+        this.stepOrder = stepOrder;
     }
 }
