@@ -49,95 +49,141 @@ public class GeminiProvider implements AiProvider {
         this.restClient = RestClient.builder().requestFactory(factory).build();
     }
 
+    private final java.util.concurrent.atomic.AtomicInteger keyIndexCounter = new java.util.concurrent.atomic.AtomicInteger(0);
+
+    public boolean hasApiKey() {
+        return !getApiKeys().isEmpty();
+    }
+
+    public List<String> getApiKeys() {
+        String raw = properties.geminiApiKey();
+        if (raw == null || raw.isBlank()) return List.of();
+        return Arrays.stream(raw.split("[,;\\s]+"))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .distinct()
+                .toList();
+    }
+
+    private List<String> getOrderedApiKeys() {
+        List<String> keys = getApiKeys();
+        if (keys.isEmpty()) return List.of();
+        if (keys.size() == 1) return keys;
+
+        int startIdx = Math.abs(keyIndexCounter.getAndIncrement() % keys.size());
+        List<String> ordered = new ArrayList<>(keys.size());
+        for (int i = 0; i < keys.size(); i++) {
+            ordered.add(keys.get((startIdx + i) % keys.size()));
+        }
+        return ordered;
+    }
+
     @Override
     public ProviderResponse generateResponse(String systemInstruction, List<ChatMessage> history, String userMessage) {
         ensureApiKeyConfigured();
 
-        String apiKey = properties.geminiApiKey().trim();
+        List<String> candidateKeys = getOrderedApiKeys();
         Map<String, Object> requestPayload = buildGeminiPayload(systemInstruction, history, userMessage, true);
         List<String> candidateModels = getCandidateModels();
 
         Throwable lastException = null;
 
-        for (int modelIndex = 0; modelIndex < candidateModels.size(); modelIndex++) {
-            String model = candidateModels.get(modelIndex);
-            int maxAttempts = (modelIndex == 0) ? 3 : 2;
+        for (int keyIdx = 0; keyIdx < candidateKeys.size(); keyIdx++) {
+            String apiKey = candidateKeys.get(keyIdx);
+            boolean keyQuotaExceeded = false;
 
-            for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-                String url = String.format("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s",
-                        model, apiKey);
-                try {
-                    GeminiResponse response = restClient.post()
-                            .uri(url)
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .body(requestPayload)
-                            .retrieve()
-                            .body(GeminiResponse.class);
+            for (int modelIndex = 0; modelIndex < candidateModels.size(); modelIndex++) {
+                String model = candidateModels.get(modelIndex);
+                int maxAttempts = (modelIndex == 0) ? 2 : 1;
 
-                    if (response == null || response.candidates == null || response.candidates.isEmpty()) {
-                        throw new AiException("EMPTY_RESPONSE", "Gemini không trả về câu trả lời.");
-                    }
+                for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+                    String url = String.format("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s",
+                            model, apiKey);
+                    try {
+                        GeminiResponse response = restClient.post()
+                                .uri(url)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .body(requestPayload)
+                                .retrieve()
+                                .body(GeminiResponse.class);
 
-                    GeminiCandidate candidate = response.candidates.getFirst();
-                    if (candidate.content == null || candidate.content.parts == null || candidate.content.parts.isEmpty()) {
-                        throw new AiException("EMPTY_RESPONSE", "Nội dung phản hồi từ Gemini bị trống.");
-                    }
-
-                    StringBuilder textBuilder = new StringBuilder();
-                    List<ToolCall> toolCalls = new ArrayList<>();
-
-                    for (GeminiPart part : candidate.content.parts) {
-                        if (part.text != null) {
-                            textBuilder.append(part.text);
+                        if (response == null || response.candidates == null || response.candidates.isEmpty()) {
+                            throw new AiException("EMPTY_RESPONSE", "Gemini không trả về câu trả lời.");
                         }
-                        if (part.functionCall != null) {
-                            toolCalls.add(new ToolCall(part.functionCall.name, part.functionCall.args));
+
+                        GeminiCandidate candidate = response.candidates.getFirst();
+                        if (candidate.content == null || candidate.content.parts == null || candidate.content.parts.isEmpty()) {
+                            throw new AiException("EMPTY_RESPONSE", "Nội dung phản hồi từ Gemini bị trống.");
                         }
-                    }
 
-                    Integer tokensUsed = (response.usageMetadata != null) ? response.usageMetadata.totalTokenCount : null;
-                    return new ProviderResponse(textBuilder.toString().trim(), toolCalls, tokensUsed);
+                        StringBuilder textBuilder = new StringBuilder();
+                        List<ToolCall> toolCalls = new ArrayList<>();
 
-                } catch (RestClientResponseException ex) {
-                    int status = ex.getStatusCode().value();
-                    String body = ex.getResponseBodyAsString();
-                    log.warn("Gemini generateContent error (model={}, attempt={}/{}): HTTP {}: {}",
-                            model, attempt, maxAttempts, status, body);
+                        for (GeminiPart part : candidate.content.parts) {
+                            if (part.text != null) {
+                                textBuilder.append(part.text);
+                            }
+                            if (part.functionCall != null) {
+                                toolCalls.add(new ToolCall(part.functionCall.name, part.functionCall.args));
+                            }
+                        }
 
-                    boolean isRetriable = isRetriableStatus(status);
-                    boolean isModelNotFound = (status == 404);
-                    boolean isQuotaExhausted = (status == 429 && body != null && body.contains("Quota exceeded"));
-                    boolean hasMoreModels = modelIndex < candidateModels.size() - 1;
+                        Integer tokensUsed = (response.usageMetadata != null) ? response.usageMetadata.totalTokenCount : null;
+                        return new ProviderResponse(textBuilder.toString().trim(), toolCalls, tokensUsed);
 
-                    if (isRetriable && !isQuotaExhausted && attempt < maxAttempts) {
-                        sleepWithBackoff(attempt);
-                        continue;
-                    }
+                    } catch (RestClientResponseException ex) {
+                        int status = ex.getStatusCode().value();
+                        String body = ex.getResponseBodyAsString();
+                        log.warn("Gemini generateContent error (key#={}/{}, model={}, attempt={}/{}): HTTP {}: {}",
+                                keyIdx + 1, candidateKeys.size(), model, attempt, maxAttempts, status, body);
 
-                    if (hasMoreModels && (isRetriable || isModelNotFound || isQuotaExhausted)) {
+                        boolean isRetriable = isRetriableStatus(status);
+                        boolean isModelNotFound = (status == 404);
+                        boolean isQuota = (status == 429);
+
+                        if (isQuota && keyIdx < candidateKeys.size() - 1) {
+                            log.info("Gemini key #{} hit quota 429, switching to next key #{} in pool",
+                                    keyIdx + 1, keyIdx + 2);
+                            keyQuotaExceeded = true;
+                            lastException = mapHttpResponseToAiException(status, body);
+                            break;
+                        }
+
+                        boolean hasMoreModels = modelIndex < candidateModels.size() - 1;
+                        if (isRetriable && !isQuota && attempt < maxAttempts) {
+                            sleepWithBackoff(attempt);
+                            continue;
+                        }
+
+                        if (hasMoreModels && (isRetriable || isModelNotFound || isQuota)) {
+                            lastException = mapHttpResponseToAiException(status, body);
+                            log.info("Gemini model {} failed with HTTP {}, switching to next candidate model", model, status);
+                            break;
+                        }
+
                         lastException = mapHttpResponseToAiException(status, body);
-                        log.info("Gemini model {} failed with HTTP {}, switching to next candidate model", model, status);
-                        break;
+                        if (!isRetriable && !isModelNotFound) {
+                            break;
+                        }
+                    } catch (AiException ex) {
+                        if ("EMPTY_RESPONSE".equals(ex.getCode()) && (attempt < maxAttempts || modelIndex < candidateModels.size() - 1)) {
+                            sleepWithBackoff(attempt);
+                            continue;
+                        }
+                        lastException = ex;
+                    } catch (Exception ex) {
+                        log.warn("Gemini generateContent connection error (key#={}/{}, model={}): {}",
+                                keyIdx + 1, candidateKeys.size(), model, ex.getMessage());
+                        if (attempt < maxAttempts || modelIndex < candidateModels.size() - 1) {
+                            sleepWithBackoff(attempt);
+                            continue;
+                        }
+                        lastException = ex;
                     }
+                }
 
-                    lastException = mapHttpResponseToAiException(status, body);
-                    if (!isRetriable && !isModelNotFound) {
-                        break; // Non-retriable client error (e.g. 401/403)
-                    }
-                } catch (AiException ex) {
-                    if ("EMPTY_RESPONSE".equals(ex.getCode()) && (attempt < maxAttempts || modelIndex < candidateModels.size() - 1)) {
-                        sleepWithBackoff(attempt);
-                        continue;
-                    }
-                    lastException = ex;
-                } catch (Exception ex) {
-                    log.warn("Gemini generateContent connection error (model={}, attempt={}/{}): {}",
-                            model, attempt, maxAttempts, ex.getMessage());
-                    if (attempt < maxAttempts || modelIndex < candidateModels.size() - 1) {
-                        sleepWithBackoff(attempt);
-                        continue;
-                    }
-                    lastException = ex;
+                if (keyQuotaExceeded) {
+                    break;
                 }
             }
         }
@@ -145,7 +191,7 @@ public class GeminiProvider implements AiProvider {
         if (lastException instanceof AiException aiEx) {
             throw aiEx;
         }
-        log.error("All Gemini generateContent retry attempts and fallback models exhausted. Last error: {}",
+        log.error("All Gemini generateContent retry attempts, keys and fallback models exhausted. Last error: {}",
                 lastException != null ? lastException.getMessage() : "Unknown");
         throw new AiException("SERVER_OVERLOADED",
                 "Máy chủ Google AI đang tạm thời quá tải hoặc bận trong giây lát. Bạn vui lòng thử lại sau ít giây nhé!");
@@ -158,138 +204,155 @@ public class GeminiProvider implements AiProvider {
                                Consumer<Throwable> onError) {
         ensureApiKeyConfigured();
 
-        String apiKey = properties.geminiApiKey().trim();
+        List<String> candidateKeys = getOrderedApiKeys();
         List<String> candidateModels = getCandidateModels();
         Map<String, Object> requestPayload = buildGeminiPayload(systemInstruction, history, userMessage, true);
 
         Throwable lastException = null;
 
-        for (int modelIndex = 0; modelIndex < candidateModels.size(); modelIndex++) {
-            String model = candidateModels.get(modelIndex);
-            int maxAttempts = (modelIndex == 0) ? 3 : 2;
+        for (int keyIdx = 0; keyIdx < candidateKeys.size(); keyIdx++) {
+            String apiKey = candidateKeys.get(keyIdx);
+            boolean keyQuotaExceeded = false;
 
-            for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-                HttpURLConnection conn = null;
-                try {
-                    String urlString = String.format("https://generativelanguage.googleapis.com/v1beta/models/%s:streamGenerateContent?key=%s&alt=sse",
-                            model, apiKey);
-                    URL url = URI.create(urlString).toURL();
-                    conn = (HttpURLConnection) url.openConnection();
-                    conn.setRequestMethod("POST");
-                    conn.setDoOutput(true);
-                    conn.setRequestProperty(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
-                    conn.setRequestProperty(HttpHeaders.ACCEPT, "text/event-stream");
-                    conn.setConnectTimeout(properties.timeoutSeconds() * 1000);
-                    conn.setReadTimeout(properties.timeoutSeconds() * 1000);
+            for (int modelIndex = 0; modelIndex < candidateModels.size(); modelIndex++) {
+                String model = candidateModels.get(modelIndex);
+                int maxAttempts = (modelIndex == 0) ? 2 : 1;
 
-                    byte[] jsonBytes = objectMapper.writeValueAsBytes(requestPayload);
-                    try (var os = conn.getOutputStream()) {
-                        os.write(jsonBytes);
-                        os.flush();
-                    }
+                for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+                    HttpURLConnection conn = null;
+                    try {
+                        String urlString = String.format("https://generativelanguage.googleapis.com/v1beta/models/%s:streamGenerateContent?key=%s&alt=sse",
+                                model, apiKey);
+                        URL url = URI.create(urlString).toURL();
+                        conn = (HttpURLConnection) url.openConnection();
+                        conn.setRequestMethod("POST");
+                        conn.setDoOutput(true);
+                        conn.setRequestProperty(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
+                        conn.setRequestProperty(HttpHeaders.ACCEPT, "text/event-stream");
+                        conn.setConnectTimeout(properties.timeoutSeconds() * 1000);
+                        conn.setReadTimeout(properties.timeoutSeconds() * 1000);
 
-                    int responseCode = conn.getResponseCode();
-                    if (responseCode >= 400) {
-                        String errorBody = "";
-                        try (InputStream es = conn.getErrorStream()) {
-                            if (es != null) {
-                                errorBody = new String(es.readAllBytes(), StandardCharsets.UTF_8);
+                        byte[] jsonBytes = objectMapper.writeValueAsBytes(requestPayload);
+                        try (var os = conn.getOutputStream()) {
+                            os.write(jsonBytes);
+                            os.flush();
+                        }
+
+                        int responseCode = conn.getResponseCode();
+                        if (responseCode >= 400) {
+                            String errorBody = "";
+                            try (InputStream es = conn.getErrorStream()) {
+                                if (es != null) {
+                                    errorBody = new String(es.readAllBytes(), StandardCharsets.UTF_8);
+                                }
                             }
-                        }
-                        log.warn("Gemini stream error (model={}, attempt={}/{}): HTTP {}: {}",
-                                model, attempt, maxAttempts, responseCode, errorBody);
+                            log.warn("Gemini stream error (key#={}/{}, model={}, attempt={}/{}): HTTP {}: {}",
+                                    keyIdx + 1, candidateKeys.size(), model, attempt, maxAttempts, responseCode, errorBody);
 
-                        boolean isRetriable = isRetriableStatus(responseCode);
-                        boolean isModelNotFound = (responseCode == 404);
-                        boolean isQuotaExhausted = (responseCode == 429 && errorBody != null && errorBody.contains("Quota exceeded"));
-                        boolean hasMoreModels = modelIndex < candidateModels.size() - 1;
+                            boolean isRetriable = isRetriableStatus(responseCode);
+                            boolean isModelNotFound = (responseCode == 404);
+                            boolean isQuota = (responseCode == 429);
 
-                        if (isRetriable && !isQuotaExhausted && attempt < maxAttempts) {
-                            sleepWithBackoff(attempt);
-                            continue;
-                        }
+                            if (isQuota && keyIdx < candidateKeys.size() - 1) {
+                                log.info("Gemini stream key #{} hit quota 429, switching to next key #{} in pool",
+                                        keyIdx + 1, keyIdx + 2);
+                                keyQuotaExceeded = true;
+                                lastException = mapHttpResponseToAiException(responseCode, errorBody);
+                                break;
+                            }
 
-                        if (hasMoreModels && (isRetriable || isModelNotFound || isQuotaExhausted)) {
-                            lastException = mapHttpResponseToAiException(responseCode, errorBody);
-                            log.info("Gemini stream model {} failed with HTTP {}, switching to next candidate model", model, responseCode);
+                            boolean hasMoreModels = modelIndex < candidateModels.size() - 1;
+                            if (isRetriable && !isQuota && attempt < maxAttempts) {
+                                sleepWithBackoff(attempt);
+                                continue;
+                            }
+
+                            if (hasMoreModels && (isRetriable || isModelNotFound || isQuota)) {
+                                lastException = mapHttpResponseToAiException(responseCode, errorBody);
+                                log.info("Gemini stream model {} failed with HTTP {}, switching to next candidate model", model, responseCode);
+                                break;
+                            }
+
+                            AiException mapped = mapHttpResponseToAiException(responseCode, errorBody);
+                            if (!isRetriable && !isModelNotFound && keyIdx >= candidateKeys.size() - 1) {
+                                onError.accept(mapped);
+                                return;
+                            }
+                            lastException = mapped;
                             break;
                         }
 
-                        AiException mapped = mapHttpResponseToAiException(responseCode, errorBody);
-                        if (!isRetriable && !isModelNotFound) {
-                            onError.accept(mapped);
-                            return;
-                        }
-                        lastException = mapped;
-                        break;
-                    }
-
-                    List<ToolCall> streamedToolCalls = new ArrayList<>();
-                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
-                        String line;
-                        while ((line = reader.readLine()) != null) {
-                            if (line.startsWith("data: ")) {
-                                String jsonChunk = line.substring(6).trim();
-                                if ("[DONE]".equalsIgnoreCase(jsonChunk)) {
-                                    break;
-                                }
-                                try {
-                                    GeminiResponse chunkResponse = objectMapper.readValue(jsonChunk, GeminiResponse.class);
-                                    if (chunkResponse != null && chunkResponse.candidates != null && !chunkResponse.candidates.isEmpty()) {
-                                        GeminiCandidate candidate = chunkResponse.candidates.getFirst();
-                                        if (candidate.content != null && candidate.content.parts != null) {
-                                            for (GeminiPart part : candidate.content.parts) {
-                                                if (part.text != null && !part.text.isEmpty()) {
-                                                    onChunk.accept(part.text);
-                                                }
-                                                if (part.functionCall != null) {
-                                                    streamedToolCalls.add(new ToolCall(part.functionCall.name, part.functionCall.args));
+                        List<ToolCall> streamedToolCalls = new ArrayList<>();
+                        try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                            String line;
+                            while ((line = reader.readLine()) != null) {
+                                if (line.startsWith("data: ")) {
+                                    String jsonChunk = line.substring(6).trim();
+                                    if ("[DONE]".equalsIgnoreCase(jsonChunk)) {
+                                        break;
+                                    }
+                                    try {
+                                        GeminiResponse chunkResponse = objectMapper.readValue(jsonChunk, GeminiResponse.class);
+                                        if (chunkResponse != null && chunkResponse.candidates != null && !chunkResponse.candidates.isEmpty()) {
+                                            GeminiCandidate candidate = chunkResponse.candidates.getFirst();
+                                            if (candidate.content != null && candidate.content.parts != null) {
+                                                for (GeminiPart part : candidate.content.parts) {
+                                                    if (part.text != null && !part.text.isEmpty()) {
+                                                        onChunk.accept(part.text);
+                                                    }
+                                                    if (part.functionCall != null) {
+                                                        streamedToolCalls.add(new ToolCall(part.functionCall.name, part.functionCall.args));
+                                                    }
                                                 }
                                             }
                                         }
+                                    } catch (Exception parseEx) {
+                                        log.debug("Could not parse SSE chunk: {}", parseEx.getMessage());
                                     }
-                                } catch (Exception parseEx) {
-                                    log.debug("Could not parse SSE chunk: {}", parseEx.getMessage());
                                 }
                             }
                         }
-                    }
 
-                    onCompleteWithTools.accept(streamedToolCalls);
-                    return;
-
-                } catch (AiException ex) {
-                    lastException = ex;
-                    boolean isTransient = "SERVER_OVERLOADED".equals(ex.getCode())
-                            || "SERVER_ERROR".equals(ex.getCode())
-                            || "QUOTA_EXCEEDED".equals(ex.getCode());
-                    if (modelIndex < candidateModels.size() - 1 && isTransient) {
-                        break;
-                    }
-                    if (!isTransient) {
-                        onError.accept(ex);
+                        onCompleteWithTools.accept(streamedToolCalls);
                         return;
+
+                    } catch (AiException ex) {
+                        lastException = ex;
+                        boolean isTransient = "SERVER_OVERLOADED".equals(ex.getCode())
+                                || "SERVER_ERROR".equals(ex.getCode())
+                                || "QUOTA_EXCEEDED".equals(ex.getCode());
+                        if (modelIndex < candidateModels.size() - 1 && isTransient) {
+                            break;
+                        }
+                        if (!isTransient && keyIdx >= candidateKeys.size() - 1) {
+                            onError.accept(ex);
+                            return;
+                        }
+                    } catch (Exception ex) {
+                        log.warn("Gemini stream connection error (key#={}/{}, model={}, attempt={}/{}): {}",
+                                keyIdx + 1, candidateKeys.size(), model, attempt, maxAttempts, ex.getMessage());
+                        lastException = ex;
+                        if (attempt < maxAttempts) {
+                            sleepWithBackoff(attempt);
+                            continue;
+                        }
+                        if (modelIndex < candidateModels.size() - 1) {
+                            break;
+                        }
+                    } finally {
+                        if (conn != null) {
+                            conn.disconnect();
+                        }
                     }
-                } catch (Exception ex) {
-                    log.warn("Gemini stream connection error (model={}, attempt={}/{}): {}",
-                            model, attempt, maxAttempts, ex.getMessage());
-                    lastException = ex;
-                    if (attempt < maxAttempts) {
-                        sleepWithBackoff(attempt);
-                        continue;
-                    }
-                    if (modelIndex < candidateModels.size() - 1) {
-                        break;
-                    }
-                } finally {
-                    if (conn != null) {
-                        conn.disconnect();
-                    }
+                }
+
+                if (keyQuotaExceeded) {
+                    break;
                 }
             }
         }
 
-        log.error("All Gemini stream retry attempts and fallback models exhausted. Last error: {}",
+        log.error("All Gemini stream retry attempts, keys and fallback models exhausted. Last error: {}",
                 lastException != null ? lastException.getMessage() : "Unknown");
         if (lastException instanceof AiException aiEx) {
             onError.accept(aiEx);
@@ -306,12 +369,13 @@ public class GeminiProvider implements AiProvider {
             list.add(configured.trim());
         }
         List<String> fallbacks = List.of(
-                "gemini-3.6-flash",
-                "gemini-3.5-flash",
+                "gemini-1.5-flash",
+                "gemini-2.0-flash",
+                "gemini-1.5-flash-8b",
                 "gemini-flash-lite-latest",
-                "gemini-3.5-flash-lite",
-                "gemini-3.7-flash",
-                "gemini-3.8-flash"
+                "gemini-1.5-pro",
+                "gemini-3.6-flash",
+                "gemini-3.5-flash"
         );
         for (String fb : fallbacks) {
             if (!list.contains(fb)) {
@@ -376,7 +440,7 @@ public class GeminiProvider implements AiProvider {
     }
 
     private void ensureApiKeyConfigured() {
-        if (!properties.hasApiKey()) {
+        if (!hasApiKey()) {
             throw new AiException("MISSING_API_KEY",
                     "Gemini API key chưa được cấu hình trên server. Vui lòng thiết lập GEMINI_API_KEY trong environment.");
         }

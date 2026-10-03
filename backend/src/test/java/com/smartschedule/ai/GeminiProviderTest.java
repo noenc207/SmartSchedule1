@@ -87,4 +87,22 @@ class GeminiProviderTest {
             }
         }
     }
+
+    @Test
+    void testMultiKeyParsing_andFiltering() {
+        AiProperties properties = new AiProperties("key1, key2; key3\nkey4,  key1", "gemini-1.5-flash", 1500, 1024, 20, 30);
+        GeminiProvider provider = new GeminiProvider(properties, new ObjectMapper());
+
+        assertThat(provider.hasApiKey()).isTrue();
+        List<String> keys = provider.getApiKeys();
+        assertThat(keys).containsExactly("key1", "key2", "key3", "key4");
+    }
+
+    @Test
+    void testHasApiKey_whenEmptyOrBlank() {
+        AiProperties blankProps = new AiProperties("   ,  ;  ", "gemini-1.5-flash", 1500, 1024, 20, 30);
+        GeminiProvider blankProvider = new GeminiProvider(blankProps, new ObjectMapper());
+        assertThat(blankProvider.hasApiKey()).isFalse();
+        assertThat(blankProvider.getApiKeys()).isEmpty();
+    }
 }
