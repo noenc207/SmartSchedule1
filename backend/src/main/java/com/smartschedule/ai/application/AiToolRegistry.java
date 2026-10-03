@@ -438,7 +438,19 @@ public class AiToolRegistry {
                         "properties", Map.of(
                                 "title", Map.of("type", "STRING", "description", "Tiêu đề của kế hoạch hành động"),
                                 "summary", Map.of("type", "STRING", "description", "Tóm tắt các thay đổi trong kế hoạch"),
-                                "actions", Map.of("type", "ARRAY", "description", "Danh sách các tool calls con cần thực hiện trong batch")
+                                "actions", Map.of(
+                                        "type", "ARRAY",
+                                        "description", "Danh sách các tool calls con cần thực hiện trong batch",
+                                        "items", Map.of(
+                                                "type", "OBJECT",
+                                                "properties", Map.of(
+                                                        "tool", Map.of("type", "STRING", "description", "Tên tool con (ví dụ: create_schedule, update_schedule, delete_schedule, reschedule_event)"),
+                                                        "summary", Map.of("type", "STRING", "description", "Mô tả ngắn gọn về hành động này"),
+                                                        "arguments_json", Map.of("type", "STRING", "description", "Chuỗi JSON chứa các tham số truyền vào tool con")
+                                                ),
+                                                "required", List.of("tool")
+                                        )
+                                )
                         ),
                         "required", List.of("title", "actions")
                 )

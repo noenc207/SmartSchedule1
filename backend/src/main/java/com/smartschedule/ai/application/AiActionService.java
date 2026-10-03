@@ -639,8 +639,27 @@ public class AiActionService {
                     int order = 1;
                     for (Map<String, Object> sub : actList) {
                         String subTool = getString(sub, "tool", getString(sub, "name", "create_schedule"));
+                        Map<String, Object> subArgs = new LinkedHashMap<>();
                         Object subArgsRaw = sub.get("arguments");
-                        Map<String, Object> subArgs = subArgsRaw instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
+                        if (subArgsRaw instanceof Map<?, ?> m) {
+                            for (Map.Entry<?, ?> e : m.entrySet()) {
+                                if (e.getKey() != null) subArgs.put(e.getKey().toString(), e.getValue());
+                            }
+                        } else if (sub.get("arguments_json") instanceof String jsonStr && !jsonStr.isBlank()) {
+                            try {
+                                Map<String, Object> parsed = objectMapper.readValue(jsonStr, Map.class);
+                                subArgs.putAll(parsed);
+                            } catch (Exception ignored) {}
+                        } else {
+                            for (Map.Entry<String, Object> entry : sub.entrySet()) {
+                                if (!"tool".equalsIgnoreCase(entry.getKey()) &&
+                                        !"name".equalsIgnoreCase(entry.getKey()) &&
+                                        !"summary".equalsIgnoreCase(entry.getKey()) &&
+                                        !"arguments_json".equalsIgnoreCase(entry.getKey())) {
+                                    subArgs.put(entry.getKey(), entry.getValue());
+                                }
+                            }
+                        }
                         try {
                             String subJson = objectMapper.writeValueAsString(subArgs);
                             String subSum = getString(sub, "summary", "Bước " + order + ": " + subTool);
