@@ -28,7 +28,7 @@ public class Schedule {
     private String description;
 
     @Column(nullable = false, length = 64)
-    private String timezone = "UTC";
+    private String timezone = "Asia/Ho_Chi_Minh";
 
     @Column(nullable = false, length = 16)
     private String visibility = "PRIVATE";

@@ -165,6 +165,74 @@ export function AIChatMessages({ messages, isThinking, onQuickAction }: AIChatMe
                   ))}
                 </div>
               )}
+
+              {/* Clarification Quick Option Chips */}
+              {!isUser && index === messages.length - 1 && !isThinking && msg.content && (
+                <>
+                  {(msg.content.toLowerCase().includes('bao nhiêu phút') ||
+                    msg.content.toLowerCase().includes('thời lượng') ||
+                    msg.content.toLowerCase().includes('trong bao lâu') ||
+                    msg.content.toLowerCase().includes('mấy tiếng') ||
+                    msg.content.toLowerCase().includes('kết thúc lúc mấy giờ')) && (
+                    <div className="ai-clarification-chips">
+                      <div className="ai-clarification-label">Chọn nhanh thời lượng:</div>
+                      <div className="ai-clarification-row">
+                        {['30 phút', '45 phút', '60 phút', '90 phút', '120 phút'].map((dur) => (
+                          <button
+                            key={dur}
+                            type="button"
+                            className="ai-clarify-chip"
+                            onClick={() => void sendMessage(dur)}
+                          >
+                            {dur}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          className="ai-clarify-chip outline"
+                          onClick={() => {
+                            const input = document.querySelector('.ai-chat-textarea') as HTMLTextAreaElement | null;
+                            input?.focus();
+                          }}
+                        >
+                          Tự nhập
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {((msg.content.toLowerCase().includes('bắt đầu lúc mấy giờ') ||
+                     msg.content.toLowerCase().includes('bắt đầu lúc') ||
+                     msg.content.toLowerCase().includes('bắt đầu từ')) &&
+                    !msg.content.toLowerCase().includes('bao nhiêu phút')) && (
+                    <div className="ai-clarification-chips">
+                      <div className="ai-clarification-label">Chọn nhanh giờ bắt đầu:</div>
+                      <div className="ai-clarification-row">
+                        {['07:00', '08:00', '09:00', '14:00', '19:00'].map((time) => (
+                          <button
+                            key={time}
+                            type="button"
+                            className="ai-clarify-chip"
+                            onClick={() => void sendMessage(time)}
+                          >
+                            {time}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          className="ai-clarify-chip outline"
+                          onClick={() => {
+                            const input = document.querySelector('.ai-chat-textarea') as HTMLTextAreaElement | null;
+                            input?.focus();
+                          }}
+                        >
+                          Chọn giờ khác
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
 
             {isUser && (

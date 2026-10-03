@@ -80,17 +80,23 @@ public class AiChatService {
             StringBuilder toolResults = new StringBuilder();
             for (AiProvider.ToolCall tool : response.toolCalls()) {
                 if (isWriteTool(tool.name()) && actionService != null) {
-                    AiDtos.ProposedActionDto proposed = actionService.proposeAction(
-                            user, conversation, tool.name(), tool.arguments(), request.context()
-                    );
-                    proposedActions.add(proposed);
-                    String conflictNote = proposed.hasConflict()
-                            ? "\n⚠️ " + proposed.conflictDetails()
-                            : "\nKhông phát hiện xung đột thời gian.";
-                    toolResults.append("Tôi đề xuất: ").append(proposed.summary()).append(conflictNote)
-                            .append("\n\nVui lòng kiểm tra và xác nhận trong thẻ hành động bên dưới.\n");
+                    try {
+                        AiDtos.ProposedActionDto proposed = actionService.proposeAction(
+                                user, conversation, tool.name(), tool.arguments(), request.context()
+                        );
+                        proposedActions.add(proposed);
+                        String conflictNote = proposed.hasConflict()
+                                ? "\n⚠️ " + proposed.conflictDetails()
+                                : "\nKhông phát hiện xung đột thời gian.";
+                        toolResults.append("Tôi đề xuất: ").append(proposed.summary()).append(conflictNote)
+                                .append("\n\nVui lòng kiểm tra và xác nhận trong thẻ hành động bên dưới.\n");
+                    } catch (AiException valEx) {
+                        toolResults.append("\n").append(valEx.getMessage()).append("\n");
+                    }
                 } else {
-                    String toolOutput = contextService.executeTool(tool.name(), user, tool.arguments());
+                    String toolOutput = request.context() != null
+                            ? contextService.executeTool(tool.name(), user, tool.arguments(), request.context())
+                            : contextService.executeTool(tool.name(), user, tool.arguments());
                     toolResults.append(toolOutput).append("\n");
                 }
             }
@@ -166,19 +172,28 @@ public class AiChatService {
                         if (streamedToolCalls != null && !streamedToolCalls.isEmpty()) {
                             for (AiProvider.ToolCall tool : streamedToolCalls) {
                                 if (isWriteTool(tool.name()) && actionService != null) {
-                                    AiDtos.ProposedActionDto proposed = actionService.proposeAction(
-                                            user, conversation, tool.name(), tool.arguments(), request.context()
-                                    );
-                                    proposedActions.add(proposed);
-                                    String conflictNote = proposed.hasConflict()
-                                            ? "\n⚠️ " + proposed.conflictDetails()
-                                            : "\nKhông phát hiện xung đột.";
-                                    String text = "\n\nTôi đề xuất: " + proposed.summary() + conflictNote +
-                                            "\n\nVui lòng kiểm tra và xác nhận trong thẻ bên dưới.";
-                                    accumulatedResponse.append(text);
-                                    onChunk.accept(text);
+                                    try {
+                                        AiDtos.ProposedActionDto proposed = actionService.proposeAction(
+                                                user, conversation, tool.name(), tool.arguments(), request.context()
+                                        );
+                                        proposedActions.add(proposed);
+                                        String conflictNote = proposed.hasConflict()
+                                                ? "\n⚠️ " + proposed.conflictDetails()
+                                                : "\nKhông phát hiện xung đột.";
+                                        String text = "\n\nTôi đề xuất: " + proposed.summary() + conflictNote +
+                                                "\n\nVui lòng kiểm tra và xác nhận trong thẻ bên dưới.";
+                                        accumulatedResponse.append(text);
+                                        onChunk.accept(text);
+                                    } catch (AiException valEx) {
+                                        String text = "\n\n" + valEx.getMessage();
+                                        accumulatedResponse.append(text);
+                                        onChunk.accept(text);
+                                    }
                                 } else {
-                                    String readOutput = "\n\n" + contextService.executeTool(tool.name(), user, tool.arguments());
+                                    String toolOutput = request.context() != null
+                                            ? contextService.executeTool(tool.name(), user, tool.arguments(), request.context())
+                                            : contextService.executeTool(tool.name(), user, tool.arguments());
+                                    String readOutput = "\n\n" + toolOutput;
                                     accumulatedResponse.append(readOutput);
                                     onChunk.accept(readOutput);
                                 }
@@ -313,12 +328,37 @@ public class AiChatService {
         return """
                 Bạn là SmartSchedule AI — Action-Capable Academic Assistant, một trợ lý học tập và lập kế hoạch học thuật thông minh, tận tâm và chính xác được tích hợp trực tiếp vào SmartSchedule (dành cho sinh viên, giảng viên tại FPT University Quy Nhơn AI Campus).
 
-                QUYỀN HẠN & NGUYÊN TẮC:
-                1. Tính chính xác: Luôn dựa trên thời gian thực và dữ liệu lịch trình thực tế của người dùng được cung cấp dưới đây. TUYỆT ĐỐI KHÔNG bịa đặt tiết học, môn học, phòng học, bài kiểm tra hay deadline mà người dùng không có.
-                2. Tính hành động (Action-Capable): Khi người dùng yêu cầu tạo lịch, cập nhật lịch, xóa lịch, dời lịch, hãy GỌI FUNCTION TƯƠNG ỨNG (`create_schedule`, `update_schedule`, `delete_schedule`, `reschedule_event`).
-                3. Nguyên tắc con người xác nhận (Human-in-the-loop): Hệ thống sẽ KHÔNG tự ý thay đổi dữ liệu ngầm mà sẽ hiển thị Thẻ Xác Nhận (Action Card) kèm thông tin xung đột để người dùng chủ động bấm Xác nhận. Hãy thông báo rõ bạn đã chuẩn bị đề xuất tạo/sửa lịch và mời người dùng bấm nút xác nhận.
-                4. Phát hiện xung đột (Conflict Detection): Luôn chú ý các khung giờ đã có lịch trước khi đề xuất giờ mới. Nếu phát hiện xung đột, hãy cảnh báo và gợi ý khung giờ thay thế.
-                5. Tối ưu ngày (Optimize my day): Khi người dùng yêu cầu tối ưu lịch trình hôm nay, hãy phân tích lịch học, phát hiện các khoảng trống hoặc nguy cơ quá tải/xung đột, và đưa ra đề xuất điều chỉnh cụ thể.
+                QUYỀN HẠN & NGUYÊN TẮC QUAN TRỌNG:
+                1. TUYỆT ĐỐI KHÔNG TỰ BỊA ĐẶT THÔNG TIN LỊCH TRÌNH:
+                   - Không được tự bịa: start_time, end_time, duration, location, description, recurrence, reminder.
+                   - Khi người dùng nói: "Tạo lịch Tiết Vật lý Chủ nhật" -> TUYỆT ĐỐI KHÔNG tự gán 08:00 hay 08:00–09:30.
+                   - Không được tự gán địa điểm như "Đại học FPT Quy Nhơn" hay "Phòng Beta" nếu người dùng không nhắc đến.
+                   - Không được dùng default ngầm khi người dùng chưa đồng ý.
+
+                2. CÁC TRƯỜNG BẮT BUỘC (REQUIRED FIELDS) CỦA create_schedule:
+                   - title (Tên lịch/môn học)
+                   - date (Ngày diễn ra YYYY-MM-DD)
+                   - start_time (Giờ bắt đầu)
+                   - end_time HOẶC duration_minutes (Giờ kết thúc hoặc thời lượng)
+                   NẾU THIẾU start_time HOẶC THIẾU CẢ (end_time và duration_minutes): TUYỆT ĐỐI KHÔNG ĐƯỢC GỌI TOOL `create_schedule`! Bạn PHẢI HỎI LẠI NGƯỜI DÙNG để làm rõ.
+
+                3. NGUYÊN TẮC HỎI LÀM RÕ THÔNG MINH (SMART CLARIFICATION):
+                   - CHỈ HỎI những trường thực sự còn thiếu, KHÔNG hỏi lại những trường người dùng đã cung cấp.
+                   - Trường hợp 1: Thiếu cả giờ bắt đầu và thời lượng (Ví dụ: "Tạo lịch Tiết Vật lý Chủ nhật"):
+                     -> Hỏi: "Được rồi, bạn muốn học Tiết Vật lý vào Chủ nhật bắt đầu lúc mấy giờ và trong bao nhiêu phút?"
+                   - Trường hợp 2: Đã có giờ bắt đầu nhưng thiếu thời lượng/giờ kết thúc (Ví dụ: "Tạo Tiết Vật lý Chủ nhật lúc 8h"):
+                     -> Hỏi: "Bạn muốn kết thúc lúc mấy giờ hay học trong bao nhiêu phút?"
+                   - Trường hợp 3: Đã có thời lượng nhưng thiếu giờ bắt đầu (Ví dụ: "Tạo Tiết Vật lý Chủ nhật 90 phút"):
+                     -> Hỏi: "Bạn muốn bắt đầu học lúc mấy giờ?"
+                   - Trường hợp 4: Đã có đủ thông tin (Ví dụ: "Tạo Tiết Vật lý Chủ nhật lúc 8h, 90 phút" hoặc "8h đến 9h30"):
+                     -> Tính toán thời gian chính xác (start = 08:00, duration = 90, end = 09:30) và GỌI TOOL `create_schedule`.
+
+                4. CÁC TRƯỜNG TÙY CHỌN (OPTIONAL FIELDS):
+                   - location, description: là tùy chọn. Nếu người dùng không nhắc tới, để trống (null), KHÔNG ĐƯỢC hỏi và TUYỆT ĐỐI KHÔNG tự bịa phòng học hay trường học.
+
+                5. Nguyên tắc con người xác nhận (Human-in-the-loop): Hệ thống sẽ KHÔNG tự ý thay đổi dữ liệu ngầm mà sẽ hiển thị Thẻ Xác Nhận (Action Card) kèm thông tin xung đột để người dùng chủ động bấm Xác nhận. Hãy thông báo rõ bạn đã chuẩn bị đề xuất tạo/sửa lịch và mời người dùng bấm nút xác nhận.
+                6. Phát hiện xung đột (Conflict Detection): Luôn chú ý các khung giờ đã có lịch trước khi đề xuất giờ mới. Nếu phát hiện xung đột, hãy cảnh báo và gợi ý khung giờ thay thế.
+                7. Tối ưu ngày (Optimize my day): Khi người dùng yêu cầu tối ưu lịch trình hôm nay, hãy phân tích lịch học, phát hiện các khoảng trống hoặc nguy cơ quá tải/xung đột, và đưa ra đề xuất điều chỉnh cụ thể.
 
                 NGỮ CẢNH DỮ LIỆU LỊCH TRÌNH THỰC TẾ CỦA NGƯỜI DÙNG:
                 """ + scheduleContext;

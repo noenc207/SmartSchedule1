@@ -177,18 +177,27 @@ public class AiContextService {
 
     @Transactional(readOnly = true)
     public String executeTool(String toolName, User user, Map<String, Object> arguments) {
+        return executeTool(toolName, user, arguments, null);
+    }
+
+    @Transactional(readOnly = true)
+    public String executeTool(String toolName, User user, Map<String, Object> arguments, AiDtos.ClientContextDto clientContext) {
         return switch (toolName) {
-            case "get_today_schedule" -> getTodaySchedule(user);
-            case "get_upcoming_schedule" -> getUpcomingSchedule(user, arguments);
-            case "find_free_time" -> findFreeTime(user, arguments);
-            case "check_schedule_conflict" -> checkScheduleConflict(user, arguments);
-            case "get_schedule_details" -> getScheduleDetails(user, arguments);
+            case "get_today_schedule" -> getTodaySchedule(user, clientContext);
+            case "get_upcoming_schedule" -> getUpcomingSchedule(user, arguments, clientContext);
+            case "find_free_time" -> findFreeTime(user, arguments, clientContext);
+            case "check_schedule_conflict" -> checkScheduleConflict(user, arguments, clientContext);
+            case "get_schedule_details" -> getScheduleDetails(user, arguments, clientContext);
             default -> "Công cụ không được hỗ trợ: " + toolName;
         };
     }
 
     public String getTodaySchedule(User user) {
-        ZoneId zoneId = resolveZone(user.getTimezone(), null);
+        return getTodaySchedule(user, null);
+    }
+
+    public String getTodaySchedule(User user, AiDtos.ClientContextDto clientContext) {
+        ZoneId zoneId = resolveZone(user.getTimezone(), clientContext);
         ZonedDateTime now = ZonedDateTime.now(zoneId);
         ZonedDateTime startOfDay = now.toLocalDate().atStartOfDay(zoneId);
         ZonedDateTime endOfDay = startOfDay.plusDays(1).minusNanos(1);
@@ -220,11 +229,15 @@ public class AiContextService {
     }
 
     public String getUpcomingSchedule(User user) {
-        return getUpcomingSchedule(user, Collections.emptyMap());
+        return getUpcomingSchedule(user, Collections.emptyMap(), null);
     }
 
     public String getUpcomingSchedule(User user, Map<String, Object> arguments) {
-        ZoneId zoneId = resolveZone(user.getTimezone(), null);
+        return getUpcomingSchedule(user, arguments, null);
+    }
+
+    public String getUpcomingSchedule(User user, Map<String, Object> arguments, AiDtos.ClientContextDto clientContext) {
+        ZoneId zoneId = resolveZone(user.getTimezone(), clientContext);
         ZonedDateTime now = ZonedDateTime.now(zoneId);
         int days = 7;
         if (arguments != null && arguments.containsKey("days")) {
@@ -257,11 +270,15 @@ public class AiContextService {
     }
 
     public String findFreeTime(User user) {
-        return findFreeTime(user, Collections.emptyMap());
+        return findFreeTime(user, Collections.emptyMap(), null);
     }
 
     public String findFreeTime(User user, Map<String, Object> arguments) {
-        ZoneId zoneId = resolveZone(user.getTimezone(), null);
+        return findFreeTime(user, arguments, null);
+    }
+
+    public String findFreeTime(User user, Map<String, Object> arguments, AiDtos.ClientContextDto clientContext) {
+        ZoneId zoneId = resolveZone(user.getTimezone(), clientContext);
         ZonedDateTime now = ZonedDateTime.now(zoneId);
 
         LocalDate targetDate = now.toLocalDate();
@@ -290,7 +307,11 @@ public class AiContextService {
     }
 
     public String checkScheduleConflict(User user, Map<String, Object> arguments) {
-        ZoneId zoneId = resolveZone(user.getTimezone(), null);
+        return checkScheduleConflict(user, arguments, null);
+    }
+
+    public String checkScheduleConflict(User user, Map<String, Object> arguments, AiDtos.ClientContextDto clientContext) {
+        ZoneId zoneId = resolveZone(user.getTimezone(), clientContext);
         Instant startsAt = parseInstant(arguments.get("start_time"), zoneId);
         Instant endsAt = parseInstant(arguments.get("end_time"), zoneId);
 
@@ -329,11 +350,15 @@ public class AiContextService {
     }
 
     public String getScheduleDetails(User user, Map<String, Object> arguments) {
+        return getScheduleDetails(user, arguments, null);
+    }
+
+    public String getScheduleDetails(User user, Map<String, Object> arguments, AiDtos.ClientContextDto clientContext) {
         if (arguments == null || !arguments.containsKey("event_id_or_title")) {
             return "Vui lòng cung cấp event_id_or_title để tra cứu chi tiết.";
         }
         String query = arguments.get("event_id_or_title").toString().trim();
-        ZoneId zoneId = resolveZone(user.getTimezone(), null);
+        ZoneId zoneId = resolveZone(user.getTimezone(), clientContext);
 
         List<Schedule> schedules = scheduleRepository.findAllByOwnerIdOrderByUpdatedAtDesc(user.getId());
         DateTimeFormatter dtFmt = DateTimeFormatter.ofPattern("EEEE, dd/MM/yyyy HH:mm", Locale.forLanguageTag("vi-VN"));
@@ -450,11 +475,11 @@ public class AiContextService {
                 return ZoneId.of(ctx.timezone().trim());
             } catch (Exception ignored) {}
         }
-        if (timezone != null && !timezone.isBlank()) {
+        if (timezone != null && !timezone.isBlank() && !"UTC".equalsIgnoreCase(timezone.trim())) {
             try {
                 return ZoneId.of(timezone.trim());
             } catch (Exception ignored) {}
         }
-        return ZoneId.of("Asia/Ho_Chi_Minh");
+        return AiDateTimeUtils.DEFAULT_ZONE;
     }
 }

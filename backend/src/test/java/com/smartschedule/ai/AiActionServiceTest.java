@@ -196,4 +196,99 @@ class AiActionServiceTest {
         assertThat(action.getStatus()).isEqualTo(AiAction.STATUS_CANCELLED);
         verify(actionRepository, times(1)).save(action);
     }
+
+    @Test
+    void testProposeCreateSchedule_strictValidation_missingStartTime_throwsException() {
+        Map<String, Object> args = Map.of(
+                "title", "Tiết Vật lý",
+                "date", "2026-10-04",
+                "duration_minutes", 90
+        );
+
+        AiDtos.ClientContextDto context = new AiDtos.ClientContextDto("calendar", "2026-10-04", null, null, "Asia/Ho_Chi_Minh");
+
+        assertThatThrownBy(() -> actionService.proposeAction(testUser, conversation, "create_schedule", args, context))
+                .isInstanceOf(AiException.class)
+                .hasMessageContaining("giờ bắt đầu");
+    }
+
+    @Test
+    void testProposeCreateSchedule_strictValidation_missingDurationAndEndTime_throwsException() {
+        Map<String, Object> args = Map.of(
+                "title", "Tiết Vật lý",
+                "date", "2026-10-04",
+                "start_time", "08:00"
+        );
+
+        AiDtos.ClientContextDto context = new AiDtos.ClientContextDto("calendar", "2026-10-04", null, null, "Asia/Ho_Chi_Minh");
+
+        assertThatThrownBy(() -> actionService.proposeAction(testUser, conversation, "create_schedule", args, context))
+                .isInstanceOf(AiException.class)
+                .hasMessageContaining("thời lượng hoặc giờ kết thúc");
+    }
+
+    @Test
+    void testProposeAndConfirm_canonicalTimezonePreserved_neverShiftsTo15pm() {
+        // REGRESSION TEST SPECIFIC TO CURRENT BUG:
+        // Input: "Tạo lịch Tiết Vật lý Chủ nhật lúc 8h, 90 phút."
+        // Expected:
+        // Proposal: 04/10, 08:00–09:30
+        // Database: startsAt = 2026-10-04T01:00:00Z (08:00 in Asia/Ho_Chi_Minh)
+        // Calendar view: 08:00–09:30
+        when(scheduleRepository.findAllByOwnerIdOrderByUpdatedAtDesc(testUser.getId()))
+                .thenReturn(List.of(testSchedule));
+        when(eventRepository.search(any(), any(), any(), any(), any(), any()))
+                .thenReturn(List.of());
+
+        Map<String, Object> args = Map.of(
+                "title", "Tiết Vật lý",
+                "date", "2026-10-04",
+                "start_time", "08:00",
+                "duration_minutes", 90
+        );
+
+        AiDtos.ClientContextDto context = new AiDtos.ClientContextDto("calendar", "2026-10-04", null, null, "Asia/Ho_Chi_Minh");
+
+        // 1. Proposal Phase
+        AiDtos.ProposedActionDto proposed = actionService.proposeAction(
+                testUser, conversation, "create_schedule", args, context
+        );
+
+        assertThat(proposed.summary()).contains("08:00–09:30");
+        assertThat(proposed.parameters().get("start_time")).isEqualTo("08:00");
+        assertThat(proposed.parameters().get("end_time")).isEqualTo("09:30");
+        assertThat(proposed.parameters().get("starts_at")).isEqualTo("2026-10-04T01:00:00Z");
+        assertThat(proposed.parameters().get("ends_at")).isEqualTo("2026-10-04T02:30:00Z");
+
+        // 2. Confirmation Phase
+        UUID actionId = proposed.id();
+        AiAction savedAction = new AiAction(testUser, conversation, "create_schedule", proposed.summary(),
+                new ObjectMapper().valueToTree(proposed.parameters()).toString(), false, null, null, Instant.now().plusSeconds(900));
+
+        when(actionRepository.findByIdAndUserId(actionId, testUser.getId()))
+                .thenReturn(Optional.of(savedAction));
+
+        org.mockito.ArgumentCaptor<Event> eventCaptor = org.mockito.ArgumentCaptor.forClass(Event.class);
+
+        AiDtos.ActionConfirmResponse confirmResp = actionService.confirmAction(testUser, actionId);
+
+        assertThat(confirmResp.status()).isEqualTo(AiAction.STATUS_SUCCESS);
+        assertThat(confirmResp.message()).contains("08:00–09:30");
+
+        verify(eventRepository).save(eventCaptor.capture());
+        Event savedEvent = eventCaptor.getValue();
+
+        // Database receives exact UTC Instant: 01:00:00Z
+        assertThat(savedEvent.getStartsAt()).isEqualTo(Instant.parse("2026-10-04T01:00:00Z"));
+        assertThat(savedEvent.getEndsAt()).isEqualTo(Instant.parse("2026-10-04T02:30:00Z"));
+
+        // Rendered in user timezone Asia/Ho_Chi_Minh: MUST BE 08:00, NOT 15:00!
+        java.time.ZonedDateTime localStart = savedEvent.getStartsAt().atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
+        java.time.ZonedDateTime localEnd = savedEvent.getEndsAt().atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
+
+        assertThat(localStart.getHour()).isEqualTo(8);
+        assertThat(localStart.getMinute()).isEqualTo(0);
+        assertThat(localEnd.getHour()).isEqualTo(9);
+        assertThat(localEnd.getMinute()).isEqualTo(30);
+    }
 }

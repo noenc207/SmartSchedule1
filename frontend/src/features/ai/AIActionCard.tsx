@@ -132,25 +132,44 @@ export function AIActionCard({
 
   // Helper for rendering date & time
   const renderTimeDetails = () => {
-    if (tool === 'reschedule_event') {
-      const newStart = params.new_start_time as string;
-      const newEnd = params.new_end_time as string;
-      if (!newStart) return null;
+    // 1. Canonical ISO timestamps (single source of truth)
+    const startsAt = (params.starts_at as string) || (params.startsAt as string);
+    const endsAt = (params.ends_at as string) || (params.endsAt as string);
+
+    if (startsAt && endsAt) {
       return (
         <div className="ai-action-detail-row">
           <Clock size={14} className="detail-icon" />
           <div className="time-display">
-            <span className="time-new">
-              {formatDate(newStart, undefined, { weekday: 'short', day: '2-digit', month: '2-digit' })},{' '}
-              {newEnd ? formatTimeRange(newStart, newEnd) : formatTime(newStart)}
+            <span>
+              {formatDate(startsAt, undefined, { weekday: 'short', day: '2-digit', month: '2-digit' })},{' '}
+              {formatTimeRange(startsAt, endsAt)}
             </span>
           </div>
         </div>
       );
     }
 
-    const start = (params.start_time as string) || (params.startsAt as string);
-    const end = (params.end_time as string) || (params.endsAt as string);
+    if (tool === 'reschedule_event') {
+      const newStart = params.new_start_time as string;
+      const newEnd = params.new_end_time as string;
+      const date = params.date as string;
+      if (!newStart) return null;
+      return (
+        <div className="ai-action-detail-row">
+          <Clock size={14} className="detail-icon" />
+          <div className="time-display">
+            <span className="time-new">
+              {date ? `${date}, ` : ''}{newEnd ? `${newStart} – ${newEnd}` : newStart}
+            </span>
+          </div>
+        </div>
+      );
+    }
+
+    const date = params.date as string;
+    const start = params.start_time as string;
+    const end = params.end_time as string;
 
     if (start) {
       return (
@@ -158,8 +177,7 @@ export function AIActionCard({
           <Clock size={14} className="detail-icon" />
           <div className="time-display">
             <span>
-              {formatDate(start, undefined, { weekday: 'short', day: '2-digit', month: '2-digit' })},{' '}
-              {end ? formatTimeRange(start, end) : formatTime(start)}
+              {date ? `${date}, ` : ''}{end ? `${start} – ${end}` : start}
             </span>
           </div>
         </div>

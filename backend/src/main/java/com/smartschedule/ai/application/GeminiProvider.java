@@ -430,19 +430,19 @@ public class GeminiProvider implements AiProvider {
                             // 6. Write: Create schedule
                             Map.of(
                                     "name", "create_schedule",
-                                    "description", "Đề xuất tạo mới một sự kiện/lịch học/lịch ôn tập trên thời khóa biểu. Hệ thống sẽ tạo yêu cầu xác nhận để người dùng đồng ý trước khi lưu.",
+                                    "description", "Đề xuất tạo mới một sự kiện/lịch học/lịch ôn tập trên thời khóa biểu. CHỈ GỌI CÔNG CỤ NÀY khi người dùng ĐÃ CUNG CẤP ĐỦ: tên sự kiện, ngày diễn ra, giờ bắt đầu và thời lượng (hoặc giờ kết thúc). NẾU THIẾU giờ bắt đầu hoặc thiếu cả (thời lượng và giờ kết thúc), TUYỆT ĐỐI KHÔNG GỌI TOOL mà phải hỏi người dùng để làm rõ. TUYỆT ĐỐI KHÔNG tự bịa giờ học, địa điểm hoặc mô tả.",
                                     "parameters", Map.of(
                                             "type", "OBJECT",
                                             "properties", Map.of(
-                                                    "title", Map.of("type", "STRING", "description", "Tên môn học hoặc sự kiện (ví dụ: Physics, Ôn thi Giải tích)"),
-                                                    "start_time", Map.of("type", "STRING", "description", "Thời gian bắt đầu (ví dụ: 08:00, 2026-10-03T08:00)"),
-                                                    "end_time", Map.of("type", "STRING", "description", "Thời gian kết thúc (ví dụ: 10:00, 2026-10-03T10:00)"),
-                                                    "duration_minutes", Map.of("type", "INTEGER", "description", "Thời lượng bằng phút nếu không rõ giờ kết thúc (mặc định 60 phút)"),
-                                                    "date", Map.of("type", "STRING", "description", "Ngày diễn ra định dạng YYYY-MM-DD"),
-                                                    "location", Map.of("type", "STRING", "description", "Phòng học hoặc địa điểm (ví dụ: Phòng Beta 204)"),
-                                                    "description", Map.of("type", "STRING", "description", "Mô tả hoặc ghi chú")
+                                                    "title", Map.of("type", "STRING", "description", "Tên môn học hoặc sự kiện người dùng đã chỉ định (ví dụ: Physics, Ôn thi Giải tích)"),
+                                                    "date", Map.of("type", "STRING", "description", "Ngày diễn ra định dạng YYYY-MM-DD (người dùng nói hoặc suy từ ngày đang xem)"),
+                                                    "start_time", Map.of("type", "STRING", "description", "Thời gian bắt đầu người dùng đã chỉ định (ví dụ: 08:00, 14:30)"),
+                                                    "end_time", Map.of("type", "STRING", "description", "Thời gian kết thúc nếu người dùng đã chỉ định (ví dụ: 09:30, 16:00)"),
+                                                    "duration_minutes", Map.of("type", "INTEGER", "description", "Thời lượng bằng phút nếu người dùng đã chỉ định (ví dụ: 60, 90, 120)"),
+                                                    "location", Map.of("type", "STRING", "description", "Địa điểm hoặc phòng học NẾU VÀ CHỈ NẾU người dùng đã đề cập. Để trống/null nếu không có."),
+                                                    "description", Map.of("type", "STRING", "description", "Ghi chú hoặc mô tả NẾU người dùng đã đề cập. Để trống/null nếu không có.")
                                             ),
-                                            "required", List.of("title", "start_time")
+                                            "required", List.of("title", "date", "start_time")
                                     )
                             ),
                             // 7. Write: Update schedule

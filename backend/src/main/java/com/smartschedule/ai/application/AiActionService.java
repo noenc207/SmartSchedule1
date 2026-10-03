@@ -50,42 +50,137 @@ public class AiActionService {
         ZoneId zoneId = resolveZone(user.getTimezone(), clientContext);
         Schedule schedule = resolveUserSchedule(user);
 
-        LocalDate refDate = resolveReferenceDate(arguments, clientContext, zoneId);
-
         String summary = "";
         boolean hasConflict = false;
         String conflictDetails = null;
         UUID targetEventId = null;
+        Map<String, Object> canonicalParams = new LinkedHashMap<>();
 
         switch (toolName) {
             case "create_schedule" -> {
-                String title = getString(arguments, "title", "Lịch mới");
-                Instant startsAt = parseInstant(arguments.get("start_time"), refDate, zoneId);
-                Instant endsAt = parseInstant(arguments.get("end_time"), refDate, zoneId);
-
-                if (startsAt == null) {
-                    startsAt = refDate.atTime(8, 0).atZone(zoneId).toInstant();
-                }
-                if (endsAt == null) {
-                    int durationMinutes = getInt(arguments, "duration_minutes", 60);
-                    endsAt = startsAt.plusSeconds(durationMinutes * 60L);
+                String title = getString(arguments, "title", null);
+                if (title == null || title.isBlank()) {
+                    throw new AiException("MISSING_TITLE", "Vui lòng cung cấp tên sự kiện hoặc môn học.");
                 }
 
-                if (!startsAt.isBefore(endsAt)) {
-                    endsAt = startsAt.plusSeconds(3600);
+                // Date resolution: arguments -> clientContext -> today in user timezone
+                LocalDate refDate = null;
+                if (arguments.containsKey("date") && arguments.get("date") != null && !arguments.get("date").toString().isBlank()) {
+                    try {
+                        refDate = LocalDate.parse(arguments.get("date").toString().trim());
+                    } catch (Exception ignored) {}
+                }
+                if (refDate == null && clientContext != null && clientContext.selectedDate() != null && !clientContext.selectedDate().isBlank()) {
+                    try {
+                        refDate = LocalDate.parse(clientContext.selectedDate().trim());
+                    } catch (Exception ignored) {}
+                }
+                if (refDate == null) {
+                    refDate = LocalDate.now(zoneId);
                 }
 
-                ConflictResult cr = detectConflict(schedule.getId(), startsAt, endsAt, null, zoneId);
+                // STRICT VALIDATION: Start time is required, NO SILENT DEFAULT
+                LocalTime startTime = AiDateTimeUtils.parseLocalTime(arguments.get("start_time"));
+                if (startTime == null) {
+                    throw new AiException("MISSING_START_TIME", "Vui lòng cung cấp giờ bắt đầu cho sự kiện.");
+                }
+
+                // End time or duration required, NO SILENT DEFAULT
+                LocalTime endTime = AiDateTimeUtils.parseLocalTime(arguments.get("end_time"));
+                Integer durationMinutes = AiDateTimeUtils.parseDurationMinutes(arguments.get("duration_minutes"));
+
+                if (endTime == null && (durationMinutes == null || durationMinutes <= 0)) {
+                    throw new AiException("MISSING_DURATION", "Vui lòng cung cấp thời lượng hoặc giờ kết thúc cho sự kiện.");
+                }
+
+                // Single canonical time utility calculates start/end Instants
+                AiDateTimeUtils.TimeRange timeRange = AiDateTimeUtils.calculateTimeRange(
+                        refDate, startTime, endTime, durationMinutes, zoneId
+                );
+
+                ConflictResult cr = detectConflict(schedule.getId(), timeRange.startsAt(), timeRange.endsAt(), null, zoneId);
                 hasConflict = cr.hasConflict();
                 conflictDetails = cr.details();
 
-                ZonedDateTime sLocal = startsAt.atZone(zoneId);
-                ZonedDateTime eLocal = endsAt.atZone(zoneId);
-                DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("EEEE, dd/MM", Locale.forLanguageTag("vi-VN"));
-                DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("HH:mm");
+                String location = getString(arguments, "location", null);
+                String description = getString(arguments, "description", null);
+
+                // Build canonical parameters map (SINGLE SOURCE OF TRUTH)
+                canonicalParams.put("title", title.trim());
+                canonicalParams.put("date", timeRange.startDate().toString());
+                canonicalParams.put("start_time", timeRange.startTime().format(AiDateTimeUtils.TIME_FMT));
+                canonicalParams.put("end_time", timeRange.endTime().format(AiDateTimeUtils.TIME_FMT));
+                canonicalParams.put("duration_minutes", timeRange.durationMinutes());
+                canonicalParams.put("starts_at", timeRange.startsAt().toString());
+                canonicalParams.put("ends_at", timeRange.endsAt().toString());
+                canonicalParams.put("timezone", zoneId.getId());
+                if (location != null && !location.isBlank()) {
+                    canonicalParams.put("location", location.trim());
+                }
+                if (description != null && !description.isBlank()) {
+                    canonicalParams.put("description", description.trim());
+                }
+
+                ZonedDateTime sLocal = timeRange.startsAt().atZone(zoneId);
+                ZonedDateTime eLocal = timeRange.endsAt().atZone(zoneId);
 
                 summary = String.format("Tạo lịch: %s vào %s (%s–%s)",
-                        title, sLocal.format(dateFmt), sLocal.format(timeFmt), eLocal.format(timeFmt));
+                        title.trim(), sLocal.format(AiDateTimeUtils.VI_DATE_FMT),
+                        sLocal.format(AiDateTimeUtils.TIME_FMT), eLocal.format(AiDateTimeUtils.TIME_FMT));
+            }
+
+            case "reschedule_event" -> {
+                Event target = findTargetEvent(user, arguments);
+                if (target == null) {
+                    throw new AiException("NOT_FOUND", "Không tìm thấy sự kiện cần dời lịch.");
+                }
+                targetEventId = target.getId();
+
+                LocalDate date = null;
+                if (arguments.containsKey("date") && arguments.get("date") != null && !arguments.get("date").toString().isBlank()) {
+                    try {
+                        date = LocalDate.parse(arguments.get("date").toString().trim());
+                    } catch (Exception ignored) {}
+                }
+                if (date == null) {
+                    date = target.getStartsAt().atZone(zoneId).toLocalDate();
+                }
+
+                LocalTime newStart = AiDateTimeUtils.parseLocalTime(arguments.get("new_start_time"));
+                if (newStart == null) {
+                    throw new AiException("MISSING_START_TIME", "Vui lòng cung cấp giờ bắt đầu mới để dời lịch.");
+                }
+
+                LocalTime newEnd = AiDateTimeUtils.parseLocalTime(arguments.get("new_end_time"));
+                Integer durationMinutes = null;
+                if (newEnd == null) {
+                    long diff = Duration.between(target.getStartsAt(), target.getEndsAt()).toMinutes();
+                    durationMinutes = (int) Math.max(15, diff);
+                }
+
+                AiDateTimeUtils.TimeRange timeRange = AiDateTimeUtils.calculateTimeRange(
+                        date, newStart, newEnd, durationMinutes, zoneId
+                );
+
+                ConflictResult cr = detectConflict(schedule.getId(), timeRange.startsAt(), timeRange.endsAt(), target.getId(), zoneId);
+                hasConflict = cr.hasConflict();
+                conflictDetails = cr.details();
+
+                canonicalParams.put("event_id", target.getId().toString());
+                canonicalParams.put("title", target.getTitle());
+                canonicalParams.put("date", timeRange.startDate().toString());
+                canonicalParams.put("new_start_time", timeRange.startTime().format(AiDateTimeUtils.TIME_FMT));
+                canonicalParams.put("new_end_time", timeRange.endTime().format(AiDateTimeUtils.TIME_FMT));
+                canonicalParams.put("starts_at", timeRange.startsAt().toString());
+                canonicalParams.put("ends_at", timeRange.endsAt().toString());
+                canonicalParams.put("timezone", zoneId.getId());
+
+                ZonedDateTime sLocal = timeRange.startsAt().atZone(zoneId);
+                ZonedDateTime eLocal = timeRange.endsAt().atZone(zoneId);
+
+                summary = String.format("Dời lịch '%s' sang %s (%s–%s)",
+                        target.getTitle(), sLocal.format(AiDateTimeUtils.VI_DATE_FMT),
+                        sLocal.format(AiDateTimeUtils.TIME_FMT), eLocal.format(AiDateTimeUtils.TIME_FMT));
             }
 
             case "update_schedule" -> {
@@ -93,29 +188,49 @@ public class AiActionService {
                 if (target != null) {
                     targetEventId = target.getId();
                     String newTitle = getString(arguments, "title", target.getTitle());
-                    Instant startsAt = parseInstant(arguments.get("start_time"), refDate, zoneId);
-                    Instant endsAt = parseInstant(arguments.get("end_time"), refDate, zoneId);
+                    LocalDate refDate = target.getStartsAt().atZone(zoneId).toLocalDate();
 
-                    if (startsAt == null) startsAt = target.getStartsAt();
-                    if (endsAt == null) endsAt = target.getEndsAt();
+                    LocalTime startTime = arguments.containsKey("start_time")
+                            ? AiDateTimeUtils.parseLocalTime(arguments.get("start_time"))
+                            : target.getStartsAt().atZone(zoneId).toLocalTime();
 
-                    if (!startsAt.isBefore(endsAt)) {
-                        endsAt = startsAt.plusSeconds(3600);
-                    }
+                    LocalTime endTime = arguments.containsKey("end_time")
+                            ? AiDateTimeUtils.parseLocalTime(arguments.get("end_time"))
+                            : target.getEndsAt().atZone(zoneId).toLocalTime();
 
-                    ConflictResult cr = detectConflict(schedule.getId(), startsAt, endsAt, target.getId(), zoneId);
+                    AiDateTimeUtils.TimeRange timeRange = AiDateTimeUtils.calculateTimeRange(
+                            refDate, startTime, endTime, null, zoneId
+                    );
+
+                    ConflictResult cr = detectConflict(schedule.getId(), timeRange.startsAt(), timeRange.endsAt(), target.getId(), zoneId);
                     hasConflict = cr.hasConflict();
                     conflictDetails = cr.details();
 
-                    ZonedDateTime sLocal = startsAt.atZone(zoneId);
-                    ZonedDateTime eLocal = endsAt.atZone(zoneId);
+                    canonicalParams.put("event_id", target.getId().toString());
+                    canonicalParams.put("title", newTitle);
+                    canonicalParams.put("date", timeRange.startDate().toString());
+                    canonicalParams.put("start_time", timeRange.startTime().format(AiDateTimeUtils.TIME_FMT));
+                    canonicalParams.put("end_time", timeRange.endTime().format(AiDateTimeUtils.TIME_FMT));
+                    canonicalParams.put("starts_at", timeRange.startsAt().toString());
+                    canonicalParams.put("ends_at", timeRange.endsAt().toString());
+                    canonicalParams.put("timezone", zoneId.getId());
+                    if (arguments.containsKey("location")) {
+                        canonicalParams.put("location", getString(arguments, "location", null));
+                    }
+                    if (arguments.containsKey("description")) {
+                        canonicalParams.put("description", getString(arguments, "description", null));
+                    }
+
+                    ZonedDateTime sLocal = timeRange.startsAt().atZone(zoneId);
+                    ZonedDateTime eLocal = timeRange.endsAt().atZone(zoneId);
                     DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("dd/MM");
-                    DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("HH:mm");
 
                     summary = String.format("Cập nhật lịch: '%s' -> '%s' (%s, %s–%s)",
-                            target.getTitle(), newTitle, sLocal.format(dateFmt), sLocal.format(timeFmt), eLocal.format(timeFmt));
+                            target.getTitle(), newTitle, sLocal.format(dateFmt),
+                            sLocal.format(AiDateTimeUtils.TIME_FMT), eLocal.format(AiDateTimeUtils.TIME_FMT));
                 } else {
                     summary = "Cập nhật lịch trình: " + getString(arguments, "title", "sự kiện");
+                    canonicalParams.putAll(arguments);
                 }
             }
 
@@ -126,50 +241,25 @@ public class AiActionService {
                     ZonedDateTime sLocal = target.getStartsAt().atZone(zoneId);
                     DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("dd/MM HH:mm");
                     summary = String.format("Xóa lịch: '%s' (%s)", target.getTitle(), sLocal.format(dateFmt));
+                    canonicalParams.put("event_id", target.getId().toString());
+                    canonicalParams.put("title", target.getTitle());
                 } else {
                     summary = "Xóa lịch: " + getString(arguments, "title", "sự kiện đã chọn");
+                    canonicalParams.putAll(arguments);
                 }
             }
 
-            case "reschedule_event" -> {
-                Event target = findTargetEvent(user, arguments);
-                if (target != null) {
-                    targetEventId = target.getId();
-                    Instant startsAt = parseInstant(arguments.get("new_start_time"), refDate, zoneId);
-                    Instant endsAt = parseInstant(arguments.get("new_end_time"), refDate, zoneId);
-
-                    if (startsAt == null) {
-                        startsAt = target.getStartsAt();
-                    }
-                    if (endsAt == null) {
-                        long durationSeconds = Duration.between(target.getStartsAt(), target.getEndsAt()).getSeconds();
-                        endsAt = startsAt.plusSeconds(Math.max(1800, durationSeconds));
-                    }
-
-                    ConflictResult cr = detectConflict(schedule.getId(), startsAt, endsAt, target.getId(), zoneId);
-                    hasConflict = cr.hasConflict();
-                    conflictDetails = cr.details();
-
-                    ZonedDateTime sLocal = startsAt.atZone(zoneId);
-                    ZonedDateTime eLocal = endsAt.atZone(zoneId);
-                    DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("EEEE, dd/MM", Locale.forLanguageTag("vi-VN"));
-                    DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("HH:mm");
-
-                    summary = String.format("Dời lịch '%s' sang %s (%s–%s)",
-                            target.getTitle(), sLocal.format(dateFmt), sLocal.format(timeFmt), eLocal.format(timeFmt));
-                } else {
-                    summary = "Dời lịch sự kiện đã chọn";
-                }
+            default -> {
+                summary = "Thực hiện hành động: " + toolName;
+                canonicalParams.putAll(arguments);
             }
-
-            default -> summary = "Thực hiện hành động: " + toolName;
         }
 
         String paramsJson = "{}";
         try {
-            paramsJson = objectMapper.writeValueAsString(arguments);
+            paramsJson = objectMapper.writeValueAsString(canonicalParams);
         } catch (Exception e) {
-            log.warn("Failed serializing action arguments: {}", e.getMessage());
+            log.warn("Failed serializing action canonical parameters: {}", e.getMessage());
         }
 
         AiAction action = new AiAction(
@@ -205,28 +295,49 @@ public class AiActionService {
         action.markExecuting();
         actionRepository.saveAndFlush(action);
 
-        ZoneId zoneId = resolveZone(user.getTimezone(), null);
-        Schedule schedule = resolveUserSchedule(user);
         Map<String, Object> params = parseParams(action.getParametersJson());
+
+        // Resolve zone from canonical parameters first, fallback to user timezone
+        ZoneId zoneId = params.containsKey("timezone") && params.get("timezone") != null
+                ? ZoneId.of(params.get("timezone").toString().trim())
+                : resolveZone(user.getTimezone(), null);
+
+        Schedule schedule = resolveUserSchedule(user);
 
         try {
             UUID createdOrModifiedId = null;
             String message;
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("tool", action.getTool());
+            data.put("summary", action.getSummary());
 
             switch (action.getTool()) {
                 case "create_schedule" -> {
                     String title = getString(params, "title", "Lịch mới");
-                    String description = getString(params, "description", "");
-                    String location = getString(params, "location", "");
-                    LocalDate refDate = resolveReferenceDate(params, null, zoneId);
+                    String description = getString(params, "description", null);
+                    String location = getString(params, "location", null);
 
-                    Instant startsAt = parseInstant(params.get("start_time"), refDate, zoneId);
-                    Instant endsAt = parseInstant(params.get("end_time"), refDate, zoneId);
+                    Instant startsAt;
+                    Instant endsAt;
 
-                    if (startsAt == null) startsAt = refDate.atTime(8, 0).atZone(zoneId).toInstant();
-                    if (endsAt == null) {
-                        int dur = getInt(params, "duration_minutes", 60);
-                        endsAt = startsAt.plusSeconds(dur * 60L);
+                    if (params.containsKey("starts_at") && params.containsKey("ends_at")
+                            && params.get("starts_at") != null && params.get("ends_at") != null) {
+                        // SINGLE SOURCE OF TRUTH: exact agreed canonical instants
+                        startsAt = Instant.parse(params.get("starts_at").toString().trim());
+                        endsAt = Instant.parse(params.get("ends_at").toString().trim());
+                    } else {
+                        // Legacy fallback using AiDateTimeUtils
+                        LocalDate refDate = resolveReferenceDate(params, null, zoneId);
+                        LocalTime sTime = AiDateTimeUtils.parseLocalTime(params.get("start_time"));
+                        LocalTime eTime = AiDateTimeUtils.parseLocalTime(params.get("end_time"));
+                        Integer dur = AiDateTimeUtils.parseDurationMinutes(params.get("duration_minutes"));
+                        var tr = AiDateTimeUtils.calculateTimeRange(refDate, sTime, eTime, dur, zoneId);
+                        startsAt = tr.startsAt();
+                        endsAt = tr.endsAt();
+                    }
+
+                    if (!startsAt.isBefore(endsAt)) {
+                        throw new AiException("INVALID_TIME", "Thời gian bắt đầu phải trước thời gian kết thúc.");
                     }
 
                     Event newEvent = new Event(
@@ -246,9 +357,78 @@ public class AiActionService {
                             false
                     );
                     eventRepository.save(newEvent);
+
+                    // MISMATCH DETECTION GUARD: Guarantee saved event matches proposed time
+                    if (!newEvent.getStartsAt().equals(startsAt) || !newEvent.getEndsAt().equals(endsAt)) {
+                        log.error("Execution mismatch: proposed {} - {} but saved {} - {}",
+                                startsAt, endsAt, newEvent.getStartsAt(), newEvent.getEndsAt());
+                        throw new AiException("DATA_MISMATCH", "Thời gian lưu vào hệ thống không khớp với thời gian đề xuất.");
+                    }
+
                     createdOrModifiedId = newEvent.getId();
                     action.setTargetEventId(createdOrModifiedId);
-                    message = String.format("Đã tạo lịch '%s' thành công.", title);
+
+                    ZonedDateTime sLocal = startsAt.atZone(zoneId);
+                    ZonedDateTime eLocal = endsAt.atZone(zoneId);
+
+                    message = String.format("Đã tạo lịch '%s' vào %s (%s–%s) thành công.",
+                            title, sLocal.format(AiDateTimeUtils.VI_DATE_FMT),
+                            sLocal.format(AiDateTimeUtils.TIME_FMT), eLocal.format(AiDateTimeUtils.TIME_FMT));
+
+                    data.put("eventId", newEvent.getId());
+                    data.put("title", newEvent.getTitle());
+                    data.put("startsAt", newEvent.getStartsAt().toString());
+                    data.put("endsAt", newEvent.getEndsAt().toString());
+                    data.put("date", sLocal.toLocalDate().toString());
+                    data.put("startTime", sLocal.format(AiDateTimeUtils.TIME_FMT));
+                    data.put("endTime", eLocal.format(AiDateTimeUtils.TIME_FMT));
+                    if (location != null) data.put("location", location);
+                }
+
+                case "reschedule_event" -> {
+                    Event event = requireTargetEvent(user, action.getTargetEventId(), params);
+                    Instant startsAt;
+                    Instant endsAt;
+
+                    if (params.containsKey("starts_at") && params.containsKey("ends_at")
+                            && params.get("starts_at") != null && params.get("ends_at") != null) {
+                        startsAt = Instant.parse(params.get("starts_at").toString().trim());
+                        endsAt = Instant.parse(params.get("ends_at").toString().trim());
+                    } else {
+                        LocalDate refDate = resolveReferenceDate(params, null, zoneId);
+                        LocalTime sTime = AiDateTimeUtils.parseLocalTime(params.get("new_start_time"));
+                        LocalTime eTime = AiDateTimeUtils.parseLocalTime(params.get("new_end_time"));
+                        Integer dur = (int) Math.max(15, Duration.between(event.getStartsAt(), event.getEndsAt()).toMinutes());
+                        var tr = AiDateTimeUtils.calculateTimeRange(refDate, sTime, eTime, dur, zoneId);
+                        startsAt = tr.startsAt();
+                        endsAt = tr.endsAt();
+                    }
+
+                    event.update(event.getCategory(), event.getTitle(), event.getDescription(), startsAt, endsAt,
+                            event.getLocation(), event.getPriority(), event.getStatus(), event.getRecurrenceRule(),
+                            event.getReminderMinutes(), event.getNotes(), event.isFixed(), event.isLocked());
+
+                    eventRepository.save(event);
+
+                    if (!event.getStartsAt().equals(startsAt) || !event.getEndsAt().equals(endsAt)) {
+                        throw new AiException("DATA_MISMATCH", "Thời gian lưu vào hệ thống không khớp với thời gian đề xuất.");
+                    }
+
+                    createdOrModifiedId = event.getId();
+                    ZonedDateTime sLocal = startsAt.atZone(zoneId);
+                    ZonedDateTime eLocal = endsAt.atZone(zoneId);
+
+                    message = String.format("Đã dời lịch '%s' sang %s (%s–%s) thành công.",
+                            event.getTitle(), sLocal.format(AiDateTimeUtils.VI_DATE_FMT),
+                            sLocal.format(AiDateTimeUtils.TIME_FMT), eLocal.format(AiDateTimeUtils.TIME_FMT));
+
+                    data.put("eventId", event.getId());
+                    data.put("title", event.getTitle());
+                    data.put("startsAt", event.getStartsAt().toString());
+                    data.put("endsAt", event.getEndsAt().toString());
+                    data.put("date", sLocal.toLocalDate().toString());
+                    data.put("startTime", sLocal.format(AiDateTimeUtils.TIME_FMT));
+                    data.put("endTime", eLocal.format(AiDateTimeUtils.TIME_FMT));
                 }
 
                 case "update_schedule" -> {
@@ -256,13 +436,16 @@ public class AiActionService {
                     String newTitle = getString(params, "title", event.getTitle());
                     String description = getString(params, "description", event.getDescription());
                     String location = getString(params, "location", event.getLocation());
-                    LocalDate refDate = resolveReferenceDate(params, null, zoneId);
 
-                    Instant startsAt = parseInstant(params.get("start_time"), refDate, zoneId);
-                    Instant endsAt = parseInstant(params.get("end_time"), refDate, zoneId);
+                    Instant startsAt = event.getStartsAt();
+                    Instant endsAt = event.getEndsAt();
 
-                    if (startsAt == null) startsAt = event.getStartsAt();
-                    if (endsAt == null) endsAt = event.getEndsAt();
+                    if (params.containsKey("starts_at") && params.get("starts_at") != null) {
+                        startsAt = Instant.parse(params.get("starts_at").toString().trim());
+                    }
+                    if (params.containsKey("ends_at") && params.get("ends_at") != null) {
+                        endsAt = Instant.parse(params.get("ends_at").toString().trim());
+                    }
 
                     event.update(event.getCategory(), newTitle, description, startsAt, endsAt, location,
                             event.getPriority(), event.getStatus(), event.getRecurrenceRule(), event.getReminderMinutes(),
@@ -270,7 +453,19 @@ public class AiActionService {
 
                     eventRepository.save(event);
                     createdOrModifiedId = event.getId();
-                    message = String.format("Đã cập nhật lịch '%s' thành công.", newTitle);
+
+                    ZonedDateTime sLocal = startsAt.atZone(zoneId);
+                    ZonedDateTime eLocal = endsAt.atZone(zoneId);
+                    DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("dd/MM");
+
+                    message = String.format("Đã cập nhật lịch '%s' (%s, %s–%s) thành công.",
+                            newTitle, sLocal.format(dateFmt),
+                            sLocal.format(AiDateTimeUtils.TIME_FMT), eLocal.format(AiDateTimeUtils.TIME_FMT));
+
+                    data.put("eventId", event.getId());
+                    data.put("title", newTitle);
+                    data.put("startsAt", startsAt.toString());
+                    data.put("endsAt", endsAt.toString());
                 }
 
                 case "delete_schedule" -> {
@@ -279,27 +474,8 @@ public class AiActionService {
                     createdOrModifiedId = event.getId();
                     eventRepository.delete(event);
                     message = String.format("Đã xóa lịch '%s' thành công.", oldTitle);
-                }
-
-                case "reschedule_event" -> {
-                    Event event = requireTargetEvent(user, action.getTargetEventId(), params);
-                    LocalDate refDate = resolveReferenceDate(params, null, zoneId);
-                    Instant startsAt = parseInstant(params.get("new_start_time"), refDate, zoneId);
-                    Instant endsAt = parseInstant(params.get("new_end_time"), refDate, zoneId);
-
-                    if (startsAt == null) startsAt = event.getStartsAt();
-                    if (endsAt == null) {
-                        long durationSeconds = Duration.between(event.getStartsAt(), event.getEndsAt()).getSeconds();
-                        endsAt = startsAt.plusSeconds(Math.max(1800, durationSeconds));
-                    }
-
-                    event.update(event.getCategory(), event.getTitle(), event.getDescription(), startsAt, endsAt,
-                            event.getLocation(), event.getPriority(), event.getStatus(), event.getRecurrenceRule(),
-                            event.getReminderMinutes(), event.getNotes(), event.isFixed(), event.isLocked());
-
-                    eventRepository.save(event);
-                    createdOrModifiedId = event.getId();
-                    message = String.format("Đã dời lịch '%s' thành công.", event.getTitle());
+                    data.put("eventId", createdOrModifiedId);
+                    data.put("title", oldTitle);
                 }
 
                 default -> throw new AiException("UNSUPPORTED_ACTION", "Hành động không được hỗ trợ: " + action.getTool());
@@ -313,9 +489,14 @@ public class AiActionService {
                     AiAction.STATUS_SUCCESS,
                     message,
                     createdOrModifiedId,
-                    Map.of("tool", action.getTool(), "summary", action.getSummary())
+                    data
             );
 
+        } catch (AiException ex) {
+            log.error("AI action execution rejected: {}", ex.getMessage());
+            action.markFailed(ex.getMessage());
+            actionRepository.save(action);
+            throw ex;
         } catch (Exception ex) {
             log.error("Failed executing AI action {}: {}", actionId, ex.getMessage(), ex);
             action.markFailed(ex.getMessage());
@@ -377,7 +558,7 @@ public class AiActionService {
         }
 
         List<Event> overlaps = eventRepository.search(scheduleId, startsAt, endsAt, null, null, null);
-        DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("HH:mm");
+        DateTimeFormatter timeFmt = AiDateTimeUtils.TIME_FMT;
         DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("dd/MM");
 
         List<String> conflicts = new ArrayList<>();
@@ -419,13 +600,8 @@ public class AiActionService {
         } catch (Exception ignored) {}
 
         try {
-            String timePart = str;
-            if (timePart.contains(" ")) {
-                String[] parts = timePart.split(" ");
-                timePart = parts[parts.length - 1];
-            }
-            if (timePart.length() >= 4 && timePart.contains(":")) {
-                LocalTime lt = LocalTime.parse(timePart.length() == 5 ? timePart : timePart.substring(0, 5));
+            LocalTime lt = AiDateTimeUtils.parseLocalTime(str);
+            if (lt != null) {
                 LocalDate d = (refDate != null) ? refDate : LocalDate.now(zoneId);
                 return d.atTime(lt).atZone(zoneId).toInstant();
             }
@@ -435,7 +611,7 @@ public class AiActionService {
     }
 
     private LocalDate resolveReferenceDate(Map<String, Object> args, AiDtos.ClientContextDto ctx, ZoneId zoneId) {
-        if (args != null && args.containsKey("date")) {
+        if (args != null && args.containsKey("date") && args.get("date") != null && !args.get("date").toString().isBlank()) {
             try {
                 return LocalDate.parse(args.get("date").toString().trim());
             } catch (Exception ignored) {}
@@ -454,12 +630,12 @@ public class AiActionService {
                 return ZoneId.of(ctx.timezone().trim());
             } catch (Exception ignored) {}
         }
-        if (timezone != null && !timezone.isBlank()) {
+        if (timezone != null && !timezone.isBlank() && !"UTC".equalsIgnoreCase(timezone.trim())) {
             try {
                 return ZoneId.of(timezone.trim());
             } catch (Exception ignored) {}
         }
-        return ZoneId.of("Asia/Ho_Chi_Minh");
+        return AiDateTimeUtils.DEFAULT_ZONE;
     }
 
     private Schedule resolveUserSchedule(User user) {
@@ -529,14 +705,5 @@ public class AiActionService {
     private String getString(Map<String, Object> map, String key, String defaultValue) {
         if (map == null || !map.containsKey(key) || map.get(key) == null) return defaultValue;
         return map.get(key).toString().trim();
-    }
-
-    private int getInt(Map<String, Object> map, String key, int defaultValue) {
-        if (map == null || !map.containsKey(key) || map.get(key) == null) return defaultValue;
-        try {
-            return Integer.parseInt(map.get(key).toString().trim());
-        } catch (Exception e) {
-            return defaultValue;
-        }
     }
 }

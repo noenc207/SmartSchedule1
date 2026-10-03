@@ -43,7 +43,7 @@ public class User {
     private boolean enabled = true;
 
     @Column(name = "timezone", nullable = false, length = 64)
-    private String timezone = "UTC";
+    private String timezone = "Asia/Ho_Chi_Minh";
 
     @Column(name = "locale", nullable = false, length = 16)
     private String locale = "en";
