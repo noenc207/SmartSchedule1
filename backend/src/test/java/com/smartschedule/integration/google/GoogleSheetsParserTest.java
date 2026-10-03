@@ -88,6 +88,41 @@ class GoogleSheetsParserTest {
     }
 
     @Test
+    @DisplayName("Should parse matrix timetable with sessions (Ngày, Thứ, Buổi Sáng, Buổi Chiều, Buổi Tối)")
+    void testParseMatrixTimetableWithSessions() {
+        List<List<Object>> rows = List.of(
+                List.of("Ngày", "Thứ", "Buổi Sáng", "Buổi Chiều", "Buổi Tối"),
+                List.of("05/10/2026", "Thứ 2", "Lên lớp tại FPT Quy Nhơn", "Luyện Competitive Programming (C++ với Segment Tree, DSU, v.v.)", "Code dự án y tế DERMA-ACT / Mind's Eye Reborn"),
+                List.of("06/10/2026", "Thứ 3", "Nghiên cứu AI & Deep Learning (PyTorch, Computer Vision)", "Lên lớp tại FPT Quy Nhơn", "Đọc truyện Tiên hiệp")
+        );
+
+        var result = parser.parseRows(rows, refDate);
+
+        assertThat(result.eventsDetected()).isEqualTo(6);
+        assertThat(result.validEvents()).isEqualTo(6);
+        assertThat(result.missingTimeCount()).isEqualTo(0);
+
+        ParsedSheetEventDto ev1 = result.events().get(0);
+        assertThat(ev1.title()).isEqualTo("Lên lớp tại FPT Quy Nhơn");
+        assertThat(ev1.date()).isEqualTo("2026-10-05");
+        assertThat(ev1.startTime()).isEqualTo("07:30");
+        assertThat(ev1.endTime()).isEqualTo("11:30");
+        assertThat(ev1.location()).isEqualTo("FPT Quy Nhơn");
+
+        ParsedSheetEventDto ev2 = result.events().get(1);
+        assertThat(ev2.title()).contains("Competitive Programming");
+        assertThat(ev2.date()).isEqualTo("2026-10-05");
+        assertThat(ev2.startTime()).isEqualTo("13:30");
+        assertThat(ev2.endTime()).isEqualTo("17:00");
+
+        ParsedSheetEventDto ev3 = result.events().get(2);
+        assertThat(ev3.title()).contains("DERMA-ACT");
+        assertThat(ev3.date()).isEqualTo("2026-10-05");
+        assertThat(ev3.startTime()).isEqualTo("18:30");
+        assertThat(ev3.endTime()).isEqualTo("21:30");
+    }
+
+    @Test
     @DisplayName("Should parse TSV string into 2D table cleanly")
     void testParseTsv() {
         String tsv = "Subject\tDate\tTime\tRoom\nMath\t2026-10-08\t10:00-11:30\tH1";

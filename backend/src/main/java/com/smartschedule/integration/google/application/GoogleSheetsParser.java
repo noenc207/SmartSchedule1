@@ -66,12 +66,17 @@ public class GoogleSheetsParser {
     private enum ColumnType {
         TITLE,
         DATE,
+        DAY_OF_WEEK,
         START_TIME,
         END_TIME,
         TIME_RANGE,
         LOCATION,
         INSTRUCTOR,
         NOTES,
+        SESSION_MORNING,     // "Buổi Sáng", "Sáng", "Morning"
+        SESSION_AFTERNOON,   // "Buổi Chiều", "Chiều", "Afternoon"
+        SESSION_EVENING,     // "Buổi Tối", "Tối", "Evening", "Night"
+        SESSION_PERIOD,      // "Tiết 1-3", "Tiết 4-6", "Ca 1", "Slot 1"
         UNKNOWN
     }
 
@@ -96,6 +101,8 @@ public class GoogleSheetsParser {
         List<Object> headerRow = rawRows.get(headerRowIndex);
         Map<Integer, ColumnType> columnMappings = detectColumnMappings(headerRow);
 
+        boolean isMatrixMode = columnMappings.values().stream().anyMatch(this::isSessionType);
+
         List<ParsedSheetEventDto> parsedEvents = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
         int missingTimeCount = 0;
@@ -107,11 +114,21 @@ public class GoogleSheetsParser {
                 continue;
             }
 
-            ParsedSheetEventDto event = parseSingleRow(row, columnMappings, r + 1, baseDate, warnings);
-            if (event != null) {
-                parsedEvents.add(event);
-                if (!event.missingFields().isEmpty() && event.missingFields().contains("startTime")) {
-                    missingTimeCount++;
+            if (isMatrixMode) {
+                List<ParsedSheetEventDto> matrixEvents = parseMatrixRow(row, columnMappings, headerRow, r + 1, baseDate, warnings);
+                for (ParsedSheetEventDto ev : matrixEvents) {
+                    parsedEvents.add(ev);
+                    if (!ev.missingFields().isEmpty() && ev.missingFields().contains("startTime")) {
+                        missingTimeCount++;
+                    }
+                }
+            } else {
+                ParsedSheetEventDto event = parseSingleRow(row, columnMappings, r + 1, baseDate, warnings);
+                if (event != null) {
+                    parsedEvents.add(event);
+                    if (!event.missingFields().isEmpty() && event.missingFields().contains("startTime")) {
+                        missingTimeCount++;
+                    }
                 }
             }
         }
@@ -184,68 +201,222 @@ public class GoogleSheetsParser {
         for (Object cell : row) {
             if (cell == null) continue;
             String text = cell.toString().toLowerCase().trim();
-            if (matchesType(text, ColumnType.TITLE) ||
-                matchesType(text, ColumnType.DATE) ||
-                matchesType(text, ColumnType.START_TIME) ||
-                matchesType(text, ColumnType.END_TIME) ||
-                matchesType(text, ColumnType.TIME_RANGE) ||
-                matchesType(text, ColumnType.LOCATION) ||
-                matchesType(text, ColumnType.INSTRUCTOR)) {
-                score++;
+            for (ColumnType type : ColumnType.values()) {
+                if (type != ColumnType.UNKNOWN && matchesType(text, type)) {
+                    score++;
+                    break;
+                }
             }
         }
         return score;
+    }
+
+    private boolean isSessionType(ColumnType type) {
+        return type == ColumnType.SESSION_MORNING
+                || type == ColumnType.SESSION_AFTERNOON
+                || type == ColumnType.SESSION_EVENING
+                || type == ColumnType.SESSION_PERIOD;
+    }
+
+    private boolean isSession(String text) {
+        if (text == null) return false;
+        String t = text.toLowerCase().trim();
+        return t.contains("sáng") || t.contains("chiều") || t.contains("tối")
+                || t.contains("morning") || t.contains("afternoon") || t.contains("evening") || t.contains("night")
+                || t.matches(".*(tiết|ca|slot)\\s*\\d+.*");
     }
 
     private Map<Integer, ColumnType> detectColumnMappings(List<Object> headerRow) {
         Map<Integer, ColumnType> map = new LinkedHashMap<>();
         if (headerRow == null) return map;
 
-        boolean hasStartTime = false;
-        boolean hasEndTime = false;
-
         for (int col = 0; col < headerRow.size(); col++) {
             Object cell = headerRow.get(col);
             if (cell == null) continue;
             String text = cell.toString().toLowerCase().trim();
 
-            if (matchesType(text, ColumnType.TITLE)) {
+            if (matchesType(text, ColumnType.SESSION_MORNING)) {
+                map.put(col, ColumnType.SESSION_MORNING);
+            } else if (matchesType(text, ColumnType.SESSION_AFTERNOON)) {
+                map.put(col, ColumnType.SESSION_AFTERNOON);
+            } else if (matchesType(text, ColumnType.SESSION_EVENING)) {
+                map.put(col, ColumnType.SESSION_EVENING);
+            } else if (matchesType(text, ColumnType.SESSION_PERIOD)) {
+                map.put(col, ColumnType.SESSION_PERIOD);
+            } else if (matchesType(text, ColumnType.TITLE)) {
                 map.put(col, ColumnType.TITLE);
             } else if (matchesType(text, ColumnType.DATE)) {
                 map.put(col, ColumnType.DATE);
+            } else if (matchesType(text, ColumnType.DAY_OF_WEEK)) {
+                map.put(col, ColumnType.DAY_OF_WEEK);
             } else if (matchesType(text, ColumnType.START_TIME)) {
                 map.put(col, ColumnType.START_TIME);
-                hasStartTime = true;
             } else if (matchesType(text, ColumnType.END_TIME)) {
                 map.put(col, ColumnType.END_TIME);
-                hasEndTime = true;
             } else if (matchesType(text, ColumnType.LOCATION)) {
                 map.put(col, ColumnType.LOCATION);
             } else if (matchesType(text, ColumnType.INSTRUCTOR)) {
                 map.put(col, ColumnType.INSTRUCTOR);
             } else if (matchesType(text, ColumnType.TIME_RANGE)) {
                 map.put(col, ColumnType.TIME_RANGE);
+            } else if (matchesType(text, ColumnType.NOTES)) {
+                map.put(col, ColumnType.NOTES);
             } else {
                 map.put(col, ColumnType.UNKNOWN);
             }
         }
-
-        // If we found both start and end time, keep them. If we have a time range column while no start/end, good.
         return map;
     }
 
     private boolean matchesType(String text, ColumnType type) {
+        String t = text.toLowerCase().trim();
         return switch (type) {
-            case TITLE -> text.matches(".*(môn|tiêu đề|subject|tiết học|tên môn|course|class|tên sự kiện|event|title|activity|hoạt động).*");
-            case DATE -> text.matches(".*(ngày|date|thứ|day|buổi|thời điểm|ngày học).*");
-            case START_TIME -> text.matches(".*(bắt đầu|start|từ giờ|giờ bắt đầu|từ).*") && !text.contains("kết thúc") && !text.contains("đến");
-            case END_TIME -> text.matches(".*(kết thúc|end|đến giờ|giờ kết thúc|đến).*");
-            case TIME_RANGE -> text.matches(".*(giờ|khung giờ|thời gian|time|slot|ca học|ca|tiết).*");
-            case LOCATION -> text.matches(".*(phòng|phòng học|room|địa điểm|location|lab|khu vực).*");
-            case INSTRUCTOR -> text.matches(".*(giảng viên|gv|thầy|cô|thầy/cô|instructor|lecturer|teacher|giáo viên).*");
-            case NOTES -> text.matches(".*(ghi chú|note|mô tả|description|chi tiết).*");
+            case SESSION_MORNING -> t.matches(".*(buổi sáng|sáng|morning).*") && !t.contains("chiều") && !t.contains("tối");
+            case SESSION_AFTERNOON -> t.matches(".*(buổi chiều|chiều|afternoon).*") && !t.contains("sáng") && !t.contains("tối");
+            case SESSION_EVENING -> t.matches(".*(buổi tối|tối|evening|night).*") && !t.contains("sáng") && !t.contains("chiều");
+            case SESSION_PERIOD -> t.matches(".*(tiết|ca|slot)\\s*\\d+.*");
+            case TITLE -> !isSession(t) && t.matches(".*(môn|tiêu đề|subject|tiết học|tên môn|course|class|tên sự kiện|event|title|activity|hoạt động).*");
+            case DATE -> !isSession(t) && t.matches(".*(ngày|date|ngày học).*");
+            case DAY_OF_WEEK -> !isSession(t) && t.matches(".*(thứ|day|dow).*");
+            case START_TIME -> !isSession(t) && t.matches(".*(bắt đầu|start|từ giờ|giờ bắt đầu|từ).*") && !t.contains("kết thúc") && !t.contains("đến");
+            case END_TIME -> !isSession(t) && t.matches(".*(kết thúc|end|đến giờ|giờ kết thúc|đến).*");
+            case TIME_RANGE -> !isSession(t) && t.matches(".*(giờ|khung giờ|thời gian|time|slot|ca học|ca|tiết).*");
+            case LOCATION -> t.matches(".*(phòng|phòng học|room|địa điểm|location|lab|khu vực).*");
+            case INSTRUCTOR -> t.matches(".*(giảng viên|gv|thầy|cô|thầy/cô|instructor|lecturer|teacher|giáo viên).*");
+            case NOTES -> t.matches(".*(ghi chú|note|mô tả|description|chi tiết).*");
             default -> false;
         };
+    }
+
+    private List<ParsedSheetEventDto> parseMatrixRow(
+            List<Object> row,
+            Map<Integer, ColumnType> colMap,
+            List<Object> headerRow,
+            int rowNum,
+            LocalDate baseDate,
+            List<String> warnings
+    ) {
+        List<ParsedSheetEventDto> list = new ArrayList<>();
+
+        // 1. Resolve date for this row
+        String dateStr = null;
+        for (Map.Entry<Integer, ColumnType> entry : colMap.entrySet()) {
+            if (entry.getValue() == ColumnType.DATE || entry.getValue() == ColumnType.DAY_OF_WEEK) {
+                int col = entry.getKey();
+                if (col < row.size() && row.get(col) != null) {
+                    String val = row.get(col).toString().trim();
+                    if (!val.isEmpty()) {
+                        LocalDate d = parseDate(val, baseDate);
+                        if (d != null) {
+                            dateStr = d.format(DateTimeFormatter.ISO_LOCAL_DATE);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Fallback: check first column if date still not resolved
+        if (dateStr == null && !row.isEmpty() && row.get(0) != null) {
+            LocalDate d = parseDate(row.get(0).toString().trim(), baseDate);
+            if (d != null) {
+                dateStr = d.format(DateTimeFormatter.ISO_LOCAL_DATE);
+            }
+        }
+
+        if (dateStr == null) {
+            warnings.add(String.format("Dòng %d: Không xác định được ngày cho hàng này.", rowNum));
+        }
+
+        // 2. Iterate through each session column in this row
+        for (Map.Entry<Integer, ColumnType> entry : colMap.entrySet()) {
+            int col = entry.getKey();
+            ColumnType colType = entry.getValue();
+            if (!isSessionType(colType) || col >= row.size() || row.get(col) == null) {
+                continue;
+            }
+
+            String cellVal = row.get(col).toString().trim();
+            if (cellVal.isEmpty() || isEventBlankOrEmpty(cellVal)) {
+                continue;
+            }
+
+            String startTime;
+            String endTime;
+
+            TimePair explicitTime = parseTimeRange(cellVal);
+            if (explicitTime != null) {
+                startTime = explicitTime.start;
+                endTime = explicitTime.end;
+            } else if (colType == ColumnType.SESSION_MORNING) {
+                startTime = "07:30";
+                endTime = "11:30";
+            } else if (colType == ColumnType.SESSION_AFTERNOON) {
+                startTime = "13:30";
+                endTime = "17:00";
+            } else if (colType == ColumnType.SESSION_EVENING) {
+                startTime = "18:30";
+                endTime = "21:30";
+            } else if (colType == ColumnType.SESSION_PERIOD) {
+                String headerText = col < headerRow.size() && headerRow.get(col) != null ? headerRow.get(col).toString() : "";
+                TimePair periodTime = parsePeriods(headerText);
+                if (periodTime != null) {
+                    startTime = periodTime.start;
+                    endTime = periodTime.end;
+                } else {
+                    startTime = "08:00";
+                    endTime = "10:00";
+                }
+            } else {
+                startTime = "08:00";
+                endTime = "10:00";
+            }
+
+            String location = extractLocation(cellVal);
+            String title = cleanTitle(cellVal);
+
+            List<String> missingFields = new ArrayList<>();
+            if (dateStr == null) missingFields.add("date");
+            if (startTime == null) missingFields.add("startTime");
+            if (endTime == null) missingFields.add("endTime");
+
+            double confidence = 0.95;
+            if (dateStr == null) confidence -= 0.3;
+            if (startTime == null) confidence -= 0.5;
+
+            list.add(new ParsedSheetEventDto(
+                    title,
+                    dateStr,
+                    startTime,
+                    endTime,
+                    location,
+                    null,
+                    Math.round(confidence * 100.0) / 100.0,
+                    rowNum,
+                    false,
+                    null,
+                    missingFields
+            ));
+        }
+
+        return list;
+    }
+
+    private boolean isEventBlankOrEmpty(String text) {
+        if (text == null) return true;
+        String t = text.trim().toLowerCase();
+        return t.isEmpty() || t.equals("-") || t.equals("—") || t.equals("x") || t.equals("none")
+                || t.equals("nghỉ") || t.equals("trống") || t.equals("rảnh") || t.equals("không có");
+    }
+
+    private String extractLocation(String text) {
+        if (text == null) return null;
+        Pattern p = Pattern.compile("(?:tại|@)\\s+([^,;\\(\\)\\n]+)", Pattern.CASE_INSENSITIVE);
+        Matcher m = p.matcher(text);
+        if (m.find()) {
+            return m.group(1).trim();
+        }
+        return null;
     }
 
     private ParsedSheetEventDto parseSingleRow(List<Object> row,

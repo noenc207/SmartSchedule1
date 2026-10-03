@@ -575,6 +575,13 @@ public class AiChatService {
                      * Chế độ Cá nhân (PERSONAL): Tập trung thời gian rảnh, thói quen sinh hoạt, tập thể dục, nghỉ ngơi phục hồi.
                      * Chế độ Tổng hợp (GENERAL): Tích hợp toàn diện học tập, công việc và đời sống.
 
+                11. NHẬP LỊCH TỪ GOOGLE WORKSPACE (GOOGLE SHEETS & CALENDAR):
+                   - Khi người dùng gửi liên kết Google Sheets hoặc nói: "đọc sheet này", "phân tích sheet", "nhập lịch từ google sheet", "đồng bộ vào lịch", "bắt đầu lên lịch đồng bộ", "thêm tất cả lịch trong bảng này", "đồng bộ google calendar":
+                     * Nếu người dùng yêu cầu đọc / kiểm tra: gọi tool `read_google_sheet`.
+                     * Nếu người dùng yêu cầu nhập / đồng bộ vào lịch: BẮT BUỘC gọi tool `import_google_sheet_events` (hoặc `sync_google_calendar` / `import_google_calendar`).
+                     * Nếu người dùng không lặp lại URL trong tin nhắn hiện tại nhưng tin nhắn trước đó trong cuộc trò chuyện đã có link Google Sheets (hoặc ID bảng tính), hãy dùng URL đó để gọi `import_google_sheet_events`.
+                     * TUYỆT ĐỐI KHÔNG chỉ vẽ bảng phân bổ giờ bằng văn bản Markdown thô rồi dừng lại khi người dùng yêu cầu "đồng bộ vào lịch" / "bắt đầu lên lịch"! Phải gọi tool `import_google_sheet_events` để hệ thống sinh Thẻ Kế Hoạch Nhập Lịch cho người dùng xác nhận và lưu vào cơ sở dữ liệu.
+
                 NGỮ CẢNH DỮ LIỆU THỰC TẾ CỦA NGƯỜI DÙNG:
                 """ + scheduleContext;
     }

@@ -26,6 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class AiActionService {
@@ -55,6 +57,7 @@ public class AiActionService {
     private final AiRiskEngine riskEngine;
     private final ObjectMapper objectMapper;
     private final com.smartschedule.ai.infrastructure.VisionResultRepository visionResultRepository;
+    private final com.smartschedule.ai.infrastructure.AiMessageRepository messageRepository;
     private final com.smartschedule.integration.google.application.GoogleSheetsService googleSheetsService;
     private final com.smartschedule.integration.google.application.GoogleCalendarService googleCalendarService;
     private final com.smartschedule.integration.google.application.GoogleSyncService googleSyncService;
@@ -71,6 +74,7 @@ public class AiActionService {
                            AiRiskEngine riskEngine,
                            ObjectMapper objectMapper,
                            @Autowired(required = false) com.smartschedule.ai.infrastructure.VisionResultRepository visionResultRepository,
+                           @Autowired(required = false) com.smartschedule.ai.infrastructure.AiMessageRepository messageRepository,
                            @Autowired(required = false) com.smartschedule.integration.google.application.GoogleSheetsService googleSheetsService,
                            @Autowired(required = false) com.smartschedule.integration.google.application.GoogleCalendarService googleCalendarService,
                            @Autowired(required = false) com.smartschedule.integration.google.application.GoogleSyncService googleSyncService) {
@@ -83,6 +87,7 @@ public class AiActionService {
         this.riskEngine = riskEngine;
         this.objectMapper = objectMapper;
         this.visionResultRepository = visionResultRepository;
+        this.messageRepository = messageRepository;
         this.googleSheetsService = googleSheetsService;
         this.googleCalendarService = googleCalendarService;
         this.googleSyncService = googleSyncService;
@@ -96,14 +101,14 @@ public class AiActionService {
                            AiActionPlanRepository actionPlanRepository,
                            AiRiskEngine riskEngine,
                            ObjectMapper objectMapper) {
-        this(actionRepository, eventRepository, scheduleRepository, taskRepository, userRepository, actionPlanRepository, riskEngine, objectMapper, null, null, null, null);
+        this(actionRepository, eventRepository, scheduleRepository, taskRepository, userRepository, actionPlanRepository, riskEngine, objectMapper, null, null, null, null, null);
     }
 
     public AiActionService(AiActionRepository actionRepository,
                            EventRepository eventRepository,
                            ScheduleRepository scheduleRepository,
                            ObjectMapper objectMapper) {
-        this(actionRepository, eventRepository, scheduleRepository, null, null, null, new AiRiskEngine(), objectMapper, null, null, null, null);
+        this(actionRepository, eventRepository, scheduleRepository, null, null, null, new AiRiskEngine(), objectMapper, null, null, null, null, null);
     }
 
     @Transactional
@@ -793,6 +798,19 @@ public class AiActionService {
                 String url = getString(arguments, "spreadsheet_url", null);
                 if (url == null || url.isBlank()) {
                     url = getString(arguments, "url", null);
+                }
+                if ((url == null || url.isBlank()) && conversation != null && messageRepository != null) {
+                    List<com.smartschedule.ai.domain.AiMessage> past = messageRepository.findAllByConversationIdOrderByCreatedAtAsc(conversation.getId());
+                    for (int i = past.size() - 1; i >= 0; i--) {
+                        String content = past.get(i).getContent();
+                        if (content != null && content.contains("docs.google.com/spreadsheets/d/")) {
+                            Matcher m = Pattern.compile("https://docs\\.google\\.com/spreadsheets/d/([a-zA-Z0-9-_]+)").matcher(content);
+                            if (m.find()) {
+                                url = "https://docs.google.com/spreadsheets/d/" + m.group(1);
+                                break;
+                            }
+                        }
+                    }
                 }
                 if (url == null || url.isBlank()) {
                     throw new AiException("MISSING_URL", "Vui lòng cung cấp URL Google Sheets canonical (docs.google.com/spreadsheets/d/...).");
