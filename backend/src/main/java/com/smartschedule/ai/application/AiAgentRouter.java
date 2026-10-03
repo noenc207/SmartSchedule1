@@ -85,11 +85,14 @@ public class AiAgentRouter {
             intents.add(AiIntent.SETTINGS);
         }
 
-        // 12. SCHEDULE (Mutation or Viewing)
+        // 12. SCHEDULE (Mutation or Viewing, including Google Workspace Sheets & Calendar)
         if (msg.contains("tạo lịch") || msg.contains("xóa lịch") || msg.contains("xoá lịch")
                 || msg.contains("sửa lịch") || msg.contains("dời lịch") || msg.contains("thay lịch")
                 || msg.contains("đổi lịch") || msg.contains("tiết") || msg.contains("môn")
-                || msg.contains("lịch học") || msg.contains("schedule") || msg.contains("calendar")) {
+                || msg.contains("lịch học") || msg.contains("schedule") || msg.contains("calendar")
+                || msg.contains("docs.google.com/spreadsheets") || msg.contains("google sheet")
+                || msg.contains("google sheets") || msg.contains("bảng tính") || msg.contains("đồng bộ")
+                || msg.contains("google calendar") || msg.contains("import lịch") || msg.contains("nhập lịch")) {
             intents.add(AiIntent.SCHEDULE);
         }
 

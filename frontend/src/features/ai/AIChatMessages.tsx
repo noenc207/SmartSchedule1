@@ -101,6 +101,22 @@ export function AIChatMessages({ messages, isThinking, onQuickAction }: AIChatMe
             <button
               type="button"
               className="ai-suggestion-card"
+              onClick={() => onQuickAction('Đồng bộ Google Calendar với SmartSchedule')}
+            >
+              <Sparkles size={14} className="card-icon" />
+              <span>Đồng bộ Google Calendar với SmartSchedule</span>
+            </button>
+            <button
+              type="button"
+              className="ai-suggestion-card"
+              onClick={() => onQuickAction('Đọc Google Sheet này và thêm lịch vào SmartSchedule https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit')}
+            >
+              <Sparkles size={14} className="card-icon" />
+              <span>Đọc Google Sheet và thêm lịch vào SmartSchedule</span>
+            </button>
+            <button
+              type="button"
+              className="ai-suggestion-card"
               onClick={() => onQuickAction('Tôi có những deadline nào sắp tới?')}
             >
               <Sparkles size={14} className="card-icon" />

@@ -469,6 +469,92 @@ public class AiToolRegistry {
                         )
                 )
         ));
+
+        // =========================================================================
+        // 4. GOOGLE WORKSPACE TOOLS (Sheets & Calendar Import / Sync)
+        // =========================================================================
+        register(new ToolDefinition(
+                "read_google_sheet",
+                "Đọc và phân tích cấu trúc, dữ liệu lịch học hoặc sự kiện từ đường dẫn Google Sheets (URL docs.google.com/spreadsheets/d/...).",
+                AiIntent.SCHEDULE,
+                RiskLevel.READ,
+                Map.of(
+                        "type", "OBJECT",
+                        "properties", Map.of(
+                                "spreadsheet_url", Map.of("type", "STRING", "description", "Đường dẫn Google Sheets canonical (docs.google.com/spreadsheets/d/...)"),
+                                "sheet_name", Map.of("type", "STRING", "description", "Tên trang tính cụ thể nếu người dùng chỉ định")
+                        ),
+                        "required", List.of("spreadsheet_url")
+                )
+        ));
+
+        register(new ToolDefinition(
+                "list_google_calendars",
+                "Xem danh sách các lịch Google Calendar được liên kết trong tài khoản của người dùng.",
+                AiIntent.SCHEDULE,
+                RiskLevel.READ,
+                Map.of("type", "OBJECT", "properties", Map.of())
+        ));
+
+        register(new ToolDefinition(
+                "import_google_sheet_events",
+                "Đề xuất tạo kế hoạch nhập danh sách sự kiện/tiết học từ Google Sheets vào SmartSchedule. Tự động kiểm tra xung đột thời gian và cảnh báo dòng thiếu dữ liệu.",
+                AiIntent.SCHEDULE,
+                RiskLevel.IMPORTANT_WRITE,
+                Map.of(
+                        "type", "OBJECT",
+                        "properties", Map.of(
+                                "spreadsheet_url", Map.of("type", "STRING", "description", "Đường dẫn Google Sheets canonical"),
+                                "sheet_name", Map.of("type", "STRING", "description", "Tên trang tính (nếu có)"),
+                                "skip_conflicts", Map.of("type", "BOOLEAN", "description", "Bỏ qua các sự kiện bị xung đột giờ (mặc định false để người dùng duyệt)")
+                        ),
+                        "required", List.of("spreadsheet_url")
+                )
+        ));
+
+        register(new ToolDefinition(
+                "import_google_calendar",
+                "Đề xuất kế hoạch nhập các sự kiện từ Google Calendar vào SmartSchedule. Tự động kiểm tra trùng lặp và phát hiện xung đột.",
+                AiIntent.SCHEDULE,
+                RiskLevel.IMPORTANT_WRITE,
+                Map.of(
+                        "type", "OBJECT",
+                        "properties", Map.of(
+                                "calendar_id", Map.of("type", "STRING", "description", "ID lịch Google Calendar (mặc định 'primary')"),
+                                "days_ahead", Map.of("type", "INTEGER", "description", "Số ngày sắp tới cần đồng bộ (mặc định 14 ngày)"),
+                                "skip_conflicts", Map.of("type", "BOOLEAN", "description", "Tự động bỏ qua các sự kiện trùng giờ (mặc định false)")
+                        )
+                )
+        ));
+
+        register(new ToolDefinition(
+                "export_to_google_calendar",
+                "Đề xuất đẩy một sự kiện từ SmartSchedule sang Google Calendar của người dùng và lưu liên kết đồng bộ.",
+                AiIntent.SCHEDULE,
+                RiskLevel.IMPORTANT_WRITE,
+                Map.of(
+                        "type", "OBJECT",
+                        "properties", Map.of(
+                                "event_title", Map.of("type", "STRING", "description", "Tên sự kiện trong SmartSchedule cần đẩy sang Google Calendar"),
+                                "event_id", Map.of("type", "STRING", "description", "UUID sự kiện trong SmartSchedule (nếu biết)"),
+                                "calendar_id", Map.of("type", "STRING", "description", "ID Google Calendar đích (mặc định 'primary')")
+                        ),
+                        "required", List.of("event_title")
+                )
+        ));
+
+        register(new ToolDefinition(
+                "sync_google_calendar",
+                "Đề xuất đồng bộ hai chiều giữa Google Calendar và SmartSchedule, cập nhật các thay đổi mới nhất.",
+                AiIntent.SCHEDULE,
+                RiskLevel.IMPORTANT_WRITE,
+                Map.of(
+                        "type", "OBJECT",
+                        "properties", Map.of(
+                                "calendar_id", Map.of("type", "STRING", "description", "ID Google Calendar cần đồng bộ (mặc định 'primary')")
+                        )
+                )
+        ));
     }
 
     private void register(ToolDefinition def) {

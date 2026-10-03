@@ -62,4 +62,16 @@ class AiAgentRouterTest {
         Set<AiIntent> docIntents = router.route("đọc file syllabus này và trích xuất lịch thi");
         assertThat(docIntents).contains(AiIntent.DOCUMENT);
     }
+
+    @Test
+    void testRoute_googleWorkspace() {
+        Set<AiIntent> sheetsIntents = router.route("Đọc Google Sheet này và thêm lịch vào SmartSchedule https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit");
+        assertThat(sheetsIntents).contains(AiIntent.SCHEDULE);
+
+        Set<AiIntent> calIntents = router.route("Import lịch từ Google Calendar của tôi");
+        assertThat(calIntents).contains(AiIntent.SCHEDULE);
+
+        Set<AiIntent> syncIntents = router.route("Đồng bộ Google Calendar với SmartSchedule");
+        assertThat(syncIntents).contains(AiIntent.SCHEDULE);
+    }
 }

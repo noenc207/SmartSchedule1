@@ -18952,6 +18952,169 @@ body {
   border-color: #94a3b8;
 }
 
+/* =========================================================================
+   GOOGLE WORKSPACE IMPORT & SYNC CARDS
+   ========================================================================= */
+.ai-action-type-pill.ai-tool-sheets {
+  background: #e6f4ea;
+  color: #137333;
+  font-weight: 600;
+}
+
+.ai-action-type-pill.ai-tool-gcalendar {
+  background: #e8f0fe;
+  color: #1a73e8;
+  font-weight: 600;
+}
+
+.ai-action-type-pill.ai-tool-gexport {
+  background: #f3e8fd;
+  color: #7e22ce;
+  font-weight: 600;
+}
+
+.ai-google-import-card-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.ai-google-stats-badge-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ai-gstat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 500;
+  border: 1px solid transparent;
+}
+
+.ai-gstat-pill .gstat-num {
+  font-weight: 700;
+}
+
+.ai-gstat-pill.neutral {
+  background: #f1f5f9;
+  color: #475569;
+  border-color: #e2e8f0;
+}
+
+.ai-gstat-pill.success {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+
+.ai-gstat-pill.warn {
+  background: #fef9c3;
+  color: #854d0e;
+  border-color: #fef08a;
+}
+
+.ai-gstat-pill.danger {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+
+.ai-google-warnings-box {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 11px;
+  color: #92400e;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ai-btn-review-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 10px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-top: 2px;
+}
+
+.ai-btn-review-toggle:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.ai-google-review-drawer {
+  max-height: 180px;
+  overflow-y: auto;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ai-google-review-item {
+  padding: 5px 8px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 5px;
+  font-size: 11.5px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ai-google-review-item.conflict {
+  border-color: #fca5a5;
+  background: #fff5f5;
+}
+
+.ai-google-review-item .review-item-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.ai-google-review-item .review-item-title {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.ai-google-review-item .review-item-time {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.ai-google-review-item .review-item-loc {
+  color: #0284c7;
+  font-size: 11px;
+}
+
+.ai-google-review-item .review-item-conflict-note {
+  font-size: 10.5px;
+  color: #dc2626;
+  font-weight: 500;
+}
+
+
 
 
 

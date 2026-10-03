@@ -24,6 +24,7 @@ import { isDemoMode } from '../../../services/demoMode';
 import { exportEventsToIcs, parseIcsToEvents, triggerIcsDownload, icsApi } from '../../../services/icsService';
 import { calendarSyncEngine } from '../../../services/calendarSyncEngine';
 import { eventApi } from '../../../services/eventApi';
+import { aiApi } from '../../../services/aiApi';
 import { useWorkspaceStore } from '../../../stores/workspaceStore';
 
 export type IntegrationId =
@@ -170,6 +171,31 @@ export function IntegrationsSection() {
     }
   }, [integrations]);
 
+  // Sync Google Workspace integration status from backend if authenticated
+  useEffect(() => {
+    if (isDemoMode()) return;
+    aiApi
+      .getGoogleWorkspaceStatus()
+      .then((status) => {
+        if (status && status.connected) {
+          setIntegrations((curr) =>
+            curr.map((it) =>
+              it.id === 'google-calendar'
+                ? {
+                    ...it,
+                    status: 'connected',
+                    accountEmail: status.googleEmail || it.accountEmail || 'google-user@gmail.com',
+                  }
+                : it
+            )
+          );
+        }
+      })
+      .catch(() => {
+        // Fall back quietly if unauthenticated or offline
+      });
+  }, []);
+
   const handleOpenConnect = (item: IntegrationItem) => {
     setConnectingTarget(item);
     setAuthEmailInput(
@@ -208,6 +234,9 @@ export function IntegrationsSection() {
   };
 
   const handleDisconnect = (item: IntegrationItem) => {
+    if (item.id === 'google-calendar' && !isDemoMode()) {
+      aiApi.disconnectGoogleWorkspace().catch(() => {});
+    }
     setIntegrations((curr) =>
       curr.map((it) =>
         it.id === item.id

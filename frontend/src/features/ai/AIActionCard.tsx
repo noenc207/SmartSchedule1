@@ -20,6 +20,10 @@ import {
   BookOpen,
   Sparkles,
   Layers,
+  FileSpreadsheet,
+  ChevronDown,
+  ChevronUp,
+  ArrowUpRight,
 } from 'lucide-react';
 import { aiApi, type ProposedActionDto, type ActionStatus } from '../../services/aiApi';
 import { formatDate, formatTimeRange } from '../../utils/dateTime';
@@ -40,6 +44,7 @@ export function AIActionCard({
   const [localStatus, setLocalStatus] = useState<ActionStatus>(action.status);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isExpired, setIsExpired] = useState(false);
+  const [showReview, setShowReview] = useState(false);
 
   // Sync prop changes
   useEffect(() => {
@@ -164,6 +169,30 @@ export function AIActionCard({
           icon: Layers,
           colorClass: 'ai-tool-batch',
         };
+      case 'import_google_sheet_events':
+        return {
+          title: 'Google Sheets Import',
+          icon: FileSpreadsheet,
+          colorClass: 'ai-tool-sheets',
+        };
+      case 'import_google_calendar':
+        return {
+          title: 'Google Calendar Import',
+          icon: CalendarSync,
+          colorClass: 'ai-tool-gcalendar',
+        };
+      case 'sync_google_calendar':
+        return {
+          title: 'Google Calendar Sync',
+          icon: CalendarSync,
+          colorClass: 'ai-tool-gcalendar',
+        };
+      case 'export_to_google_calendar':
+        return {
+          title: 'Đẩy sang Google Calendar',
+          icon: ArrowUpRight,
+          colorClass: 'ai-tool-gexport',
+        };
       default:
         return {
           title: 'Thao tác hệ thống',
@@ -181,7 +210,13 @@ export function AIActionCard({
     setIsProcessing(true);
     setLocalStatus('EXECUTING');
     try {
-      if (action.planId && tool === 'batch_action') {
+      if (
+        action.planId &&
+        (tool === 'batch_action' ||
+          tool === 'import_google_sheet_events' ||
+          tool === 'import_google_calendar' ||
+          tool === 'sync_google_calendar')
+      ) {
         await aiApi.confirmPlan(action.planId);
       } else {
         await onConfirm(action.id);
@@ -354,7 +389,11 @@ export function AIActionCard({
         )}
 
         {/* Sub actions list for batch action plans */}
-        {action.subActions && action.subActions.length > 0 && (
+        {tool !== 'import_google_sheet_events' &&
+          tool !== 'import_google_calendar' &&
+          tool !== 'sync_google_calendar' &&
+          action.subActions &&
+          action.subActions.length > 0 && (
           <div className="ai-subactions-list">
             <div className="ai-subactions-header">Các bước trong kế hoạch:</div>
             {action.subActions.map((sub, idx) => (
@@ -363,6 +402,113 @@ export function AIActionCard({
                 <span className="ai-step-text">{sub.summary}</span>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Special Google Workspace Summary & Review Section */}
+        {(tool === 'import_google_sheet_events' ||
+          tool === 'import_google_calendar' ||
+          tool === 'sync_google_calendar') && (
+          <div className="ai-google-import-card-details">
+            <div className="ai-google-stats-badge-grid">
+              {tool === 'import_google_sheet_events' ? (
+                <>
+                  <div className="ai-gstat-pill neutral">
+                    <span className="gstat-num">{params.events_detected || params.rows_detected || 0}</span>
+                    <span className="gstat-label">phát hiện</span>
+                  </div>
+                  <div className="ai-gstat-pill success">
+                    <span className="gstat-num">{params.valid_events || 0}</span>
+                    <span className="gstat-label">hợp lệ</span>
+                  </div>
+                  {Number(params.conflict_count || 0) > 0 && (
+                    <div className="ai-gstat-pill warn">
+                      <span className="gstat-num">{params.conflict_count}</span>
+                      <span className="gstat-label">xung đột</span>
+                    </div>
+                  )}
+                  {Number(params.missing_time_count || 0) > 0 && (
+                    <div className="ai-gstat-pill danger">
+                      <span className="gstat-num">{params.missing_time_count}</span>
+                      <span className="gstat-label">thiếu giờ</span>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="ai-gstat-pill neutral">
+                    <span className="gstat-num">{params.total_found || 0}</span>
+                    <span className="gstat-label">sự kiện Google</span>
+                  </div>
+                  <div className="ai-gstat-pill success">
+                    <span className="gstat-num">{params.new_count || 0}</span>
+                    <span className="gstat-label">mới</span>
+                  </div>
+                  {Number(params.duplicate_count || 0) > 0 && (
+                    <div className="ai-gstat-pill neutral">
+                      <span className="gstat-num">{params.duplicate_count}</span>
+                      <span className="gstat-label">trùng lặp</span>
+                    </div>
+                  )}
+                  {Number(params.conflict_count || 0) > 0 && (
+                    <div className="ai-gstat-pill warn">
+                      <span className="gstat-num">{params.conflict_count}</span>
+                      <span className="gstat-label">xung đột</span>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {Array.isArray(params.warnings) && params.warnings.length > 0 && (
+              <div className="ai-google-warnings-box">
+                {params.warnings.map((w: string, idx: number) => (
+                  <div key={idx} className="ai-warning-line">
+                    ⚠️ {w}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {action.subActions && action.subActions.length > 0 && (
+              <button
+                type="button"
+                className="ai-btn-review-toggle"
+                onClick={() => setShowReview(!showReview)}
+              >
+                <span>{showReview ? 'Ẩn chi tiết' : `Review chi tiết (${action.subActions.length} sự kiện)`}</span>
+                {showReview ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+              </button>
+            )}
+
+            {showReview && action.subActions && action.subActions.length > 0 && (
+              <div className="ai-google-review-drawer">
+                {action.subActions.map((sub, idx) => {
+                  const sParams = sub.parameters || {};
+                  return (
+                    <div
+                      key={sub.id || idx}
+                      className={`ai-google-review-item ${sub.hasConflict ? 'conflict' : ''}`}
+                    >
+                      <div className="review-item-main">
+                        <span className="review-item-title">{sParams.title || sub.summary}</span>
+                        <span className="review-item-time">
+                          {sParams.date} {sParams.start_time}–{sParams.end_time}
+                        </span>
+                        {sParams.location && (
+                          <span className="review-item-loc">📍 {sParams.location}</span>
+                        )}
+                      </div>
+                      {sub.hasConflict && (
+                        <div className="review-item-conflict-note">
+                          ⚠️ {sub.conflictDetails || 'Trùng giờ với lịch hiện có'}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -425,9 +571,14 @@ export function AIActionCard({
 
           <button
             type="button"
-            className={`ai-btn-confirm ${tool === 'batch_action' ? 'plan-btn' : ''} ${
-              action.hasConflict ? 'warn' : ''
-            }`}
+            className={`ai-btn-confirm ${
+              tool === 'batch_action' ||
+              tool === 'import_google_sheet_events' ||
+              tool === 'import_google_calendar' ||
+              tool === 'sync_google_calendar'
+                ? 'plan-btn'
+                : ''
+            } ${action.hasConflict ? 'warn' : ''}`}
             onClick={handleConfirm}
             disabled={isProcessing}
           >
@@ -436,6 +587,12 @@ export function AIActionCard({
                 <Loader2 size={13} className="spin-icon" />
                 <span>Đang xử lý...</span>
               </>
+            ) : tool === 'import_google_sheet_events' ? (
+              `Import ${params.valid_events || ''} sự kiện`
+            ) : tool === 'import_google_calendar' || tool === 'sync_google_calendar' ? (
+              `Import ${params.new_count || ''} sự kiện`
+            ) : tool === 'export_to_google_calendar' ? (
+              'Đẩy sang Google Calendar'
             ) : action.hasConflict ? (
               tool === 'reschedule_event' ? 'Vẫn dời' : tool === 'replace_schedule' ? 'Vẫn thay' : 'Vẫn tạo'
             ) : tool === 'batch_action' ? (

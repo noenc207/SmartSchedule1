@@ -55,6 +55,9 @@ public class AiActionService {
     private final AiRiskEngine riskEngine;
     private final ObjectMapper objectMapper;
     private final com.smartschedule.ai.infrastructure.VisionResultRepository visionResultRepository;
+    private final com.smartschedule.integration.google.application.GoogleSheetsService googleSheetsService;
+    private final com.smartschedule.integration.google.application.GoogleCalendarService googleCalendarService;
+    private final com.smartschedule.integration.google.application.GoogleSyncService googleSyncService;
 
     public record ConflictResult(boolean hasConflict, String details) {}
 
@@ -67,7 +70,10 @@ public class AiActionService {
                            AiActionPlanRepository actionPlanRepository,
                            AiRiskEngine riskEngine,
                            ObjectMapper objectMapper,
-                           @Autowired(required = false) com.smartschedule.ai.infrastructure.VisionResultRepository visionResultRepository) {
+                           @Autowired(required = false) com.smartschedule.ai.infrastructure.VisionResultRepository visionResultRepository,
+                           @Autowired(required = false) com.smartschedule.integration.google.application.GoogleSheetsService googleSheetsService,
+                           @Autowired(required = false) com.smartschedule.integration.google.application.GoogleCalendarService googleCalendarService,
+                           @Autowired(required = false) com.smartschedule.integration.google.application.GoogleSyncService googleSyncService) {
         this.actionRepository = actionRepository;
         this.eventRepository = eventRepository;
         this.scheduleRepository = scheduleRepository;
@@ -77,6 +83,9 @@ public class AiActionService {
         this.riskEngine = riskEngine;
         this.objectMapper = objectMapper;
         this.visionResultRepository = visionResultRepository;
+        this.googleSheetsService = googleSheetsService;
+        this.googleCalendarService = googleCalendarService;
+        this.googleSyncService = googleSyncService;
     }
 
     public AiActionService(AiActionRepository actionRepository,
@@ -87,14 +96,14 @@ public class AiActionService {
                            AiActionPlanRepository actionPlanRepository,
                            AiRiskEngine riskEngine,
                            ObjectMapper objectMapper) {
-        this(actionRepository, eventRepository, scheduleRepository, taskRepository, userRepository, actionPlanRepository, riskEngine, objectMapper, null);
+        this(actionRepository, eventRepository, scheduleRepository, taskRepository, userRepository, actionPlanRepository, riskEngine, objectMapper, null, null, null, null);
     }
 
     public AiActionService(AiActionRepository actionRepository,
                            EventRepository eventRepository,
                            ScheduleRepository scheduleRepository,
                            ObjectMapper objectMapper) {
-        this(actionRepository, eventRepository, scheduleRepository, null, null, null, new AiRiskEngine(), objectMapper, null);
+        this(actionRepository, eventRepository, scheduleRepository, null, null, null, new AiRiskEngine(), objectMapper, null, null, null, null);
     }
 
     @Transactional
@@ -777,6 +786,204 @@ public class AiActionService {
                 }
             }
 
+            case "import_google_sheet_events" -> {
+                if (googleSheetsService == null) {
+                    throw new AiException("SERVICE_UNAVAILABLE", "Dịch vụ Google Sheets tạm thời chưa khả dụng.");
+                }
+                String url = getString(arguments, "spreadsheet_url", null);
+                if (url == null || url.isBlank()) {
+                    url = getString(arguments, "url", null);
+                }
+                if (url == null || url.isBlank()) {
+                    throw new AiException("MISSING_URL", "Vui lòng cung cấp URL Google Sheets canonical (docs.google.com/spreadsheets/d/...).");
+                }
+                String sheetName = getString(arguments, "sheet_name", null);
+                boolean skipConflicts = getBoolean(arguments, "skip_conflicts", false);
+
+                var analysis = googleSheetsService.analyzeSpreadsheet(user, url, sheetName);
+                if (analysis.events() == null || analysis.events().isEmpty()) {
+                    throw new AiException("NO_EVENTS", "Không tìm thấy sự kiện nào trong Google Sheets này.");
+                }
+
+                List<com.smartschedule.integration.google.api.GoogleWorkspaceDtos.ParsedSheetEventDto> validEvents = analysis.events().stream()
+                        .filter(e -> e.missingFields() == null || (!e.missingFields().contains("startTime") && !e.missingFields().contains("date")))
+                        .toList();
+
+                if (validEvents.isEmpty()) {
+                    throw new AiException("NO_VALID_EVENTS", "Không có sự kiện hợp lệ nào (tất cả các dòng đều thiếu giờ hoặc ngày học).");
+                }
+
+                String planTitle = "Nhập lịch từ Google Sheets (" + analysis.sheetName() + ")";
+                String planSummary = String.format("Nhập %d sự kiện (%d hợp lệ, %d xung đột, %d dòng thiếu giờ)",
+                        analysis.eventsDetected(), analysis.validEvents(), analysis.conflictCount(), analysis.missingTimeCount());
+
+                AiActionPlan plan = new AiActionPlan(user, conversation, planTitle, planSummary, validEvents.size());
+                if (actionPlanRepository != null) {
+                    actionPlanRepository.save(plan);
+                    planId = plan.getId();
+                }
+
+                summary = String.format("Kế hoạch: %s (%d sự kiện hợp lệ)", planTitle, validEvents.size());
+                hasConflict = analysis.conflictCount() > 0;
+                if (hasConflict) {
+                    conflictDetails = String.format("Phát hiện %d sự kiện xung đột giờ với lịch hiện có.", analysis.conflictCount());
+                }
+
+                canonicalParams.put("title", planTitle);
+                canonicalParams.put("summary", planSummary);
+                canonicalParams.put("plan_id", planId != null ? planId.toString() : null);
+                canonicalParams.put("spreadsheet_id", analysis.spreadsheetId());
+                canonicalParams.put("sheet_name", analysis.sheetName());
+                canonicalParams.put("source_type", "GOOGLE_SHEETS");
+                canonicalParams.put("events_detected", analysis.eventsDetected());
+                canonicalParams.put("valid_events", analysis.validEvents());
+                canonicalParams.put("missing_time_count", analysis.missingTimeCount());
+                canonicalParams.put("conflict_count", analysis.conflictCount());
+                canonicalParams.put("warnings", analysis.warnings());
+
+                if (actionPlanRepository != null && planId != null) {
+                    int order = 1;
+                    for (var ev : validEvents) {
+                        if (skipConflicts && ev.hasConflict()) {
+                            continue;
+                        }
+                        try {
+                            LocalDate evDate = LocalDate.parse(ev.date());
+                            LocalTime sTime = LocalTime.parse(ev.startTime());
+                            LocalTime eTime = ev.endTime() != null ? LocalTime.parse(ev.endTime()) : sTime.plusHours(1);
+
+                            Instant sInst = evDate.atTime(sTime).atZone(zoneId).toInstant();
+                            Instant eInst = evDate.atTime(eTime).atZone(zoneId).toInstant();
+
+                            Map<String, Object> subParams = new LinkedHashMap<>();
+                            subParams.put("title", ev.title());
+                            subParams.put("date", ev.date());
+                            subParams.put("start_time", ev.startTime());
+                            subParams.put("end_time", ev.endTime());
+                            subParams.put("duration_minutes", (int) Duration.between(sTime, eTime).toMinutes());
+                            subParams.put("starts_at", sInst.toString());
+                            subParams.put("ends_at", eInst.toString());
+                            subParams.put("timezone", zoneId.getId());
+                            if (ev.location() != null) subParams.put("location", ev.location());
+                            subParams.put("description", "Nhập từ Google Sheets (" + analysis.spreadsheetId() + ")");
+
+                            String subSum = String.format("Tạo lịch: %s vào %s (%s–%s)",
+                                    ev.title(), evDate.format(AiDateTimeUtils.VI_DATE_FMT), ev.startTime(), ev.endTime());
+
+                            String subJson = objectMapper.writeValueAsString(subParams);
+                            AiAction subAct = new AiAction(user, conversation, "create_schedule", subSum, subJson, ev.hasConflict(), ev.conflictDetails(), null, Instant.now().plusSeconds(900));
+                            subAct.setRiskLevel("IMPORTANT_WRITE");
+                            subAct.setPlanId(planId);
+                            subAct.setStepOrder(order++);
+                            actionRepository.save(subAct);
+                        } catch (Exception ex) {
+                            log.warn("Failed creating sub-action for sheet row {}: {}", ev.sourceRow(), ex.getMessage());
+                        }
+                    }
+                }
+            }
+
+            case "import_google_calendar", "sync_google_calendar" -> {
+                if (googleCalendarService == null) {
+                    throw new AiException("SERVICE_UNAVAILABLE", "Dịch vụ Google Calendar tạm thời chưa khả dụng.");
+                }
+                String calId = getString(arguments, "calendar_id", "primary");
+                Integer days = getInteger(arguments, "days_ahead", 14);
+                boolean skipConflicts = getBoolean(arguments, "skip_conflicts", false);
+
+                var prepRes = googleCalendarService.prepareCalendarImport(user, calId, days);
+                if (prepRes.eventsToImport() == null || prepRes.eventsToImport().isEmpty()) {
+                    throw new AiException("NO_NEW_EVENTS", "Không có sự kiện mới nào từ Google Calendar để nhập (tất cả đã được đồng bộ hoặc không có sự kiện trong 14 ngày tới).");
+                }
+
+                String planTitle = "Nhập lịch từ Google Calendar (" + calId + ")";
+                String planSummary = String.format("Nhập %d sự kiện mới (%d bỏ qua do trùng lặp, %d xung đột)",
+                        prepRes.newCount(), prepRes.duplicateCount(), prepRes.conflictCount());
+
+                AiActionPlan plan = new AiActionPlan(user, conversation, planTitle, planSummary, prepRes.eventsToImport().size());
+                if (actionPlanRepository != null) {
+                    actionPlanRepository.save(plan);
+                    planId = plan.getId();
+                }
+
+                summary = String.format("Kế hoạch: %s (%d sự kiện mới)", planTitle, prepRes.newCount());
+                hasConflict = prepRes.conflictCount() > 0;
+                if (hasConflict) {
+                    conflictDetails = String.format("Phát hiện %d sự kiện xung đột giờ với lịch hiện có.", prepRes.conflictCount());
+                }
+
+                canonicalParams.put("title", planTitle);
+                canonicalParams.put("summary", planSummary);
+                canonicalParams.put("plan_id", planId != null ? planId.toString() : null);
+                canonicalParams.put("calendar_id", calId);
+                canonicalParams.put("source_type", "GOOGLE_CALENDAR");
+                canonicalParams.put("total_found", prepRes.totalFound());
+                canonicalParams.put("new_count", prepRes.newCount());
+                canonicalParams.put("duplicate_count", prepRes.duplicateCount());
+                canonicalParams.put("conflict_count", prepRes.conflictCount());
+                canonicalParams.put("warnings", prepRes.warnings());
+
+                if (actionPlanRepository != null && planId != null) {
+                    int order = 1;
+                    for (var ev : prepRes.eventsToImport()) {
+                        if (skipConflicts && ev.hasConflict()) {
+                            continue;
+                        }
+                        try {
+                            LocalDate evDate = LocalDate.parse(ev.date());
+                            LocalTime sTime = LocalTime.parse(ev.startTime());
+                            LocalTime eTime = ev.endTime() != null ? LocalTime.parse(ev.endTime()) : sTime.plusHours(1);
+
+                            Instant sInst = evDate.atTime(sTime).atZone(zoneId).toInstant();
+                            Instant eInst = evDate.atTime(eTime).atZone(zoneId).toInstant();
+
+                            Map<String, Object> subParams = new LinkedHashMap<>();
+                            subParams.put("title", ev.title());
+                            subParams.put("date", ev.date());
+                            subParams.put("start_time", ev.startTime());
+                            subParams.put("end_time", ev.endTime());
+                            subParams.put("duration_minutes", (int) Duration.between(sTime, eTime).toMinutes());
+                            subParams.put("starts_at", sInst.toString());
+                            subParams.put("ends_at", eInst.toString());
+                            subParams.put("timezone", zoneId.getId());
+                            if (ev.location() != null) subParams.put("location", ev.location());
+                            subParams.put("description", "Đồng bộ từ Google Calendar (" + calId + ")");
+
+                            String subSum = String.format("Tạo lịch: %s vào %s (%s–%s)",
+                                    ev.title(), evDate.format(AiDateTimeUtils.VI_DATE_FMT), ev.startTime(), ev.endTime());
+
+                            String subJson = objectMapper.writeValueAsString(subParams);
+                            AiAction subAct = new AiAction(user, conversation, "create_schedule", subSum, subJson, ev.hasConflict(), ev.conflictDetails(), null, Instant.now().plusSeconds(900));
+                            subAct.setRiskLevel("IMPORTANT_WRITE");
+                            subAct.setPlanId(planId);
+                            subAct.setStepOrder(order++);
+                            actionRepository.save(subAct);
+                        } catch (Exception ex) {
+                            log.warn("Failed creating sub-action for calendar event: {}", ex.getMessage());
+                        }
+                    }
+                }
+            }
+
+            case "export_to_google_calendar" -> {
+                if (googleCalendarService == null) {
+                    throw new AiException("SERVICE_UNAVAILABLE", "Dịch vụ Google Calendar tạm thời chưa khả dụng.");
+                }
+                Event target = findTargetEvent(user, arguments, clientContext);
+                if (target == null) {
+                    throw new AiException("EVENT_NOT_FOUND", "Không tìm thấy sự kiện cần đẩy sang Google Calendar.");
+                }
+                String calId = getString(arguments, "calendar_id", "primary");
+                targetEventId = target.getId();
+
+                summary = String.format("Đẩy sự kiện '%s' sang Google Calendar (%s)", target.getTitle(), calId);
+                canonicalParams.put("event_id", target.getId().toString());
+                canonicalParams.put("calendar_id", calId);
+                canonicalParams.put("title", target.getTitle());
+                canonicalParams.put("starts_at", target.getStartsAt().toString());
+                canonicalParams.put("ends_at", target.getEndsAt().toString());
+            }
+
             default -> {
                 summary = "Thực hiện hành động: " + toolName;
                 canonicalParams.putAll(arguments);
@@ -1209,7 +1416,8 @@ public class AiActionService {
                     data.put("displayName", user.getDisplayName());
                 }
 
-                case "create_study_plan", "batch_action", "import_vision_schedule" -> {
+                case "create_study_plan", "batch_action", "import_vision_schedule",
+                     "import_google_sheet_events", "import_google_calendar", "sync_google_calendar" -> {
                     if (action.getPlanId() != null) {
                         AiDtos.PlanConfirmResponse planRes = confirmPlan(user, action.getPlanId());
                         message = planRes.message();
@@ -1218,6 +1426,20 @@ public class AiActionService {
                     } else {
                         message = "Đã thực thi thành công kế hoạch.";
                     }
+                }
+
+                case "export_to_google_calendar" -> {
+                    if (googleCalendarService == null) {
+                        throw new AiException("SERVICE_UNAVAILABLE", "Dịch vụ Google Calendar tạm thời chưa khả dụng.");
+                    }
+                    UUID targetId = UUID.fromString(params.get("event_id").toString());
+                    String calId = params.getOrDefault("calendar_id", "primary").toString();
+                    var exportRes = googleCalendarService.exportEvent(user, targetId, calId);
+                    message = exportRes.message();
+                    data.put("googleCalendarId", exportRes.googleCalendarId());
+                    data.put("googleEventId", exportRes.googleEventId());
+                    data.put("status", exportRes.status());
+                    createdOrModifiedId = targetId;
                 }
 
                 case "optimize_day", "optimize_week" -> {
@@ -1672,5 +1894,23 @@ public class AiActionService {
     private String getString(Map<String, Object> map, String key, String defaultValue) {
         if (map == null || !map.containsKey(key) || map.get(key) == null) return defaultValue;
         return map.get(key).toString().trim();
+    }
+
+    private boolean getBoolean(Map<String, Object> map, String key, boolean defaultValue) {
+        if (map == null || !map.containsKey(key) || map.get(key) == null) return defaultValue;
+        Object val = map.get(key);
+        if (val instanceof Boolean b) return b;
+        return Boolean.parseBoolean(val.toString().trim());
+    }
+
+    private Integer getInteger(Map<String, Object> map, String key, Integer defaultValue) {
+        if (map == null || !map.containsKey(key) || map.get(key) == null) return defaultValue;
+        Object val = map.get(key);
+        if (val instanceof Number n) return n.intValue();
+        try {
+            return Integer.parseInt(val.toString().trim());
+        } catch (Exception e) {
+            return defaultValue;
+        }
     }
 }

@@ -25,11 +25,13 @@ public class AiContextService {
     private final TaskRepository taskRepository;
     private final VisionResultRepository visionResultRepository;
     private final ObjectMapper objectMapper;
+    private final com.smartschedule.integration.google.application.GoogleSheetsService googleSheetsService;
+    private final com.smartschedule.integration.google.application.GoogleCalendarService googleCalendarService;
 
     public AiContextService(ScheduleRepository scheduleRepository,
                             EventRepository eventRepository,
                             TaskRepository taskRepository) {
-        this(scheduleRepository, eventRepository, taskRepository, null, new ObjectMapper());
+        this(scheduleRepository, eventRepository, taskRepository, null, new ObjectMapper(), null, null);
     }
 
     @Autowired
@@ -37,12 +39,16 @@ public class AiContextService {
                             EventRepository eventRepository,
                             TaskRepository taskRepository,
                             @Autowired(required = false) VisionResultRepository visionResultRepository,
-                            @Autowired(required = false) ObjectMapper objectMapper) {
+                            @Autowired(required = false) ObjectMapper objectMapper,
+                            @Autowired(required = false) com.smartschedule.integration.google.application.GoogleSheetsService googleSheetsService,
+                            @Autowired(required = false) com.smartschedule.integration.google.application.GoogleCalendarService googleCalendarService) {
         this.scheduleRepository = scheduleRepository;
         this.eventRepository = eventRepository;
         this.taskRepository = taskRepository;
         this.visionResultRepository = visionResultRepository;
         this.objectMapper = objectMapper != null ? objectMapper : new ObjectMapper();
+        this.googleSheetsService = googleSheetsService;
+        this.googleCalendarService = googleCalendarService;
     }
 
     @Transactional(readOnly = true)
@@ -308,6 +314,8 @@ public class AiContextService {
             case "get_user_preferences" -> getUserPreferences(user);
             case "get_analytics_summary" -> getAnalyticsSummary(user, clientContext);
             case "analyze_document" -> analyzeDocument(arguments);
+            case "read_google_sheet" -> readGoogleSheet(user, arguments);
+            case "list_google_calendars" -> listGoogleCalendars(user);
             default -> "Công cụ không được hỗ trợ: " + toolName;
         };
     }
@@ -749,5 +757,82 @@ public class AiContextService {
             return "Đã đọc tài liệu (" + lines.length + " dòng). Không phát hiện mốc thời gian hay deadline rõ ràng nào.";
         }
         return "📄 Đã phân tích tài liệu, phát hiện các mốc quan trọng sau:\n" + String.join("\n", keyItems);
+    }
+
+    public String readGoogleSheet(User user, Map<String, Object> arguments) {
+        if (googleSheetsService == null) {
+            return "Dịch vụ Google Sheets tạm thời chưa khả dụng.";
+        }
+        String url = arguments != null && arguments.containsKey("spreadsheet_url") ? arguments.get("spreadsheet_url").toString() : "";
+        if (url.isBlank() && arguments != null && arguments.containsKey("url")) {
+            url = arguments.get("url").toString();
+        }
+        if (url.isBlank()) {
+            return "Vui lòng cung cấp URL Google Sheets canonical (docs.google.com/spreadsheets/d/...).";
+        }
+
+        String sheetName = arguments != null && arguments.containsKey("sheet_name") && arguments.get("sheet_name") != null
+                ? arguments.get("sheet_name").toString()
+                : null;
+
+        try {
+            var res = googleSheetsService.analyzeSpreadsheet(user, url, sheetName);
+            StringBuilder sb = new StringBuilder();
+            sb.append("📊 Kết quả phân tích Google Sheets:\n");
+            sb.append("- Loại nguồn: ").append(res.sourceType()).append("\n");
+            sb.append("- Spreadsheet ID: ").append(res.spreadsheetId()).append("\n");
+            sb.append("- Tên bảng: ").append(res.sheetName()).append("\n");
+            sb.append(String.format("- Tổng dòng: %d | Phát hiện: %d sự kiện (%d hợp lệ, %d thiếu giờ, %d xung đột)\n",
+                    res.rowsDetected(), res.eventsDetected(), res.validEvents(), res.missingTimeCount(), res.conflictCount()));
+
+            if (res.warnings() != null && !res.warnings().isEmpty()) {
+                sb.append("\n⚠️ Cảnh báo:\n");
+                for (String w : res.warnings()) {
+                    sb.append("  • ").append(w).append("\n");
+                }
+            }
+
+            if (res.events() != null && !res.events().isEmpty()) {
+                sb.append("\n📅 Các sự kiện phát hiện (tối đa 10 dòng đầu):\n");
+                int limit = Math.min(res.events().size(), 10);
+                for (int i = 0; i < limit; i++) {
+                    var ev = res.events().get(i);
+                    String timeStr = (ev.startTime() != null && ev.endTime() != null)
+                            ? (ev.startTime() + " - " + ev.endTime())
+                            : "[Thiếu giờ]";
+                    String conflictTag = ev.hasConflict() ? " [⚠️ Xung đột: " + ev.conflictDetails() + "]" : "";
+                    sb.append(String.format("  %d. %s | %s | %s | %s%s\n",
+                            ev.sourceRow(), ev.title(), ev.date() != null ? ev.date() : "[Thiếu ngày]",
+                            timeStr, ev.location() != null ? ev.location() : "Không rõ phòng", conflictTag));
+                }
+                if (res.events().size() > 10) {
+                    sb.append(String.format("  ... và %d sự kiện khác.\n", res.events().size() - 10));
+                }
+            }
+
+            return sb.toString();
+        } catch (Exception ex) {
+            return "Không thể phân tích Google Sheets: " + ex.getMessage();
+        }
+    }
+
+    public String listGoogleCalendars(User user) {
+        if (googleCalendarService == null) {
+            return "Dịch vụ Google Calendar tạm thời chưa khả dụng.";
+        }
+        try {
+            var calendars = googleCalendarService.listCalendars(user);
+            if (calendars.isEmpty()) {
+                return "Không tìm thấy lịch Google Calendar nào trong tài khoản của bạn.";
+            }
+            StringBuilder sb = new StringBuilder("🗓️ Danh sách Google Calendars của bạn:\n");
+            for (var cal : calendars) {
+                sb.append(String.format("- %s%s (ID: %s, Múi giờ: %s)\n",
+                        cal.summary(), cal.primary() ? " [Mặc định/Primary]" : "", cal.id(), cal.timeZone()));
+            }
+            return sb.toString();
+        } catch (Exception ex) {
+            return "Không thể lấy danh sách Google Calendar: " + ex.getMessage();
+        }
     }
 }
