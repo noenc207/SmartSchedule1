@@ -291,4 +291,97 @@ class AiActionServiceTest {
         assertThat(localEnd.getHour()).isEqualTo(9);
         assertThat(localEnd.getMinute()).isEqualTo(30);
     }
+
+    @Test
+    void testSubjectAliasMatching() {
+        assertThat(AiActionService.isSubjectMatch("Tiết Vật lý", "lý")).isTrue();
+        assertThat(AiActionService.isSubjectMatch("Physics 101", "lý")).isTrue();
+        assertThat(AiActionService.isSubjectMatch("Tiết Lý", "vật lý")).isTrue();
+        assertThat(AiActionService.isSubjectMatch("Đại số tuyến tính", "toán")).isTrue();
+        assertThat(AiActionService.isSubjectMatch("Calculus II", "toan")).isTrue();
+        assertThat(AiActionService.isSubjectMatch("Hóa đại cương", "hoa")).isTrue();
+        assertThat(AiActionService.isSubjectMatch("Nhập môn Lập trình Java", "coding")).isTrue();
+        assertThat(AiActionService.isSubjectMatch("Văn học hiện đại", "toán")).isFalse();
+    }
+
+    @Test
+    void testProposeReplaceSchedule_subjectAliasAndInheritance() {
+        when(scheduleRepository.findAllByOwnerIdOrderByUpdatedAtDesc(testUser.getId()))
+                .thenReturn(List.of(testSchedule));
+
+        Instant physicsStart = Instant.parse("2026-10-04T01:00:00Z"); // 08:00 Asia/Ho_Chi_Minh
+        Instant physicsEnd = Instant.parse("2026-10-04T02:30:00Z");   // 09:30 Asia/Ho_Chi_Minh
+        Event physicsEvent = new Event(testSchedule, null, "Tiết Vật lý", "Lý thuyết cơ học", physicsStart, physicsEnd,
+                "Phòng Alpha 201", "HIGH", "CONFIRMED", null, 15, "", false, false);
+
+        when(eventRepository.search(any(), any(), any(), any(), any(), any()))
+                .thenReturn(List.of(physicsEvent));
+
+        // User says: "xoá lịch lý đi thay giúp tôi thành toán"
+        Map<String, Object> args = Map.of(
+                "target_title", "lý",
+                "new_title", "Toán"
+        );
+
+        AiDtos.ClientContextDto context = new AiDtos.ClientContextDto("calendar", "2026-10-04", null, null, "Asia/Ho_Chi_Minh");
+
+        AiDtos.ProposedActionDto proposed = actionService.proposeAction(
+                testUser, conversation, "replace_schedule", args, context
+        );
+
+        assertThat(proposed).isNotNull();
+        assertThat(proposed.tool()).isEqualTo("replace_schedule");
+        assertThat(proposed.summary()).contains("Tiết Vật lý");
+        assertThat(proposed.summary()).contains("Toán");
+        assertThat(proposed.summary()).contains("08:00–09:30");
+        assertThat(proposed.parameters().get("target_title")).isEqualTo("Tiết Vật lý");
+        assertThat(proposed.parameters().get("new_title")).isEqualTo("Toán");
+        assertThat(proposed.parameters().get("start_time")).isEqualTo("08:00");
+        assertThat(proposed.parameters().get("end_time")).isEqualTo("09:30");
+        assertThat(proposed.parameters().get("location")).isEqualTo("Phòng Alpha 201");
+        assertThat(proposed.hasConflict()).isFalse();
+    }
+
+    @Test
+    void testConfirmReplaceSchedule_atomicExecution() {
+        Instant physicsStart = Instant.parse("2026-10-04T01:00:00Z");
+        Instant physicsEnd = Instant.parse("2026-10-04T02:30:00Z");
+        Event physicsEvent = new Event(testSchedule, null, "Tiết Vật lý", "Lý thuyết cơ học", physicsStart, physicsEnd,
+                "Phòng Alpha 201", "HIGH", "CONFIRMED", null, 15, "", false, false);
+
+        UUID targetId = physicsEvent.getId();
+        when(eventRepository.findById(targetId)).thenReturn(Optional.of(physicsEvent));
+
+        Map<String, Object> params = Map.of(
+                "target_event_id", targetId.toString(),
+                "target_title", "Tiết Vật lý",
+                "new_title", "Toán",
+                "date", "2026-10-04",
+                "start_time", "08:00",
+                "end_time", "09:30",
+                "starts_at", "2026-10-04T01:00:00Z",
+                "ends_at", "2026-10-04T02:30:00Z",
+                "timezone", "Asia/Ho_Chi_Minh"
+        );
+
+        AiAction action = new AiAction(testUser, conversation, "replace_schedule",
+                "Thay lịch: Xóa 'Tiết Vật lý' và thay bằng 'Toán'",
+                new ObjectMapper().valueToTree(params).toString(), false, null, targetId, Instant.now().plusSeconds(900));
+
+        when(actionRepository.findByIdAndUserId(action.getId(), testUser.getId()))
+                .thenReturn(Optional.of(action));
+
+        AiDtos.ActionConfirmResponse confirmResp = actionService.confirmAction(testUser, action.getId());
+
+        assertThat(confirmResp.status()).isEqualTo(AiAction.STATUS_SUCCESS);
+        assertThat(confirmResp.message()).contains("Tiết Vật lý");
+        assertThat(confirmResp.message()).contains("Toán");
+        assertThat(confirmResp.data().get("operation")).isEqualTo("REPLACE_SCHEDULE");
+        assertThat(confirmResp.data().get("newTitle")).isEqualTo("Toán");
+
+        verify(eventRepository).save(physicsEvent);
+        assertThat(physicsEvent.getTitle()).isEqualTo("Toán");
+        assertThat(physicsEvent.getStartsAt()).isEqualTo(physicsStart);
+        assertThat(physicsEvent.getEndsAt()).isEqualTo(physicsEnd);
+    }
 }

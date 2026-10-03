@@ -78,8 +78,10 @@ public class AiChatService {
         // Handle tool calls if returned
         if (response.toolCalls() != null && !response.toolCalls().isEmpty()) {
             StringBuilder toolResults = new StringBuilder();
+            boolean hasWriteTool = false;
             for (AiProvider.ToolCall tool : response.toolCalls()) {
                 if (isWriteTool(tool.name()) && actionService != null) {
+                    hasWriteTool = true;
                     try {
                         AiDtos.ProposedActionDto proposed = actionService.proposeAction(
                                 user, conversation, tool.name(), tool.arguments(), request.context()
@@ -100,10 +102,44 @@ public class AiChatService {
                     toolResults.append(toolOutput).append("\n");
                 }
             }
-            if (replyContent.isBlank()) {
-                replyContent = toolResults.toString().trim();
+
+            if (!hasWriteTool && hasMutationIntent(userPrompt)) {
+                // Multi-step ReAct Turn 2: Feed the read tool results back to Gemini so it can generate the write tool call or clarification
+                List<AiProvider.ChatMessage> turn2History = new ArrayList<>(chatHistory);
+                turn2History.add(new AiProvider.ChatMessage("user", userPrompt));
+                turn2History.add(new AiProvider.ChatMessage("model", "Dữ liệu lịch hiện tại của người dùng:\n" + toolResults.toString().trim()));
+                String followUpPrompt = "Dựa trên dữ liệu lịch trên, hãy thực hiện thao tác người dùng yêu cầu: \"" + userPrompt + "\". "
+                        + "Nếu đây là yêu cầu thay thế/xóa/sửa/dời lịch, hãy gọi write tool tương ứng (replace_schedule, delete_schedule, update_schedule, reschedule_event) ngay lập tức. "
+                        + "Nếu thiếu thông tin bắt buộc, hãy hỏi làm rõ ngắn gọn.";
+
+                AiProvider.ProviderResponse turn2Response = aiProvider.generateResponse(systemInstruction, turn2History, followUpPrompt);
+                if (turn2Response.toolCalls() != null && !turn2Response.toolCalls().isEmpty()) {
+                    for (AiProvider.ToolCall tool : turn2Response.toolCalls()) {
+                        if (isWriteTool(tool.name()) && actionService != null) {
+                            try {
+                                AiDtos.ProposedActionDto proposed = actionService.proposeAction(
+                                        user, conversation, tool.name(), tool.arguments(), request.context()
+                                );
+                                proposedActions.add(proposed);
+                                String conflictNote = proposed.hasConflict()
+                                        ? "\n⚠️ " + proposed.conflictDetails()
+                                        : "\nKhông phát hiện xung đột thời gian.";
+                                replyContent = "Tôi đề xuất: " + proposed.summary() + conflictNote +
+                                        "\n\nVui lòng kiểm tra và xác nhận trong thẻ hành động bên dưới.";
+                            } catch (AiException valEx) {
+                                replyContent = valEx.getMessage();
+                            }
+                        }
+                    }
+                } else if (turn2Response.content() != null && !turn2Response.content().isBlank()) {
+                    replyContent = turn2Response.content();
+                }
             } else {
-                replyContent = replyContent + "\n\n" + toolResults.toString().trim();
+                if (replyContent.isBlank()) {
+                    replyContent = toolResults.toString().trim();
+                } else {
+                    replyContent = replyContent + "\n\n" + toolResults.toString().trim();
+                }
             }
         }
 
@@ -170,8 +206,11 @@ public class AiChatService {
                         List<AiDtos.ProposedActionDto> proposedActions = new ArrayList<>();
 
                         if (streamedToolCalls != null && !streamedToolCalls.isEmpty()) {
+                            boolean hasWriteTool = false;
+                            StringBuilder toolResults = new StringBuilder();
                             for (AiProvider.ToolCall tool : streamedToolCalls) {
                                 if (isWriteTool(tool.name()) && actionService != null) {
+                                    hasWriteTool = true;
                                     try {
                                         AiDtos.ProposedActionDto proposed = actionService.proposeAction(
                                                 user, conversation, tool.name(), tool.arguments(), request.context()
@@ -193,10 +232,52 @@ public class AiChatService {
                                     String toolOutput = request.context() != null
                                             ? contextService.executeTool(tool.name(), user, tool.arguments(), request.context())
                                             : contextService.executeTool(tool.name(), user, tool.arguments());
-                                    String readOutput = "\n\n" + toolOutput;
-                                    accumulatedResponse.append(readOutput);
-                                    onChunk.accept(readOutput);
+                                    toolResults.append(toolOutput).append("\n");
                                 }
+                            }
+
+                            if (!hasWriteTool && hasMutationIntent(userPrompt)) {
+                                // Turn 2 for streamChat
+                                List<AiProvider.ChatMessage> turn2History = new ArrayList<>(chatHistory);
+                                turn2History.add(new AiProvider.ChatMessage("user", userPrompt));
+                                turn2History.add(new AiProvider.ChatMessage("model", "Dữ liệu lịch hiện tại của người dùng:\n" + toolResults.toString().trim()));
+                                String followUpPrompt = "Dựa trên dữ liệu lịch trên, hãy thực hiện thao tác người dùng yêu cầu: \"" + userPrompt + "\". "
+                                        + "Nếu đây là yêu cầu thay thế/xóa/sửa/dời lịch, hãy gọi write tool tương ứng (replace_schedule, delete_schedule, update_schedule, reschedule_event) ngay lập tức. "
+                                        + "Nếu thiếu thông tin bắt buộc, hãy hỏi làm rõ ngắn gọn.";
+
+                                AiProvider.ProviderResponse turn2Response = aiProvider.generateResponse(systemInstruction, turn2History, followUpPrompt);
+                                if (turn2Response.toolCalls() != null && !turn2Response.toolCalls().isEmpty()) {
+                                    for (AiProvider.ToolCall tool : turn2Response.toolCalls()) {
+                                        if (isWriteTool(tool.name()) && actionService != null) {
+                                            try {
+                                                AiDtos.ProposedActionDto proposed = actionService.proposeAction(
+                                                        user, conversation, tool.name(), tool.arguments(), request.context()
+                                                );
+                                                proposedActions.add(proposed);
+                                                String conflictNote = proposed.hasConflict()
+                                                        ? "\n⚠️ " + proposed.conflictDetails()
+                                                        : "\nKhông phát hiện xung đột.";
+                                                String text = "\n\nTôi đề xuất: " + proposed.summary() + conflictNote +
+                                                        "\n\nVui lòng kiểm tra và xác nhận trong thẻ bên dưới.";
+                                                accumulatedResponse.setLength(0);
+                                                accumulatedResponse.append(text.trim());
+                                                onChunk.accept(text);
+                                            } catch (AiException valEx) {
+                                                String text = "\n\n" + valEx.getMessage();
+                                                accumulatedResponse.append(text);
+                                                onChunk.accept(text);
+                                            }
+                                        }
+                                    }
+                                } else if (turn2Response.content() != null && !turn2Response.content().isBlank()) {
+                                    accumulatedResponse.setLength(0);
+                                    accumulatedResponse.append(turn2Response.content());
+                                    onChunk.accept(turn2Response.content());
+                                }
+                            } else if (!hasWriteTool) {
+                                String readOutput = "\n\n" + toolResults.toString().trim();
+                                accumulatedResponse.append(readOutput);
+                                onChunk.accept(readOutput);
                             }
                         }
 
@@ -274,9 +355,22 @@ public class AiChatService {
 
     public static boolean isWriteTool(String toolName) {
         return switch (toolName) {
-            case "create_schedule", "update_schedule", "delete_schedule", "reschedule_event" -> true;
+            case "create_schedule", "update_schedule", "delete_schedule", "reschedule_event", "replace_schedule" -> true;
             default -> false;
         };
+    }
+
+    public static boolean hasMutationIntent(String prompt) {
+        if (prompt == null || prompt.isBlank()) return false;
+        String p = prompt.toLowerCase();
+        return p.contains("xóa") || p.contains("xoá") || p.contains("xoa")
+                || p.contains("thay") || p.contains("đổi") || p.contains("doi")
+                || p.contains("dời") || p.contains("hủy") || p.contains("huy")
+                || p.contains("chuyển") || p.contains("chuyen")
+                || p.contains("tạo") || p.contains("tao") || p.contains("thêm") || p.contains("them")
+                || p.contains("sửa") || p.contains("sua")
+                || p.contains("delete") || p.contains("replace") || p.contains("reschedule")
+                || p.contains("update") || p.contains("create") || p.contains("cancel");
     }
 
     private void validateRequest(User user, String message) {
@@ -353,12 +447,24 @@ public class AiChatService {
                    - Trường hợp 4: Đã có đủ thông tin (Ví dụ: "Tạo Tiết Vật lý Chủ nhật lúc 8h, 90 phút" hoặc "8h đến 9h30"):
                      -> Tính toán thời gian chính xác (start = 08:00, duration = 90, end = 09:30) và GỌI TOOL `create_schedule`.
 
-                4. CÁC TRƯỜNG TÙY CHỌN (OPTIONAL FIELDS):
+                4. XỬ LÝ Ý ĐỊNH THAY THẾ HOẶC ĐỔI MÔN HỌC / LỊCH TRÌNH (REPLACE / SWAP):
+                   - Khi người dùng nói: "xoá lịch lý đi thay giúp tôi thành toán", "đổi lịch lý sang toán", "thay môn lý bằng toán", "hủy lý tạo toán", "thay lịch toán thành lý":
+                     * BẮT BUỘC GỌI TOOL `replace_schedule`. TUYỆT ĐỐI KHÔNG gọi `get_upcoming_schedule` rồi xuất danh sách lịch thô cho người dùng!
+                     * target_title: tên môn/lịch cũ cần thay (ví dụ: "lý", "Vật lý", "Physics"). Lưu ý: Hệ thống tự động nhận diện từ viết tắt, bí danh môn học ("lý" <-> "Vật lý", "toán" <-> "Toán học", "hóa" <-> "Hóa học"...).
+                     * new_title: tên môn/lịch mới thay thế (ví dụ: "Tiết Toán", "Toán").
+                     * Nếu người dùng KHÔNG đề cập ngày hoặc giờ mới: để trống date, start_time, end_time, duration_minutes. Hệ thống backend sẽ TỰ ĐỘNG KẾ THỪA toàn bộ ngày, giờ, thời lượng và địa điểm từ môn học cũ!
+                     * Nếu người dùng có nói giờ mới (ví dụ: "thay thành toán lúc 14h"): điền start_time: "14:00".
+
+                5. CÁC TRƯỜNG TÙY CHỌN (OPTIONAL FIELDS):
                    - location, description: là tùy chọn. Nếu người dùng không nhắc tới, để trống (null), KHÔNG ĐƯỢC hỏi và TUYỆT ĐỐI KHÔNG tự bịa phòng học hay trường học.
 
-                5. Nguyên tắc con người xác nhận (Human-in-the-loop): Hệ thống sẽ KHÔNG tự ý thay đổi dữ liệu ngầm mà sẽ hiển thị Thẻ Xác Nhận (Action Card) kèm thông tin xung đột để người dùng chủ động bấm Xác nhận. Hãy thông báo rõ bạn đã chuẩn bị đề xuất tạo/sửa lịch và mời người dùng bấm nút xác nhận.
-                6. Phát hiện xung đột (Conflict Detection): Luôn chú ý các khung giờ đã có lịch trước khi đề xuất giờ mới. Nếu phát hiện xung đột, hãy cảnh báo và gợi ý khung giờ thay thế.
-                7. Tối ưu ngày (Optimize my day): Khi người dùng yêu cầu tối ưu lịch trình hôm nay, hãy phân tích lịch học, phát hiện các khoảng trống hoặc nguy cơ quá tải/xung đột, và đưa ra đề xuất điều chỉnh cụ thể.
+                6. Ý ĐỊNH THAO TÁC (MUTATION INTENT):
+                   - Khi người dùng có ý định thay đổi lịch (tạo, xóa, sửa, dời, thay thế): PHẢI gọi write tool (`create_schedule`, `update_schedule`, `delete_schedule`, `reschedule_event`, `replace_schedule`) hoặc đặt câu hỏi làm rõ nếu thiếu thông tin bắt buộc.
+                   - TUYỆT ĐỐI KHÔNG gọi tool tra cứu (như get_upcoming_schedule) thay cho lệnh thao tác của người dùng.
+
+                7. Nguyên tắc con người xác nhận (Human-in-the-loop): Hệ thống sẽ KHÔNG tự ý thay đổi dữ liệu ngầm mà sẽ hiển thị Thẻ Xác Nhận (Action Card) kèm thông tin xung đột để người dùng chủ động bấm Xác nhận. Hãy thông báo rõ bạn đã chuẩn bị đề xuất tạo/sửa lịch và mời người dùng bấm nút xác nhận.
+                8. Phát hiện xung đột (Conflict Detection): Luôn chú ý các khung giờ đã có lịch trước khi đề xuất giờ mới. Nếu phát hiện xung đột, hãy cảnh báo và gợi ý khung giờ thay thế.
+                9. Tối ưu ngày (Optimize my day): Khi người dùng yêu cầu tối ưu lịch trình hôm nay, hãy phân tích lịch học, phát hiện các khoảng trống hoặc nguy cơ quá tải/xung đột, và đưa ra đề xuất điều chỉnh cụ thể.
 
                 NGỮ CẢNH DỮ LIỆU LỊCH TRÌNH THỰC TẾ CỦA NGƯỜI DÙNG:
                 """ + scheduleContext;

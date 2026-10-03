@@ -488,6 +488,23 @@ public class GeminiProvider implements AiProvider {
                                             ),
                                             "required", List.of("new_start_time")
                                     )
+                            ),
+                            // 10. Write: Replace schedule (thay môn, đổi lịch)
+                            Map.of(
+                                    "name", "replace_schedule",
+                                    "description", "Đề xuất thay thế một lịch học/tiết học đã có bằng một môn học hoặc lịch mới (ví dụ: 'xóa lịch lý thay thành toán', 'đổi môn Vật lý thành Toán'). Tự động kế thừa ngày, giờ bắt đầu và thời lượng từ sự kiện cũ nếu sự kiện mới không chỉ định giờ mới.",
+                                    "parameters", Map.of(
+                                            "type", "OBJECT",
+                                            "properties", Map.of(
+                                                    "target_title", Map.of("type", "STRING", "description", "Tên môn học hoặc từ khóa sự kiện cần thay thế/xóa (ví dụ: Tiết Vật lý, Lý, Physics)"),
+                                                    "new_title", Map.of("type", "STRING", "description", "Tên môn học hoặc sự kiện thay thế mới (ví dụ: Tiết Toán, Toán, Math)"),
+                                                    "date", Map.of("type", "STRING", "description", "Ngày mới định dạng YYYY-MM-DD nếu muốn đổi ngày (để trống nếu giữ nguyên ngày cũ)"),
+                                                    "start_time", Map.of("type", "STRING", "description", "Giờ bắt đầu mới HH:mm nếu muốn đổi giờ (để trống nếu giữ nguyên giờ cũ)"),
+                                                    "end_time", Map.of("type", "STRING", "description", "Giờ kết thúc mới HH:mm nếu muốn đổi giờ (để trống nếu giữ nguyên giờ cũ)"),
+                                                    "duration_minutes", Map.of("type", "INTEGER", "description", "Thời lượng mới theo phút (để trống nếu giữ nguyên thời lượng cũ)")
+                                            ),
+                                            "required", List.of("target_title", "new_title")
+                                    )
                             )
                     ))
             ));

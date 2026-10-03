@@ -3,6 +3,7 @@ package com.smartschedule.ai;
 import com.smartschedule.ai.api.AiDtos;
 import com.smartschedule.ai.application.*;
 import com.smartschedule.ai.config.AiProperties;
+import com.smartschedule.ai.domain.AiAction;
 import com.smartschedule.ai.domain.AiConversation;
 import com.smartschedule.ai.domain.AiMessage;
 import com.smartschedule.ai.infrastructure.AiConversationRepository;
@@ -114,5 +115,47 @@ class AiChatServiceTest {
         assertThatThrownBy(() -> rateLimitedService.chat(testUser, new AiDtos.ChatRequest(null, "Msg 3", false)))
                 .isInstanceOf(AiException.class)
                 .hasMessageContaining("quá nhiều yêu cầu trong 1 phút");
+    }
+
+    @Test
+    void testChat_mutationIntentWithReadToolTriggersTurn2() {
+        AiConversation conversation = new AiConversation(testUser, "Cuộc trò chuyện mới");
+        when(conversationRepository.findLatestByUserId(testUser.getId())).thenReturn(Optional.of(conversation));
+        when(contextService.buildContextSummary(eq(testUser), any())).thenReturn("Mock Context");
+
+        String userPrompt = "xoá lịch lý đi thay giúp tôi thành toán";
+
+        // Turn 1: Gemini returns read tool get_upcoming_schedule
+        AiProvider.ToolCall readToolCall = new AiProvider.ToolCall("get_upcoming_schedule", java.util.Map.of());
+        when(aiProvider.generateResponse(anyString(), anyList(), eq(userPrompt)))
+                .thenReturn(new AiProvider.ProviderResponse("", List.of(readToolCall), 80));
+
+        when(contextService.executeTool(eq("get_upcoming_schedule"), eq(testUser), any()))
+                .thenReturn("Lịch trình 7 ngày tới:\n04/10 08:00: Tiết Vật lý");
+
+        // Turn 2: Gemini receives read tool output and returns write tool replace_schedule
+        AiProvider.ToolCall writeToolCall = new AiProvider.ToolCall("replace_schedule", java.util.Map.of(
+                "target_title", "lý",
+                "new_title", "toán"
+        ));
+        when(aiProvider.generateResponse(anyString(), anyList(), contains("thực hiện thao tác người dùng yêu cầu")))
+                .thenReturn(new AiProvider.ProviderResponse("", List.of(writeToolCall), 120));
+
+        AiDtos.ProposedActionDto proposed = new AiDtos.ProposedActionDto(
+                UUID.randomUUID(), conversation.getId(), "replace_schedule",
+                AiAction.STATUS_PROPOSED, "Thay lịch: Xóa 'Tiết Vật lý' và thay bằng 'toán'",
+                java.util.Map.of("target_title", "Tiết Vật lý", "new_title", "toán"),
+                false, null, null, java.time.Instant.now().plusSeconds(900), java.time.Instant.now(), null, null
+        );
+        when(actionService.proposeAction(eq(testUser), eq(conversation), eq("replace_schedule"), any(), any()))
+                .thenReturn(proposed);
+
+        AiDtos.ChatRequest request = new AiDtos.ChatRequest(null, userPrompt, false);
+        AiDtos.ChatResponse response = chatService.chat(testUser, request);
+
+        assertThat(response.proposedActions()).hasSize(1);
+        assertThat(response.proposedActions().get(0).tool()).isEqualTo("replace_schedule");
+        assertThat(response.content()).contains("Thay lịch: Xóa 'Tiết Vật lý' và thay bằng 'toán'");
+        assertThat(response.content()).doesNotContain("Lịch trình 7 ngày tới:");
     }
 }

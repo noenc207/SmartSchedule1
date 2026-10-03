@@ -71,6 +71,12 @@ export function AIActionCard({
           icon: CalendarSync,
           colorClass: 'ai-tool-reschedule',
         };
+      case 'replace_schedule':
+        return {
+          title: 'Thay thế lịch',
+          icon: CalendarSync,
+          colorClass: 'ai-tool-reschedule',
+        };
       case 'update_schedule':
         return {
           title: 'Cập nhật lịch',
@@ -187,10 +193,12 @@ export function AIActionCard({
   };
 
   const eventTitle =
-    (params.title as string) ||
-    (params.event_title as string) ||
-    (params.new_title as string) ||
-    action.summary;
+    tool === 'replace_schedule' && (params.target_title || params.oldTitle) && (params.new_title || params.newTitle)
+      ? `Thay "${params.target_title || params.oldTitle}" ➔ "${params.new_title || params.newTitle}"`
+      : (params.title as string) ||
+        (params.event_title as string) ||
+        (params.new_title as string) ||
+        action.summary;
 
   const location = params.location as string;
   const description = params.description as string;
@@ -324,7 +332,7 @@ export function AIActionCard({
                 <span>Đang xử lý...</span>
               </>
             ) : action.hasConflict ? (
-              tool === 'reschedule_event' ? 'Vẫn dời' : 'Vẫn tạo'
+              tool === 'reschedule_event' ? 'Vẫn dời' : tool === 'replace_schedule' ? 'Vẫn thay' : 'Vẫn tạo'
             ) : (
               'Xác nhận'
             )}

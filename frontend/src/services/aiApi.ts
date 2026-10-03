@@ -5,7 +5,7 @@ export type ActionStatus = 'PROPOSED' | 'CONFIRMED' | 'EXECUTING' | 'SUCCESS' | 
 export interface ProposedActionDto {
   id: string;
   conversationId: string;
-  tool: 'create_schedule' | 'update_schedule' | 'delete_schedule' | 'reschedule_event' | string;
+  tool: 'create_schedule' | 'update_schedule' | 'delete_schedule' | 'reschedule_event' | 'replace_schedule' | string;
   status: ActionStatus;
   summary: string;
   parameters: Record<string, any>;

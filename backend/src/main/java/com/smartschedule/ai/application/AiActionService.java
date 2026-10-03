@@ -130,7 +130,7 @@ public class AiActionService {
             }
 
             case "reschedule_event" -> {
-                Event target = findTargetEvent(user, arguments);
+                Event target = findTargetEvent(user, arguments, clientContext);
                 if (target == null) {
                     throw new AiException("NOT_FOUND", "Không tìm thấy sự kiện cần dời lịch.");
                 }
@@ -184,7 +184,7 @@ public class AiActionService {
             }
 
             case "update_schedule" -> {
-                Event target = findTargetEvent(user, arguments);
+                Event target = findTargetEvent(user, arguments, clientContext);
                 if (target != null) {
                     targetEventId = target.getId();
                     String newTitle = getString(arguments, "title", target.getTitle());
@@ -234,8 +234,81 @@ public class AiActionService {
                 }
             }
 
+            case "replace_schedule" -> {
+                String targetTitle = getString(arguments, "target_title", getString(arguments, "title", null));
+                Event target = findTargetEvent(user, arguments, clientContext);
+                if (target == null) {
+                    throw new AiException("NOT_FOUND", "Không tìm thấy lịch học nào phù hợp với '" + (targetTitle != null ? targetTitle : "yêu cầu") + "' để thay thế.");
+                }
+                targetEventId = target.getId();
+
+                String newTitle = getString(arguments, "new_title", null);
+                if (newTitle == null || newTitle.isBlank()) {
+                    newTitle = getString(arguments, "title", "Lịch mới");
+                }
+
+                // Check if new date/time specified; if not, INHERIT from target
+                LocalDate date = null;
+                if (arguments.containsKey("date") && arguments.get("date") != null && !arguments.get("date").toString().isBlank()) {
+                    try {
+                        date = LocalDate.parse(arguments.get("date").toString().trim());
+                    } catch (Exception ignored) {}
+                }
+                if (date == null) {
+                    date = target.getStartsAt().atZone(zoneId).toLocalDate();
+                }
+
+                boolean customStart = arguments.containsKey("start_time") && arguments.get("start_time") != null && !arguments.get("start_time").toString().isBlank();
+                boolean customEnd = arguments.containsKey("end_time") && arguments.get("end_time") != null && !arguments.get("end_time").toString().isBlank();
+
+                LocalTime startTime = customStart
+                        ? AiDateTimeUtils.parseLocalTime(arguments.get("start_time"))
+                        : target.getStartsAt().atZone(zoneId).toLocalTime();
+
+                Integer durationMinutes = arguments.containsKey("duration_minutes")
+                        ? AiDateTimeUtils.parseDurationMinutes(arguments.get("duration_minutes"))
+                        : (int) Math.max(15, Duration.between(target.getStartsAt(), target.getEndsAt()).toMinutes());
+
+                LocalTime endTime;
+                if (customEnd) {
+                    endTime = AiDateTimeUtils.parseLocalTime(arguments.get("end_time"));
+                } else if (customStart) {
+                    endTime = startTime.plusMinutes(durationMinutes);
+                } else {
+                    endTime = target.getEndsAt().atZone(zoneId).toLocalTime();
+                }
+
+                AiDateTimeUtils.TimeRange timeRange = AiDateTimeUtils.calculateTimeRange(
+                        date, startTime, endTime, durationMinutes, zoneId
+                );
+
+                ConflictResult cr = detectConflict(schedule.getId(), timeRange.startsAt(), timeRange.endsAt(), target.getId(), zoneId);
+                hasConflict = cr.hasConflict();
+                conflictDetails = cr.details();
+
+                canonicalParams.put("target_event_id", target.getId().toString());
+                canonicalParams.put("target_title", target.getTitle());
+                canonicalParams.put("new_title", newTitle.trim());
+                canonicalParams.put("date", timeRange.startDate().toString());
+                canonicalParams.put("start_time", timeRange.startTime().format(AiDateTimeUtils.TIME_FMT));
+                canonicalParams.put("end_time", timeRange.endTime().format(AiDateTimeUtils.TIME_FMT));
+                canonicalParams.put("duration_minutes", timeRange.durationMinutes());
+                canonicalParams.put("starts_at", timeRange.startsAt().toString());
+                canonicalParams.put("ends_at", timeRange.endsAt().toString());
+                canonicalParams.put("timezone", zoneId.getId());
+                canonicalParams.put("location", getString(arguments, "location", target.getLocation()));
+                canonicalParams.put("description", getString(arguments, "description", target.getDescription()));
+
+                ZonedDateTime sLocal = timeRange.startsAt().atZone(zoneId);
+                ZonedDateTime eLocal = timeRange.endsAt().atZone(zoneId);
+
+                summary = String.format("Thay lịch: Xóa '%s' và thay bằng '%s' vào %s (%s–%s)",
+                        target.getTitle(), newTitle.trim(), sLocal.format(AiDateTimeUtils.VI_DATE_FMT),
+                        sLocal.format(AiDateTimeUtils.TIME_FMT), eLocal.format(AiDateTimeUtils.TIME_FMT));
+            }
+
             case "delete_schedule" -> {
-                Event target = findTargetEvent(user, arguments);
+                Event target = findTargetEvent(user, arguments, clientContext);
                 if (target != null) {
                     targetEventId = target.getId();
                     ZonedDateTime sLocal = target.getStartsAt().atZone(zoneId);
@@ -468,6 +541,51 @@ public class AiActionService {
                     data.put("endsAt", endsAt.toString());
                 }
 
+                case "replace_schedule" -> {
+                    Event event = requireTargetEvent(user, action.getTargetEventId(), params);
+                    String oldTitle = event.getTitle();
+                    String newTitle = getString(params, "new_title", "Lịch mới");
+                    String description = getString(params, "description", event.getDescription());
+                    String location = getString(params, "location", event.getLocation());
+
+                    Instant startsAt;
+                    Instant endsAt;
+
+                    if (params.containsKey("starts_at") && params.containsKey("ends_at")
+                            && params.get("starts_at") != null && params.get("ends_at") != null) {
+                        startsAt = Instant.parse(params.get("starts_at").toString().trim());
+                        endsAt = Instant.parse(params.get("ends_at").toString().trim());
+                    } else {
+                        startsAt = event.getStartsAt();
+                        endsAt = event.getEndsAt();
+                    }
+
+                    // Atomic update / replacement in single transaction
+                    event.update(event.getCategory(), newTitle, description, startsAt, endsAt, location,
+                            event.getPriority(), event.getStatus(), event.getRecurrenceRule(), event.getReminderMinutes(),
+                            event.getNotes(), event.isFixed(), event.isLocked());
+
+                    eventRepository.save(event);
+                    createdOrModifiedId = event.getId();
+
+                    ZonedDateTime sLocal = startsAt.atZone(zoneId);
+                    ZonedDateTime eLocal = endsAt.atZone(zoneId);
+
+                    message = String.format("Đã thay lịch '%s' bằng '%s' vào %s (%s–%s) thành công.",
+                            oldTitle, newTitle, sLocal.format(AiDateTimeUtils.VI_DATE_FMT),
+                            sLocal.format(AiDateTimeUtils.TIME_FMT), eLocal.format(AiDateTimeUtils.TIME_FMT));
+
+                    data.put("operation", "REPLACE_SCHEDULE");
+                    data.put("oldTitle", oldTitle);
+                    data.put("newTitle", newTitle);
+                    data.put("eventId", createdOrModifiedId);
+                    data.put("startsAt", startsAt.toString());
+                    data.put("endsAt", endsAt.toString());
+                    data.put("date", sLocal.toLocalDate().toString());
+                    data.put("startTime", sLocal.format(AiDateTimeUtils.TIME_FMT));
+                    data.put("endTime", eLocal.format(AiDateTimeUtils.TIME_FMT));
+                }
+
                 case "delete_schedule" -> {
                     Event event = requireTargetEvent(user, action.getTargetEventId(), params);
                     String oldTitle = event.getTitle();
@@ -646,8 +764,15 @@ public class AiActionService {
     }
 
     private Event findTargetEvent(User user, Map<String, Object> args) {
+        return findTargetEvent(user, args, null);
+    }
+
+    private Event findTargetEvent(User user, Map<String, Object> args, AiDtos.ClientContextDto clientContext) {
         if (args == null) return null;
-        Object eventIdObj = args.get("event_id");
+
+        // 1. Direct event ID from args
+        Object eventIdObj = args.get("target_event_id");
+        if (eventIdObj == null) eventIdObj = args.get("event_id");
         if (eventIdObj != null) {
             try {
                 UUID eventId = UUID.fromString(eventIdObj.toString().trim());
@@ -658,22 +783,80 @@ public class AiActionService {
             } catch (Exception ignored) {}
         }
 
-        String title = getString(args, "title", null);
-        if (title != null && !title.isBlank()) {
-            List<Schedule> userSchedules = scheduleRepository.findAllByOwnerIdOrderByUpdatedAtDesc(user.getId());
-            for (Schedule s : userSchedules) {
-                List<Event> matches = eventRepository.search(s.getId(),
-                        Instant.now().minusSeconds(86400L * 7),
-                        Instant.now().plusSeconds(86400L * 30),
-                        null, null, null);
-                for (Event e : matches) {
-                    if (e.getTitle().equalsIgnoreCase(title.trim()) || e.getTitle().toLowerCase().contains(title.toLowerCase().trim())) {
-                        return e;
+        // 2. Direct event ID from client context
+        if (clientContext != null && clientContext.selectedEventId() != null && !clientContext.selectedEventId().isBlank()) {
+            try {
+                UUID selectedId = UUID.fromString(clientContext.selectedEventId().trim());
+                Optional<Event> ev = eventRepository.findById(selectedId);
+                if (ev.isPresent() && ev.get().getSchedule().getOwner().getId().equals(user.getId())) {
+                    return ev.get();
+                }
+            } catch (Exception ignored) {}
+        }
+
+        // 3. Search by title / target_title with subject alias matching
+        String query = getString(args, "target_title", getString(args, "title", null));
+        if (query != null && !query.isBlank()) {
+            List<Event> matches = searchUserEventsByQuery(user, query);
+            if (!matches.isEmpty()) {
+                // If a date is provided in args or context, prioritize matches on that date
+                String targetDate = getString(args, "date", clientContext != null ? clientContext.selectedDate() : null);
+                if (targetDate != null && !targetDate.isBlank()) {
+                    List<Event> onDate = matches.stream()
+                            .filter(e -> e.getStartsAt().atZone(AiDateTimeUtils.DEFAULT_ZONE).toLocalDate().toString().equals(targetDate.trim()))
+                            .toList();
+                    if (!onDate.isEmpty()) {
+                        return onDate.get(0);
                     }
                 }
+                return matches.get(0);
             }
         }
         return null;
+    }
+
+    public List<Event> searchUserEventsByQuery(User user, String query) {
+        if (query == null || query.isBlank()) return Collections.emptyList();
+        List<Schedule> userSchedules = scheduleRepository.findAllByOwnerIdOrderByUpdatedAtDesc(user.getId());
+        List<Event> results = new ArrayList<>();
+        Instant from = Instant.now().minusSeconds(86400L * 7);
+        Instant to = Instant.now().plusSeconds(86400L * 30);
+
+        for (Schedule s : userSchedules) {
+            List<Event> matches = eventRepository.search(s.getId(), from, to, null, null, null);
+            for (Event e : matches) {
+                if (isSubjectMatch(e.getTitle(), query)) {
+                    results.add(e);
+                }
+            }
+        }
+        results.sort(Comparator.comparing(Event::getStartsAt));
+        return results;
+    }
+
+    public static boolean isSubjectMatch(String eventTitle, String query) {
+        if (eventTitle == null || query == null) return false;
+        String e = eventTitle.toLowerCase().trim();
+        String q = query.toLowerCase().trim();
+        if (e.equals(q) || e.contains(q) || q.contains(e)) return true;
+
+        List<Set<String>> aliasGroups = List.of(
+                Set.of("lý", "ly", "vật lý", "vat ly", "physics", "phy"),
+                Set.of("toán", "toan", "toán học", "math", "mathematics", "calculus", "giải tích", "đại số"),
+                Set.of("hóa", "hoa", "hóa học", "chemistry", "chem"),
+                Set.of("anh", "tiếng anh", "english", "eng"),
+                Set.of("văn", "ngữ văn", "literature"),
+                Set.of("tin", "tin học", "cntt", "computer science", "lập trình", "coding", "java", "python")
+        );
+
+        for (Set<String> group : aliasGroups) {
+            boolean matchQuery = group.stream().anyMatch(alias -> q.equals(alias) || q.contains(alias));
+            boolean matchEvent = group.stream().anyMatch(alias -> e.equals(alias) || e.contains(alias));
+            if (matchQuery && matchEvent) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private Event requireTargetEvent(User user, UUID targetEventId, Map<String, Object> params) {
