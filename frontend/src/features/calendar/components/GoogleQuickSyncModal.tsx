@@ -22,6 +22,7 @@ import {
   GoogleWorkspaceStatus,
 } from '../../../services/aiApi';
 import { showToast } from '../../../components/Toast';
+import { isDemoMode } from '../../../services/demoMode';
 
 export interface GoogleQuickSyncModalProps {
   isOpen: boolean;
@@ -138,8 +139,122 @@ export function GoogleQuickSyncModal({
     }
   };
 
+  const [isConnectingGoogle, setIsConnectingGoogle] = useState(false);
+
+  // Handle Connect Google Workspace
+  const handleConnectGoogle = async () => {
+    setIsConnectingGoogle(true);
+    try {
+      if (isDemoMode()) {
+        const mockStatus = await aiApi.connectGoogleWorkspace({
+          accessToken: 'mock-google-calendar-token',
+          scopes: 'calendar.events.readonly calendar.events',
+        });
+        setCalendarStatus(mockStatus);
+        showToast('Đã kết nối thành công Google Workspace (Demo)!', 'success');
+        setIsConnectingGoogle(false);
+        return;
+      }
+
+      const rawClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+      const googleClientId =
+        rawClientId && rawClientId.trim().length > 0
+          ? rawClientId.trim()
+          : '231472661796-1iegvpdu3jj9s845cbm46imktk73u5ss.apps.googleusercontent.com';
+      const redirectUri = `${window.location.origin}/auth/google/callback`;
+
+      const scopes = [
+        'openid',
+        'email',
+        'profile',
+        'https://www.googleapis.com/auth/calendar.events.readonly',
+        'https://www.googleapis.com/auth/calendar.events',
+        'https://www.googleapis.com/auth/spreadsheets.readonly',
+      ].join(' ');
+
+      const params = new URLSearchParams({
+        client_id: googleClientId,
+        redirect_uri: redirectUri,
+        response_type: 'code',
+        scope: scopes,
+        access_type: 'offline',
+        prompt: 'consent select_account',
+      });
+
+      const oauthUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+
+      const width = 520;
+      const height = 650;
+      const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - width) / 2));
+      const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - height) / 2));
+
+      const popup = window.open(
+        oauthUrl,
+        'google_workspace_oauth',
+        `width=${width},height=${height},left=${left},top=${top},status=no,toolbar=no,menubar=no,location=yes,resizable=yes`
+      );
+
+      if (!popup || popup.closed) {
+        window.location.href = oauthUrl;
+        return;
+      }
+
+      const messageHandler = async (evt: MessageEvent) => {
+        if (evt.data?.type === 'SOCIAL_OAUTH_RESPONSE' || evt.data?.type === 'GOOGLE_OAUTH_RESPONSE') {
+          window.removeEventListener('message', messageHandler);
+          const code = evt.data?.code;
+          if (code) {
+            try {
+              const res = await aiApi.connectGoogleWorkspace({
+                code,
+                redirectUri,
+              });
+              setCalendarStatus(res);
+              showToast('Đã kết nối thành công Google Workspace!', 'success');
+            } catch (err: any) {
+              showToast('Lỗi khi kích hoạt kết nối Google.', 'error');
+            }
+          } else if (evt.data?.accessToken) {
+            try {
+              const res = await aiApi.connectGoogleWorkspace({
+                accessToken: evt.data.accessToken,
+                scopes,
+              });
+              setCalendarStatus(res);
+              showToast('Đã kết nối thành công Google Workspace!', 'success');
+            } catch (err: any) {
+              showToast('Lỗi khi kích hoạt kết nối Google.', 'error');
+            }
+          }
+          setIsConnectingGoogle(false);
+        }
+      };
+
+      window.addEventListener('message', messageHandler);
+    } catch (err) {
+      showToast('Không thể mở cửa sổ đăng nhập Google.', 'error');
+      setIsConnectingGoogle(false);
+    }
+  };
+
+  const handleDisconnectGoogle = async () => {
+    try {
+      await aiApi.disconnectGoogleWorkspace();
+      setCalendarStatus(null);
+      setCalendarResult(null);
+      showToast('Đã hủy liên kết Google Workspace.', 'info');
+    } catch {
+      showToast('Lỗi khi hủy liên kết.', 'error');
+    }
+  };
+
   // Handle Calendar Prepare
   const handlePrepareCalendar = async () => {
+    if (!calendarStatus?.connected) {
+      showToast('Vui lòng kết nối tài khoản Google trước khi quét lịch.', 'warning');
+      void handleConnectGoogle();
+      return;
+    }
     setIsPreparingCalendar(true);
     setCalendarResult(null);
     try {
@@ -575,7 +690,7 @@ export function GoogleQuickSyncModal({
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <CheckCircle2
-                    size={20}
+                    size={22}
                     color={calendarStatus?.connected ? '#16a34a' : '#d97706'}
                   />
                   <div>
@@ -587,10 +702,41 @@ export function GoogleQuickSyncModal({
                     <span style={{ fontSize: 11.5, color: '#64748b' }}>
                       {calendarStatus?.googleEmail
                         ? `Tài khoản: ${calendarStatus.googleEmail}`
-                        : 'Bạn có thể đồng bộ thời khóa biểu trực tiếp từ Google Calendar.'}
+                        : 'Bạn cần cấp quyền Google một lần để SmartSchedule đọc Calendar.'}
                     </span>
                   </div>
                 </div>
+
+                {!calendarStatus?.connected ? (
+                  <button
+                    type="button"
+                    className="primary-button compact-btn"
+                    onClick={handleConnectGoogle}
+                    disabled={isConnectingGoogle}
+                    style={{
+                      background: '#2563eb',
+                      borderColor: '#2563eb',
+                      whiteSpace: 'nowrap',
+                      padding: '7px 14px',
+                      fontSize: 12.5,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <ExternalLink size={14} />
+                    <span>{isConnectingGoogle ? 'Đang kết nối...' : 'Kết nối Google ngay'}</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="secondary-button compact-btn danger"
+                    onClick={handleDisconnectGoogle}
+                    style={{ fontSize: 11.5, padding: '5px 10px' }}
+                  >
+                    Hủy kết nối
+                  </button>
+                )}
               </div>
 
               {/* Scope & Date Range Options */}
@@ -631,13 +777,15 @@ export function GoogleQuickSyncModal({
                   <button
                     type="button"
                     className="primary-button"
-                    disabled={isPreparingCalendar}
+                    disabled={isPreparingCalendar || isConnectingGoogle}
                     onClick={handlePrepareCalendar}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
                       gap: 8,
                       padding: '9px 18px',
+                      background: calendarStatus?.connected ? 'var(--primary-color, #f27024)' : '#2563eb',
+                      borderColor: calendarStatus?.connected ? 'var(--primary-color, #f27024)' : '#2563eb',
                     }}
                   >
                     {isPreparingCalendar ? (
@@ -648,7 +796,11 @@ export function GoogleQuickSyncModal({
                     ) : (
                       <>
                         <CalendarSync size={15} />
-                        <span>Quét sự kiện từ Google</span>
+                        <span>
+                          {calendarStatus?.connected
+                            ? 'Quét sự kiện từ Google'
+                            : 'Kết nối Google & Quét lịch'}
+                        </span>
                       </>
                     )}
                   </button>
