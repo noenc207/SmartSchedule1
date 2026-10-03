@@ -10,6 +10,8 @@ import {
   ChevronLeft,
   ChevronRight,
   SlidersHorizontal,
+  FileSpreadsheet,
+  CalendarSync,
 } from 'lucide-react';
 import type { CalendarViewType, SemanticZoomLevel } from '../../../stores/preferenceStore';
 import { DEFAULT_TIMEZONE, formatDate } from '../../../utils/dateTime';
@@ -35,6 +37,7 @@ export interface CalendarToolbarProps {
   onToggleWhatIf?: () => void;
   isWhatIfActive?: boolean;
   onOpenConstraints?: () => void;
+  onOpenGoogleImport?: (tab: 'sheets' | 'calendar') => void;
 }
 
 const VIEW_OPTIONS: { id: CalendarViewType; label: string; iconLabel: string }[] = [
@@ -67,6 +70,7 @@ export function CalendarToolbar({
   onToggleWhatIf,
   isWhatIfActive = false,
   onOpenConstraints,
+  onOpenGoogleImport,
 }: CalendarToolbarProps) {
   const [viewDropdownOpen, setViewDropdownOpen] = useState(false);
   const [optionsMenuOpen, setOptionsMenuOpen] = useState(false);
@@ -320,6 +324,34 @@ export function CalendarToolbar({
           >
             <Plus size={15} />
             <span className="create-event-btn-text">Thêm sự kiện</span>
+          </button>
+        )}
+
+        {/* Quick Google Sheets Import Button */}
+        {onOpenGoogleImport && (
+          <button
+            type="button"
+            className="toolbar-google-quick-btn toolbar-sheet-quick-btn"
+            onClick={() => onOpenGoogleImport('sheets')}
+            title="Dán liên kết Google Sheets để nhập lịch nhanh"
+            aria-label="Dán link Google Sheet"
+          >
+            <FileSpreadsheet size={15} color="#059669" />
+            <span className="create-event-btn-text">Dán link Sheet</span>
+          </button>
+        )}
+
+        {/* Quick Google Calendar Sync Button */}
+        {onOpenGoogleImport && (
+          <button
+            type="button"
+            className="toolbar-google-quick-btn toolbar-cal-quick-btn"
+            onClick={() => onOpenGoogleImport('calendar')}
+            title="Đồng bộ với Google Calendar"
+            aria-label="Đồng bộ Google Calendar"
+          >
+            <CalendarSync size={15} color="#2563eb" />
+            <span className="create-event-btn-text">Đồng bộ Google</span>
           </button>
         )}
 

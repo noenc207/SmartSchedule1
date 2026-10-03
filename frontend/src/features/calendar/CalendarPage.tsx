@@ -70,6 +70,7 @@ import { MobileDayStrip } from './components/MobileDayStrip';
 import { COLOR_PALETTE } from './utils/colorPalette';
 import { NlpTaskInput } from '../tasks/components/NlpTaskInput';
 import { AdvancedConstraintsModal } from '../scheduling/components/AdvancedConstraintsModal';
+import { GoogleQuickSyncModal } from './components/GoogleQuickSyncModal';
 import { DEFAULT_SCHEDULING_RULES, type SchedulingRule } from '../scheduling/utils/constraintRules';
 import {
   Share2,
@@ -167,6 +168,8 @@ export function CalendarPage() {
   // Progressive Disclosure contextual controls
   const [isConstraintsModalOpen, setIsConstraintsModalOpen] = useState(false);
   const [schedulingRules, setSchedulingRules] = useState<SchedulingRule[]>(() => DEFAULT_SCHEDULING_RULES);
+  const [googleSyncModalOpen, setGoogleSyncModalOpen] = useState(false);
+  const [googleSyncInitialTab, setGoogleSyncInitialTab] = useState<'sheets' | 'calendar'>('sheets');
 
   // Preferences persistence
   const calendarView = usePreferenceStore((s) => s.calendarView);
@@ -2205,6 +2208,10 @@ export function CalendarPage() {
               }}
               isWhatIfActive={whatIfActive}
               onOpenConstraints={() => setIsConstraintsModalOpen(true)}
+              onOpenGoogleImport={(tab) => {
+                setGoogleSyncInitialTab(tab);
+                setGoogleSyncModalOpen(true);
+              }}
             />
 
             {/* Mobile Day Picker Strip for 1-tap fast navigation */}
@@ -2717,6 +2724,13 @@ export function CalendarPage() {
           setIsConstraintsModalOpen(false);
           showToast('Advanced constraints updated', 'success');
         }}
+      />
+
+      {/* Quick Google Sheets & Calendar Sync Modal */}
+      <GoogleQuickSyncModal
+        isOpen={googleSyncModalOpen}
+        initialTab={googleSyncInitialTab}
+        onClose={() => setGoogleSyncModalOpen(false)}
       />
     </section>
   );

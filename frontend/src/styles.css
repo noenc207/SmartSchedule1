@@ -15817,6 +15817,22 @@ body {
     display: none !important; /* Hide text, only show + icon on mobile */
   }
 
+  .toolbar-google-quick-btn {
+    padding: 0 !important;
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    border-radius: 8px !important;
+    flex-shrink: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .toolbar-google-quick-btn .create-event-btn-text {
+    display: none !important;
+  }
+
   .toolbar-icon-toggle-btn {
     width: 30px !important;
     height: 30px !important;
@@ -19112,6 +19128,40 @@ body {
   font-size: 10.5px;
   color: #dc2626;
   font-weight: 500;
+}
+
+/* Quick Action Buttons for Google Sheets & Calendar in Toolbar */
+.toolbar-google-quick-btn {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 5px 11px !important;
+  height: 32px !important;
+  border-radius: 9px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  white-space: nowrap !important;
+  background: var(--surface, #ffffff) !important;
+  border: 1px solid var(--border, #e2e8f0) !important;
+  color: var(--text, #1e293b) !important;
+}
+
+.toolbar-sheet-quick-btn:hover {
+  background: #ecfdf5 !important;
+  border-color: #a7f3d0 !important;
+  color: #065f46 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.15) !important;
+}
+
+.toolbar-cal-quick-btn:hover {
+  background: #eff6ff !important;
+  border-color: #bfdbfe !important;
+  color: #1e40af !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.15) !important;
 }
 
 
