@@ -104,12 +104,23 @@ public class GeminiProvider implements AiProvider {
                     log.warn("Gemini generateContent error (model={}, attempt={}/{}): HTTP {}: {}",
                             model, attempt, maxAttempts, status, body);
 
-                    if (isRetriableStatus(status) && (attempt < maxAttempts || modelIndex < candidateModels.size() - 1)) {
+                    boolean isRetriable = isRetriableStatus(status);
+                    boolean isModelNotFound = (status == 404);
+                    boolean hasMoreModels = modelIndex < candidateModels.size() - 1;
+
+                    if (isRetriable && attempt < maxAttempts) {
                         sleepWithBackoff(attempt);
                         continue;
                     }
+
+                    if (hasMoreModels && (isRetriable || isModelNotFound)) {
+                        lastException = mapHttpResponseToAiException(status, body);
+                        log.info("Gemini model {} failed with HTTP {}, switching to next candidate model", model, status);
+                        break;
+                    }
+
                     lastException = mapHttpResponseToAiException(status, body);
-                    if (!isRetriableStatus(status)) {
+                    if (!isRetriable && !isModelNotFound) {
                         break; // Non-retriable client error (e.g. 401/403)
                     }
                 } catch (AiException ex) {
@@ -188,18 +199,27 @@ public class GeminiProvider implements AiProvider {
                                 model, attempt, maxAttempts, responseCode, errorBody);
 
                         boolean isRetriable = isRetriableStatus(responseCode);
-                        if (isRetriable && (attempt < maxAttempts || modelIndex < candidateModels.size() - 1)) {
+                        boolean isModelNotFound = (responseCode == 404);
+                        boolean hasMoreModels = modelIndex < candidateModels.size() - 1;
+
+                        if (isRetriable && attempt < maxAttempts) {
                             sleepWithBackoff(attempt);
                             continue;
                         }
 
+                        if (hasMoreModels && (isRetriable || isModelNotFound)) {
+                            lastException = mapHttpResponseToAiException(responseCode, errorBody);
+                            log.info("Gemini stream model {} failed with HTTP {}, switching to next candidate model", model, responseCode);
+                            break;
+                        }
+
                         AiException mapped = mapHttpResponseToAiException(responseCode, errorBody);
-                        if (!isRetriable) {
+                        if (!isRetriable && !isModelNotFound) {
                             onError.accept(mapped);
                             return;
                         }
                         lastException = mapped;
-                        continue;
+                        break;
                     }
 
                     List<ToolCall> streamedToolCalls = new ArrayList<>();
@@ -238,7 +258,13 @@ public class GeminiProvider implements AiProvider {
 
                 } catch (AiException ex) {
                     lastException = ex;
-                    if (!"SERVER_OVERLOADED".equals(ex.getCode()) && !"SERVER_ERROR".equals(ex.getCode()) && !"QUOTA_EXCEEDED".equals(ex.getCode())) {
+                    boolean isTransient = "SERVER_OVERLOADED".equals(ex.getCode())
+                            || "SERVER_ERROR".equals(ex.getCode())
+                            || "QUOTA_EXCEEDED".equals(ex.getCode());
+                    if (modelIndex < candidateModels.size() - 1 && isTransient) {
+                        break;
+                    }
+                    if (!isTransient) {
                         onError.accept(ex);
                         return;
                     }
@@ -246,8 +272,12 @@ public class GeminiProvider implements AiProvider {
                     log.warn("Gemini stream connection error (model={}, attempt={}/{}): {}",
                             model, attempt, maxAttempts, ex.getMessage());
                     lastException = ex;
-                    if (attempt < maxAttempts || modelIndex < candidateModels.size() - 1) {
+                    if (attempt < maxAttempts) {
                         sleepWithBackoff(attempt);
+                        continue;
+                    }
+                    if (modelIndex < candidateModels.size() - 1) {
+                        break;
                     }
                 } finally {
                     if (conn != null) {
@@ -273,7 +303,13 @@ public class GeminiProvider implements AiProvider {
         if (configured != null && !configured.isBlank()) {
             list.add(configured.trim());
         }
-        List<String> fallbacks = List.of("gemini-2.5-flash", "gemini-flash-latest", "gemini-1.5-flash");
+        List<String> fallbacks = List.of(
+                "gemini-3.7-flash",
+                "gemini-3.6-flash",
+                "gemini-3.8-flash",
+                "gemini-flash-latest",
+                "gemini-3.5-flash-lite"
+        );
         for (String fb : fallbacks) {
             if (!list.contains(fb)) {
                 list.add(fb);
