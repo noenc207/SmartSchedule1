@@ -36,4 +36,19 @@ class GeminiProviderTest {
                 }))
                 .isInstanceOf(AiException.class);
     }
+
+    @Test
+    void testSpringContext_canInstantiateGeminiProvider() {
+        org.springframework.context.annotation.AnnotationConfigApplicationContext context =
+                new org.springframework.context.annotation.AnnotationConfigApplicationContext();
+        context.registerBean(AiProperties.class, () -> new AiProperties("", "gemini-3.8-flash", 1500, 1024, 20, 30));
+        context.registerBean(ObjectMapper.class, () -> new ObjectMapper());
+        context.registerBean(com.smartschedule.ai.application.AiToolRegistry.class, () -> new com.smartschedule.ai.application.AiToolRegistry());
+        context.register(GeminiProvider.class);
+        context.refresh();
+
+        GeminiProvider provider = context.getBean(GeminiProvider.class);
+        assertThat(provider).isNotNull();
+        context.close();
+    }
 }

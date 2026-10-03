@@ -1,6 +1,8 @@
 package com.smartschedule.ai.application;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartschedule.ai.api.AiDtos;
+import com.smartschedule.ai.infrastructure.VisionResultRepository;
 import com.smartschedule.event.domain.Event;
 import com.smartschedule.event.infrastructure.EventRepository;
 import com.smartschedule.schedule.domain.Schedule;
@@ -8,6 +10,7 @@ import com.smartschedule.schedule.infrastructure.ScheduleRepository;
 import com.smartschedule.task.domain.Task;
 import com.smartschedule.task.infrastructure.TaskRepository;
 import com.smartschedule.user.domain.User;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,26 +23,26 @@ public class AiContextService {
     private final ScheduleRepository scheduleRepository;
     private final EventRepository eventRepository;
     private final TaskRepository taskRepository;
-    private final com.smartschedule.ai.infrastructure.VisionResultRepository visionResultRepository;
-    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    private final VisionResultRepository visionResultRepository;
+    private final ObjectMapper objectMapper;
 
     public AiContextService(ScheduleRepository scheduleRepository,
                             EventRepository eventRepository,
                             TaskRepository taskRepository) {
-        this(scheduleRepository, eventRepository, taskRepository, null, new com.fasterxml.jackson.databind.ObjectMapper());
+        this(scheduleRepository, eventRepository, taskRepository, null, new ObjectMapper());
     }
 
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     public AiContextService(ScheduleRepository scheduleRepository,
                             EventRepository eventRepository,
                             TaskRepository taskRepository,
-                            @org.springframework.beans.factory.annotation.Autowired(required = false) com.smartschedule.ai.infrastructure.VisionResultRepository visionResultRepository,
-                            @org.springframework.beans.factory.annotation.Autowired(required = false) com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
+                            @Autowired(required = false) VisionResultRepository visionResultRepository,
+                            @Autowired(required = false) ObjectMapper objectMapper) {
         this.scheduleRepository = scheduleRepository;
         this.eventRepository = eventRepository;
         this.taskRepository = taskRepository;
         this.visionResultRepository = visionResultRepository;
-        this.objectMapper = objectMapper != null ? objectMapper : new com.fasterxml.jackson.databind.ObjectMapper();
+        this.objectMapper = objectMapper != null ? objectMapper : new ObjectMapper();
     }
 
     @Transactional(readOnly = true)
