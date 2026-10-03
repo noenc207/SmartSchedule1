@@ -20,13 +20,26 @@ public class AiContextService {
     private final ScheduleRepository scheduleRepository;
     private final EventRepository eventRepository;
     private final TaskRepository taskRepository;
+    private final com.smartschedule.ai.infrastructure.VisionResultRepository visionResultRepository;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     public AiContextService(ScheduleRepository scheduleRepository,
                             EventRepository eventRepository,
                             TaskRepository taskRepository) {
+        this(scheduleRepository, eventRepository, taskRepository, null, new com.fasterxml.jackson.databind.ObjectMapper());
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public AiContextService(ScheduleRepository scheduleRepository,
+                            EventRepository eventRepository,
+                            TaskRepository taskRepository,
+                            @org.springframework.beans.factory.annotation.Autowired(required = false) com.smartschedule.ai.infrastructure.VisionResultRepository visionResultRepository,
+                            @org.springframework.beans.factory.annotation.Autowired(required = false) com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
         this.scheduleRepository = scheduleRepository;
         this.eventRepository = eventRepository;
         this.taskRepository = taskRepository;
+        this.visionResultRepository = visionResultRepository;
+        this.objectMapper = objectMapper != null ? objectMapper : new com.fasterxml.jackson.databind.ObjectMapper();
     }
 
     @Transactional(readOnly = true)
@@ -170,6 +183,51 @@ public class AiContextService {
                 }
                 sb.append("\n");
             }
+        }
+
+        // 5. Recent Vision Results (Zero Raw Image to Gemini - Only Structured Data)
+        if (visionResultRepository != null) {
+            try {
+                List<com.smartschedule.ai.domain.VisionResult> visionList = visionResultRepository.findByUserIdOrderByCreatedAtDesc(user.getId());
+                if (!visionList.isEmpty()) {
+                    com.smartschedule.ai.domain.VisionResult latest = visionList.get(0);
+                    if (Duration.between(latest.getCreatedAt(), Instant.now()).toMinutes() < 120) {
+                        sb.append("\n=== KẾT QUẢ PHÂN TÍCH THỊ GIÁC GẦN ĐÂY (STRUCTURED VISION DATA) ===\n");
+                        sb.append("- Result ID: ").append(latest.getId()).append("\n");
+                        sb.append("- Loại tài liệu: ").append(latest.getDocumentType())
+                          .append(" | Provider: ").append(latest.getProvider())
+                          .append(" (Độ tin cậy: ").append(String.format(Locale.US, "%.0f%%", latest.getConfidence() * 100)).append(")\n");
+                        sb.append("- Tóm tắt: ").append(latest.getSummary()).append("\n");
+
+                        try {
+                            Map<String, Object> payload = objectMapper.readValue(latest.getPayloadJson(), new com.fasterxml.jackson.core.type.TypeReference<>() {});
+                            if (payload.containsKey("events")) {
+                                List<Map<String, Object>> evs = (List<Map<String, Object>>) payload.get("events");
+                                if (evs != null && !evs.isEmpty()) {
+                                    sb.append("- Danh sách lịch học trích xuất được từ ảnh:\n");
+                                    for (Map<String, Object> ev : evs) {
+                                        sb.append("  • ").append(ev.get("title"))
+                                          .append(" | ").append(ev.getOrDefault("day_of_week", "Hàng tuần"))
+                                          .append(" (").append(ev.get("start_time")).append("–").append(ev.get("end_time")).append(")")
+                                          .append(ev.get("location") != null ? " tại " + ev.get("location") : "")
+                                          .append("\n");
+                                    }
+                                }
+                            }
+                            if (payload.containsKey("deadlines")) {
+                                List<Map<String, Object>> dls = (List<Map<String, Object>>) payload.get("deadlines");
+                                if (dls != null && !dls.isEmpty()) {
+                                    sb.append("- Danh sách hạn chót / deadline từ ảnh:\n");
+                                    for (Map<String, Object> dl : dls) {
+                                        sb.append("  • [HẠN NỘP] ").append(dl.get("title")).append(" (Hạn chót: ").append(dl.get("due_date")).append(")\n");
+                                    }
+                                }
+                            }
+                        } catch (Exception ignored) {}
+                        sb.append("LƯU Ý: Đây là dữ liệu JSON đã số hóa cục bộ. RAW IMAGE KHÔNG ĐƯỢC GỬI CHO GEMINI.\n");
+                    }
+                }
+            } catch (Exception ignored) {}
         }
 
         return sb.toString();

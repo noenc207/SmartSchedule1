@@ -9,7 +9,8 @@ public record AiProperties(
         int maxMessageLength,
         int maxOutputTokens,
         int requestsPerMinute,
-        int timeoutSeconds
+        int timeoutSeconds,
+        String visionServerUrl
 ) {
     public AiProperties {
         if (geminiModel == null || geminiModel.isBlank()) {
@@ -27,6 +28,20 @@ public record AiProperties(
         if (timeoutSeconds <= 0) {
             timeoutSeconds = 30;
         }
+        if (visionServerUrl == null || visionServerUrl.isBlank()) {
+            visionServerUrl = "http://localhost:8090";
+        }
+    }
+
+    public AiProperties(
+            String geminiApiKey,
+            String geminiModel,
+            int maxMessageLength,
+            int maxOutputTokens,
+            int requestsPerMinute,
+            int timeoutSeconds
+    ) {
+        this(geminiApiKey, geminiModel, maxMessageLength, maxOutputTokens, requestsPerMinute, timeoutSeconds, "http://localhost:8090");
     }
 
     public boolean hasApiKey() {

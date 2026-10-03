@@ -377,7 +377,8 @@ public class AiChatService {
             case "create_schedule", "update_schedule", "delete_schedule", "reschedule_event", "replace_schedule",
                     "create_task", "update_task", "delete_task", "complete_task",
                     "create_deadline", "update_reminder", "navigate_to", "update_user_preferences",
-                    "create_study_plan", "optimize_day", "optimize_week", "batch_action" -> true;
+                    "create_study_plan", "optimize_day", "optimize_week", "batch_action",
+                    "import_vision_schedule" -> true;
             default -> false;
         };
     }
@@ -504,12 +505,21 @@ public class AiChatService {
                    - Khi người dùng nói "đưa tôi tới trang lịch", "mở cài đặt", "xem danh sách task": gọi tool `navigate_to` với `target_screen` tương ứng (`calendar`, `settings`, `tasks`, `dashboard`...).
 
                 7. TỐI ƯU & LẬP KẾ HOẠCH HỌC TẬP (PLANNING & OPTIMIZATION):
-                   - "Lập kế hoạch ôn thi Physics 10 ngày": gọi tool `create_study_plan`.
+                   - Khi người dùng muốn lập kế hoạch học tập / ôn thi:
+                     * BẮT BUỘC phải có đủ: môn học (`subject`), số ngày (`total_days`), và thời lượng tự học mỗi ngày (`daily_minutes`).
+                     * Nếu người dùng CHƯA nói học bao nhiêu phút mỗi ngày: TUYỆT ĐỐI KHÔNG tự bịa thời gian! Hãy hỏi: "Bạn muốn dành bao nhiêu phút mỗi ngày để tự học/ôn tập môn này?".
+                     * Chỉ khi người dùng đã cung cấp đủ `daily_minutes` mới gọi tool `create_study_plan`.
                    - "Tối ưu lịch hôm nay", "tối ưu tuần này": gọi tool `optimize_day` hoặc `optimize_week`.
 
                 8. THAO TÁC CÓ RỦI RO (RISK LEVELS & ACTION CARDS):
-                   - Các thao tác thay đổi dữ liệu (create, update, delete, reschedule, replace, task, deadline, plan) sẽ được hệ thống hiển thị dưới dạng Thẻ Hành Động (Action Card) có nút Xác Nhận rõ ràng.
+                   - Các thao tác thay đổi dữ liệu (create, update, delete, reschedule, replace, task, deadline, plan, import) sẽ được hệ thống hiển thị dưới dạng Thẻ Hành Động (Action Card) có nút Xác Nhận rõ ràng.
                    - Hãy phản hồi thân thiện, tóm tắt rõ đề xuất và mời người dùng bấm nút xác nhận trên thẻ.
+
+                9. XỬ LÝ HÌNH ẢNH & THỜI KHÓA BIỂU TỪ VISION (VISION AGENT INTEGRATION):
+                   - Khi người dùng gửi ảnh hoặc nhắc đến ảnh/thời khóa biểu vừa tải lên ("thêm lịch từ ảnh", "nhập thời khóa biểu này vào calendar", "tạo các môn học từ hình vừa quét"):
+                     * Kiểm tra dữ liệu thị giác đã được số hóa trong ngữ cảnh bên dưới.
+                     * Gọi tool `import_vision_schedule` để hệ thống tự động tạo kế hoạch nhập các môn học đã trích xuất, hoặc gọi `create_schedule` cho môn học cụ thể được yêu cầu.
+                     * Tuyệt đối không tự bịa các môn học khác ngoài dữ liệu đã được trích xuất từ ảnh.
 
                 NGỮ CẢNH DỮ LIỆU THỰC TẾ CỦA NGƯỜI DÙNG:
                 """ + scheduleContext;

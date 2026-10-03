@@ -500,4 +500,56 @@ class AiActionServiceTest {
         assertThat(planResp.status()).isEqualTo(com.smartschedule.ai.domain.AiActionPlan.STATUS_SUCCESS);
         assertThat(planResp.results()).hasSize(1);
     }
+
+    @Test
+    void testProposeStudyPlan_missingDailyMinutes_throwsAiException() {
+        Map<String, Object> args = Map.of(
+                "subject", "Physics",
+                "total_days", 10
+        );
+
+        assertThatThrownBy(() -> actionService.proposeAction(
+                testUser, conversation, "create_study_plan", args, null
+        )).isInstanceOf(AiException.class)
+          .satisfies(e -> {
+              AiException aie = (AiException) e;
+              assertThat(aie.getCode()).isEqualTo("MISSING_DURATION");
+          });
+    }
+
+    @Test
+    void testProposeStudyPlan_missingSubject_throwsAiException() {
+        Map<String, Object> args = Map.of(
+                "total_days", 10,
+                "daily_minutes", 60
+        );
+
+        assertThatThrownBy(() -> actionService.proposeAction(
+                testUser, conversation, "create_study_plan", args, null
+        )).isInstanceOf(AiException.class)
+          .satisfies(e -> {
+              AiException aie = (AiException) e;
+              assertThat(aie.getCode()).isEqualTo("MISSING_SUBJECT");
+          });
+    }
+
+    @Test
+    void testProposeStudyPlan_validParameters_createsPlanAndSubActions() {
+        Map<String, Object> args = Map.of(
+                "subject", "Physics",
+                "total_days", 3,
+                "daily_minutes", 90,
+                "preferred_time", "morning"
+        );
+
+        AiDtos.ProposedActionDto proposed = actionService.proposeAction(
+                testUser, conversation, "create_study_plan", args, null
+        );
+
+        assertThat(proposed.tool()).isEqualTo("create_study_plan");
+        assertThat(proposed.parameters().get("subject")).isEqualTo("Physics");
+        assertThat(proposed.parameters().get("total_days")).isEqualTo(3);
+        assertThat(proposed.parameters().get("daily_minutes")).isEqualTo(90);
+        assertThat(proposed.summary()).contains("Physics");
+    }
 }

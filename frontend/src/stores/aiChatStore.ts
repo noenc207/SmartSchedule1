@@ -51,6 +51,7 @@ export interface AiChatState {
   sendMessage: (text: string) => Promise<void>;
   confirmAction: (actionId: string) => Promise<void>;
   cancelAction: (actionId: string) => Promise<void>;
+  sendVisionFile: (file: File, mode?: string, instruction?: string) => Promise<void>;
   newConversation: () => Promise<void>;
   clearError: () => void;
 }
@@ -341,6 +342,59 @@ export const useAiChatStore = create<AiChatState>((set, get) => ({
           mascotState: 'ERROR',
         };
       });
+    }
+  },
+
+  sendVisionFile: async (file: File, mode: string = 'TIMETABLE', userInstruction?: string) => {
+    if (get().isThinking || get().isStreaming) return;
+
+    const tempUserId = 'user-' + Date.now();
+    const tempUserMessage: ChatMessageDto = {
+      id: tempUserId,
+      role: 'user',
+      content: userInstruction
+        ? `[Tải lên ảnh: ${file.name}] ${userInstruction}`
+        : `[Tải lên ảnh: ${file.name}] Phân tích thời khóa biểu/tài liệu này`,
+      createdAt: new Date().toISOString(),
+    };
+
+    set((state) => ({
+      messages: [...state.messages, tempUserMessage],
+      isThinking: true,
+      error: null,
+      mascotState: 'THINKING',
+    }));
+
+    try {
+      const conversationId = get().activeConversationId || undefined;
+      const visionResult = await aiApi.analyzeVision(file, userInstruction, mode, conversationId);
+
+      const tempModelId = 'model-' + Date.now();
+      const modelMessage: ChatMessageDto = {
+        id: tempModelId,
+        role: 'model',
+        content: visionResult.summary || 'Đã phân tích xong hình ảnh thời khóa biểu.',
+        createdAt: new Date().toISOString(),
+        visionResult,
+      };
+
+      set((state) => ({
+        messages: [...state.messages, modelMessage],
+        isThinking: false,
+        mascotState: state.isOpen ? 'OPEN' : 'IDLE',
+      }));
+
+      if (visionResult.events && visionResult.events.length > 0) {
+        showToast(`Đã nhận diện ${visionResult.events.length} môn học từ ảnh!`, 'success');
+      }
+    } catch (err) {
+      const errMsg = getApiErrorMessage(err);
+      set((state) => ({
+        isThinking: false,
+        error: `Lỗi phân tích ảnh: ${errMsg}`,
+        mascotState: 'ERROR',
+      }));
+      showToast(`Không thể phân tích ảnh: ${errMsg}`, 'error');
     }
   },
 }));

@@ -16,6 +16,24 @@ services:
       timeout: 5s
       retries: 10
 
+  vision-server:
+    build:
+      context: ./vision-server
+    restart: unless-stopped
+    environment:
+      PORT: 8090
+      PRIMARY_TIMETABLE_PROVIDER: paddleocr-vl-1.5
+      PRIMARY_GENERAL_PROVIDER: qwen3-vl
+    expose:
+      - "8090"
+    ports:
+      - "8090:8090"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/v1/vision/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: ./backend
@@ -37,10 +55,13 @@ services:
       SMARTSCHEDULE_GOOGLE_CLIENT_ID: ${SMARTSCHEDULE_GOOGLE_CLIENT_ID:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-flash}
+      VISION_SERVER_URL: ${VISION_SERVER_URL:-http://vision-server:8090}
     expose:
       - "8080"
     depends_on:
       postgres:
+        condition: service_healthy
+      vision-server:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/api/v1/health"]

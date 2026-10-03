@@ -15,6 +15,7 @@ export function AIChatPanel() {
   const mascotState = useAiChatStore((s) => s.mascotState);
   const setOpen = useAiChatStore((s) => s.setOpen);
   const sendMessage = useAiChatStore((s) => s.sendMessage);
+  const sendVisionFile = useAiChatStore((s) => s.sendVisionFile);
   const newConversation = useAiChatStore((s) => s.newConversation);
   const clearError = useAiChatStore((s) => s.clearError);
 
@@ -158,6 +159,7 @@ export function AIChatPanel() {
           />
           <AIChatInput
             onSend={(text) => void sendMessage(text)}
+            onSendFile={(file, mode, instruction) => void sendVisionFile(file, mode, instruction)}
             disabled={isBusy}
           />
         </div>

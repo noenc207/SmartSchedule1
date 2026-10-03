@@ -71,6 +71,7 @@ export interface ChatMessageDto {
   content: string;
   createdAt: string;
   proposedActions?: ProposedActionDto[];
+  visionResult?: VisionAnalysisResponse;
 }
 
 export interface ConversationDto {
@@ -251,4 +252,87 @@ export const aiApi = {
   async deleteConversation(conversationId: string): Promise<void> {
     await apiClient.delete(`/ai/conversations/${conversationId}`);
   },
+
+  // =========================================================================
+  // VISION MICROSERVICE ENDPOINTS
+  // =========================================================================
+  async analyzeVision(
+    file: File,
+    instruction?: string,
+    mode: string = 'TIMETABLE',
+    conversationId?: string
+  ): Promise<VisionAnalysisResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (instruction) formData.append('instruction', instruction);
+    formData.append('mode', mode);
+    if (conversationId) formData.append('conversation_id', conversationId);
+
+    const { data } = await apiClient.post<VisionAnalysisResponse>('/ai/vision/analyze', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return data;
+  },
+
+  async getVisionResult(resultId: string): Promise<VisionAnalysisResponse> {
+    const { data } = await apiClient.get<VisionAnalysisResponse>(`/ai/vision/results/${resultId}`);
+    return data;
+  },
+
+  async sendVisionFeedback(feedback: VisionFeedbackRequest): Promise<{ status: string; message: string }> {
+    const { data } = await apiClient.post<{ status: string; message: string }>('/ai/vision/feedback', feedback);
+    return data;
+  },
 };
+
+export interface VisionEventDto {
+  title: string;
+  date?: string;
+  day_of_week?: string;
+  start_time: string;
+  end_time?: string;
+  duration_minutes?: number;
+  location?: string;
+  description?: string;
+  recurrence?: string;
+  confidence: number;
+}
+
+export interface VisionTaskDto {
+  title: string;
+  estimated_minutes?: number;
+  priority?: string;
+  deadline?: string;
+  confidence: number;
+}
+
+export interface VisionDeadlineDto {
+  title: string;
+  due_date: string;
+  priority?: string;
+  confidence: number;
+}
+
+export interface VisionAnalysisResponse {
+  resultId: string;
+  documentType: 'TIMETABLE' | 'DOCUMENT' | 'DEADLINE' | 'SCREENSHOT' | 'GENERAL_IMAGE' | string;
+  provider: string;
+  model: string;
+  confidence: number;
+  events: VisionEventDto[];
+  tasks: VisionTaskDto[];
+  deadlines: VisionDeadlineDto[];
+  summary: string;
+  warnings: string[];
+  createdAt: string;
+}
+
+export interface VisionFeedbackRequest {
+  resultId: string;
+  accepted: boolean;
+  corrections?: Record<string, any>;
+  userNotes?: string;
+}
+

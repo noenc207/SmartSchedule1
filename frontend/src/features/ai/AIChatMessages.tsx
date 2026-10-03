@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import type { ChatMessageDto } from '../../services/aiApi';
 import { AIMascot } from './AIMascot';
 import { AIActionCard } from './AIActionCard';
+import { AIVisionReviewCard } from './AIVisionReviewCard';
 import { useAiChatStore } from '../../stores/aiChatStore';
 import { Sparkles, User as UserIcon } from 'lucide-react';
 
@@ -163,6 +164,19 @@ export function AIChatMessages({ messages, isThinking, onQuickAction }: AIChatMe
                       }}
                     />
                   ))}
+                </div>
+              )}
+
+              {!isUser && msg.visionResult && (
+                <div className="ai-message-actions-wrapper">
+                  <AIVisionReviewCard
+                    result={msg.visionResult}
+                    onImportSelected={(selected) => {
+                      const titles = selected.map((s) => s.title).join(', ');
+                      void sendMessage(`Hãy nhập các môn học này vào thời khóa biểu của tôi: ${titles}`);
+                    }}
+                    onAskAi={(prompt) => void sendMessage(prompt)}
+                  />
                 </div>
               )}
 

@@ -37,7 +37,8 @@ public class AiRiskEngine {
             "create_study_plan",
             "optimize_day",
             "optimize_week",
-            "batch_action"
+            "batch_action",
+            "import_vision_schedule"
     );
 
     public RiskLevel getRiskLevel(String toolName) {

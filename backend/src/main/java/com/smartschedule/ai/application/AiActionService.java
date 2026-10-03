@@ -54,6 +54,7 @@ public class AiActionService {
     private final AiActionPlanRepository actionPlanRepository;
     private final AiRiskEngine riskEngine;
     private final ObjectMapper objectMapper;
+    private final com.smartschedule.ai.infrastructure.VisionResultRepository visionResultRepository;
 
     public record ConflictResult(boolean hasConflict, String details) {}
 
@@ -65,7 +66,8 @@ public class AiActionService {
                            UserRepository userRepository,
                            AiActionPlanRepository actionPlanRepository,
                            AiRiskEngine riskEngine,
-                           ObjectMapper objectMapper) {
+                           ObjectMapper objectMapper,
+                           @Autowired(required = false) com.smartschedule.ai.infrastructure.VisionResultRepository visionResultRepository) {
         this.actionRepository = actionRepository;
         this.eventRepository = eventRepository;
         this.scheduleRepository = scheduleRepository;
@@ -74,13 +76,25 @@ public class AiActionService {
         this.actionPlanRepository = actionPlanRepository;
         this.riskEngine = riskEngine;
         this.objectMapper = objectMapper;
+        this.visionResultRepository = visionResultRepository;
+    }
+
+    public AiActionService(AiActionRepository actionRepository,
+                           EventRepository eventRepository,
+                           ScheduleRepository scheduleRepository,
+                           TaskRepository taskRepository,
+                           UserRepository userRepository,
+                           AiActionPlanRepository actionPlanRepository,
+                           AiRiskEngine riskEngine,
+                           ObjectMapper objectMapper) {
+        this(actionRepository, eventRepository, scheduleRepository, taskRepository, userRepository, actionPlanRepository, riskEngine, objectMapper, null);
     }
 
     public AiActionService(AiActionRepository actionRepository,
                            EventRepository eventRepository,
                            ScheduleRepository scheduleRepository,
                            ObjectMapper objectMapper) {
-        this(actionRepository, eventRepository, scheduleRepository, null, null, null, new AiRiskEngine(), objectMapper);
+        this(actionRepository, eventRepository, scheduleRepository, null, null, null, new AiRiskEngine(), objectMapper, null);
     }
 
     @Transactional
@@ -498,14 +512,34 @@ public class AiActionService {
             }
 
             case "create_study_plan" -> {
-                String subject = getString(arguments, "subject", "Ôn tập");
-                int totalDays = 7;
-                if (arguments.containsKey("total_days") && arguments.get("total_days") != null) {
-                    try { totalDays = Math.max(1, Math.min(30, Integer.parseInt(arguments.get("total_days").toString().trim()))); } catch (Exception ignored) {}
+                String subject = getString(arguments, "subject", null);
+                if (subject == null || subject.trim().isEmpty()) {
+                    throw new AiException("MISSING_SUBJECT", "Vui lòng cung cấp môn học hoặc kỳ thi cần lập kế hoạch.");
                 }
-                int dailyMinutes = 60;
-                if (arguments.containsKey("daily_minutes") && arguments.get("daily_minutes") != null) {
-                    try { dailyMinutes = Math.max(15, Math.min(240, Integer.parseInt(arguments.get("daily_minutes").toString().trim()))); } catch (Exception ignored) {}
+                if (!arguments.containsKey("total_days") || arguments.get("total_days") == null) {
+                    throw new AiException("MISSING_TOTAL_DAYS", "Vui lòng cung cấp số ngày trong lộ trình học tập (ví dụ: 7 ngày, 10 ngày).");
+                }
+                int totalDays;
+                try {
+                    totalDays = Integer.parseInt(arguments.get("total_days").toString().trim());
+                    if (totalDays <= 0 || totalDays > 60) {
+                        throw new AiException("INVALID_TOTAL_DAYS", "Số ngày học tập phải từ 1 đến 60 ngày.");
+                    }
+                } catch (NumberFormatException e) {
+                    throw new AiException("INVALID_TOTAL_DAYS", "Số ngày học tập không hợp lệ: " + arguments.get("total_days"));
+                }
+
+                if (!arguments.containsKey("daily_minutes") || arguments.get("daily_minutes") == null) {
+                    throw new AiException("MISSING_DURATION", "Vui lòng cung cấp thời gian tự học mỗi ngày tính bằng phút (ví dụ: 60 phút, 90 phút).");
+                }
+                int dailyMinutes;
+                try {
+                    dailyMinutes = Integer.parseInt(arguments.get("daily_minutes").toString().trim());
+                    if (dailyMinutes < 15 || dailyMinutes > 360) {
+                        throw new AiException("INVALID_DURATION", "Thời gian học mỗi ngày phải từ 15 đến 360 phút.");
+                    }
+                } catch (NumberFormatException e) {
+                    throw new AiException("INVALID_DURATION", "Thời gian tự học mỗi ngày không hợp lệ: " + arguments.get("daily_minutes"));
                 }
                 String preferred = getString(arguments, "preferred_time", "evening").toLowerCase();
                 LocalTime sTime = preferred.contains("morning") ? LocalTime.of(8, 0)
@@ -612,6 +646,110 @@ public class AiActionService {
                             String subSum = getString(sub, "summary", "Bước " + order + ": " + subTool);
                             AiAction subAct = new AiAction(user, conversation, subTool, subSum, subJson, false, null, null, Instant.now().plusSeconds(900));
                             subAct.setRiskLevel(riskEngine != null ? riskEngine.getRiskLevel(subTool).name() : "IMPORTANT_WRITE");
+                            subAct.setPlanId(planId);
+                            subAct.setStepOrder(order++);
+                            actionRepository.save(subAct);
+                        } catch (Exception ignored) {}
+                    }
+                }
+            }
+
+            case "import_vision_schedule" -> {
+                com.smartschedule.ai.domain.VisionResult visionResult = null;
+                if (arguments.containsKey("vision_result_id") && arguments.get("vision_result_id") != null) {
+                    try {
+                        UUID vId = UUID.fromString(arguments.get("vision_result_id").toString());
+                        visionResult = visionResultRepository != null
+                                ? visionResultRepository.findByIdAndUserId(vId, user.getId()).orElse(null)
+                                : null;
+                    } catch (Exception ignored) {}
+                }
+                if (visionResult == null && visionResultRepository != null) {
+                    List<com.smartschedule.ai.domain.VisionResult> latest = visionResultRepository.findByUserIdOrderByCreatedAtDesc(user.getId());
+                    if (!latest.isEmpty()) {
+                        visionResult = latest.get(0);
+                    }
+                }
+                if (visionResult == null) {
+                    throw new AiException("NO_VISION_DATA", "Không tìm thấy dữ liệu phân tích hình ảnh thời khóa biểu nào.");
+                }
+
+                List<Map<String, Object>> eventsList = new ArrayList<>();
+                try {
+                    Map<String, Object> payload = objectMapper.readValue(visionResult.getPayloadJson(), new com.fasterxml.jackson.core.type.TypeReference<>() {});
+                    if (payload.containsKey("events")) {
+                        eventsList = objectMapper.convertValue(payload.get("events"), new com.fasterxml.jackson.core.type.TypeReference<>() {});
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed parsing vision payload: {}", e.getMessage());
+                }
+
+                if (eventsList.isEmpty()) {
+                    throw new AiException("NO_EVENTS_FOUND", "Không tìm thấy sự kiện nào trong dữ liệu phân tích thị giác.");
+                }
+
+                String planTitle = "Nhập thời khóa biểu từ ảnh (" + visionResult.getDocumentType() + ")";
+                String planSummary = String.format("Nhập %d môn học/sự kiện đã nhận diện thành công vào lịch học", eventsList.size());
+
+                AiActionPlan plan = new AiActionPlan(user, conversation, planTitle, planSummary, eventsList.size());
+                if (actionPlanRepository != null) {
+                    actionPlanRepository.save(plan);
+                    planId = plan.getId();
+                }
+
+                summary = String.format("Kế hoạch: %s (%d môn học)", planTitle, eventsList.size());
+                canonicalParams.put("title", planTitle);
+                canonicalParams.put("summary", planSummary);
+                canonicalParams.put("plan_id", planId != null ? planId.toString() : null);
+                canonicalParams.put("vision_result_id", visionResult.getId().toString());
+
+                if (actionPlanRepository != null && planId != null) {
+                    int order = 1;
+                    LocalDate monday = LocalDate.now(zoneId).with(java.time.DayOfWeek.MONDAY);
+                    for (Map<String, Object> ev : eventsList) {
+                        String evTitle = getString(ev, "title", "Tiết học");
+                        String dayOfWeek = getString(ev, "day_of_week", "Thứ Hai");
+                        int dayOffset = switch (dayOfWeek != null ? dayOfWeek.toLowerCase() : "") {
+                            case "thứ ba", "t3", "tuesday" -> 1;
+                            case "thứ tư", "t4", "wednesday" -> 2;
+                            case "thứ năm", "t5", "thursday" -> 3;
+                            case "thứ sáu", "t6", "friday" -> 4;
+                            case "thứ bảy", "t7", "saturday" -> 5;
+                            case "chủ nhật", "cn", "sunday" -> 6;
+                            default -> 0; // Monday
+                        };
+                        LocalDate evDate = monday.plusDays(dayOffset);
+                        String sTime = getString(ev, "start_time", "08:00");
+                        String eTime = getString(ev, "end_time", "09:30");
+                        String location = getString(ev, "location", null);
+                        String desc = getString(ev, "description", "Nhập tự động từ ảnh thời khóa biểu");
+
+                        LocalTime parsedStart = AiDateTimeUtils.parseLocalTime(sTime);
+                        if (parsedStart == null) parsedStart = LocalTime.of(8, 0);
+                        LocalTime parsedEnd = AiDateTimeUtils.parseLocalTime(eTime);
+                        if (parsedEnd == null) parsedEnd = parsedStart.plusMinutes(90);
+                        Instant sInst = evDate.atTime(parsedStart).atZone(zoneId).toInstant();
+                        Instant eInst = evDate.atTime(parsedEnd).atZone(zoneId).toInstant();
+
+                        Map<String, Object> subParams = new LinkedHashMap<>();
+                        subParams.put("title", evTitle);
+                        subParams.put("date", evDate.toString());
+                        subParams.put("start_time", sTime);
+                        subParams.put("end_time", eTime);
+                        subParams.put("duration_minutes", (int) Duration.between(parsedStart, parsedEnd).toMinutes());
+                        subParams.put("starts_at", sInst.toString());
+                        subParams.put("ends_at", eInst.toString());
+                        subParams.put("timezone", zoneId.getId());
+                        if (location != null) subParams.put("location", location);
+                        if (desc != null) subParams.put("description", desc);
+
+                        String subSum = String.format("Tạo lịch: %s vào %s (%s–%s)",
+                                evTitle, evDate.format(AiDateTimeUtils.VI_DATE_FMT), sTime, eTime);
+
+                        try {
+                            String subJson = objectMapper.writeValueAsString(subParams);
+                            AiAction subAct = new AiAction(user, conversation, "create_schedule", subSum, subJson, false, null, null, Instant.now().plusSeconds(900));
+                            subAct.setRiskLevel("IMPORTANT_WRITE");
                             subAct.setPlanId(planId);
                             subAct.setStepOrder(order++);
                             actionRepository.save(subAct);
@@ -1052,7 +1190,7 @@ public class AiActionService {
                     data.put("displayName", user.getDisplayName());
                 }
 
-                case "create_study_plan", "batch_action" -> {
+                case "create_study_plan", "batch_action", "import_vision_schedule" -> {
                     if (action.getPlanId() != null) {
                         AiDtos.PlanConfirmResponse planRes = confirmPlan(user, action.getPlanId());
                         message = planRes.message();

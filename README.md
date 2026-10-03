@@ -1095,6 +1095,38 @@ When swapping subjects without specifying a new time, the system automatically *
 
 ---
 
+### 9. Independent Vision Server Microservice (PaddleOCR-VL-1.5 & Qwen3-VL)
+
+SmartSchedule incorporates an **independent Vision Microservice** (`vision-server/` in Python/FastAPI on port `8090`) to parse university timetables, syllabuses, deadline lists, and screenshot images into structured events and tasks.
+
+#### Zero-Raw-Image-to-Gemini Privacy Guard
+- **RAW IMAGES ARE NEVER SENT TO GEMINI BY DEFAULT.**
+- Images are analyzed entirely within the local/private boundary of the Vision Server.
+- Only clean, validated, structured JSON representations (`VisionResult` / `VisionDtos.VisionAnalysisResponse`) containing extracted events, deadlines, tasks, and confidence scores are ingested into Spring Boot (`vision_results` table, Flyway `V22`) and passed to Gemini 3.8 Flash via `AiContextService`.
+- Multi-turn conversations reference the existing `vision_result_id` without re-inferencing the image.
+- Image temporary files have a 15-minute TTL and are automatically purged from disk (`TempStorageManager`).
+
+#### Provider Architecture & Routing
+- **`VisionProvider` (Abstract Base Class)**:
+  - `PaddleOCRVLProvider`: Specializes in structured table grids, schedules, and document syllabuses (`TIMETABLE`, `DOCUMENT`, `DEADLINE`).
+  - `Qwen3VLProvider`: Specializes in visual reasoning, screenshot comprehension, and complex scene layouts (`SCREENSHOT`, `GENERAL_IMAGE`).
+  - `CustomLocalVLMProvider`: Extensible adapter for future fine-tuned local models.
+- **`VisionRouter` & Fallback Gating**:
+  - Dynamically routes requests according to `ProcessingMode`.
+  - **Confidence Fallback Gating**: If the primary provider yields an overall confidence score below 0.65 (or encounters an error), the router automatically queries the secondary provider and retains the higher-confidence result.
+
+#### Security & File Integrity
+- **Magic Byte Verification**: Verifies actual binary headers (`image/png`, `image/jpeg`, `image/webp`, `image/bmp`) to prevent extension-spoofing attacks.
+- **Size & Dimension Limits**: Maximum 10MB file size, maximum 10,000x10,000 px dimensions.
+- **Decompression Bomb Protection**: Enforces Pillow `Image.MAX_IMAGE_PIXELS = 50,000,000` to prevent denial-of-service memory exhaustion.
+- **Per-User SHA-256 Deduplication Caching**: Avoids redundant OCR computation when the same user submits the same image within TTL.
+
+#### Interactive Frontend Review (`AIVisionReviewCard.tsx`)
+- **Visual Confidence Badges**: Color-coded badges indicating overall detection confidence (>=90% green, 75-89% yellow, <75% red).
+- **Selective Event Import**: Users can inspect each detected event (title, day of week, start/end time, room/location) with checkboxes to selectively import only desired classes.
+- **One-Click Agent Import**: Clicking **[ Nhập lịch đã chọn ]** triggers the AI Agent to execute an atomic batch import (`import_vision_schedule`) with human confirmation.
+- **Active Learning Feedback**: Users can submit thumbs up/down evaluations (`POST /api/v1/ai/vision/feedback`) to log detection accuracy.
+
 ---
 
 ## Performance & Testing

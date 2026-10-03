@@ -54,4 +54,5 @@ smartschedule:
     max-output-tokens: ${AI_MAX_OUTPUT_TOKENS:1024}
     requests-per-minute: ${AI_REQUESTS_PER_MINUTE:20}
     timeout-seconds: ${AI_TIMEOUT_SECONDS:30}
+    vision-server-url: ${VISION_SERVER_URL:http://localhost:8090}
 

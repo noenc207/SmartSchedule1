@@ -385,7 +385,7 @@ public class AiToolRegistry {
 
         register(new ToolDefinition(
                 "create_study_plan",
-                "Đề xuất lập kế hoạch học tập/ôn thi gồm chuỗi nhiều phiên học trong nhiều ngày.",
+                "Đề xuất lập kế hoạch học tập/ôn thi gồm chuỗi nhiều phiên học trong nhiều ngày. CHỈ GỌI CÔNG CỤ NÀY khi người dùng đã cung cấp đủ: môn học, số ngày, và thời gian học mỗi ngày (daily_minutes).",
                 AiIntent.PLANNING,
                 RiskLevel.IMPORTANT_WRITE,
                 Map.of(
@@ -396,7 +396,7 @@ public class AiToolRegistry {
                                 "daily_minutes", Map.of("type", "INTEGER", "description", "Thời gian tự học mỗi ngày tính bằng phút (ví dụ: 90)"),
                                 "preferred_time", Map.of("type", "STRING", "description", "Khung giờ ưu tiên: morning (sáng), afternoon (chiều), evening (tối)")
                         ),
-                        "required", List.of("subject", "total_days")
+                        "required", List.of("subject", "total_days", "daily_minutes")
                 )
         ));
 
@@ -441,6 +441,20 @@ public class AiToolRegistry {
                                 "actions", Map.of("type", "ARRAY", "description", "Danh sách các tool calls con cần thực hiện trong batch")
                         ),
                         "required", List.of("title", "actions")
+                )
+        ));
+
+        register(new ToolDefinition(
+                "import_vision_schedule",
+                "Đề xuất nhập toàn bộ hoặc các môn học/sự kiện đã được trích xuất từ ảnh thời khóa biểu/tài liệu gần nhất vào lịch học.",
+                AiIntent.SCHEDULE,
+                RiskLevel.IMPORTANT_WRITE,
+                Map.of(
+                        "type", "OBJECT",
+                        "properties", Map.of(
+                                "vision_result_id", Map.of("type", "STRING", "description", "UUID kết quả phân tích ảnh (nếu không có thì hệ thống tự lấy kết quả ảnh gần nhất)"),
+                                "target_schedule_id", Map.of("type", "STRING", "description", "ID thời khóa biểu muốn nhập vào")
+                        )
                 )
         ));
     }
