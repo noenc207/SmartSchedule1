@@ -39,7 +39,7 @@ Suggest → Explain → Review → User Decides → Confirm → Apply
 - [Collaboration](#collaboration)
 - [3D Landing Page](#3d-landing-page)
 - [Authentication & Security](#authentication--security)
-- [SmartSchedule AI Assistant (Gemini Function Calling)](#smartschedule-ai-assistant-gemini-function-calling)
+- [SmartSchedule Full-Scope AI Agent (Autonomous Academic Operating System)](#smartschedule-full-scope-ai-agent-autonomous-academic-operating-system)
 - [Performance & Testing](#performance--testing)
 - [Deployment](#deployment)
 - [Repository Structure](#repository-structure)
@@ -257,26 +257,25 @@ SmartSchedule addresses these combined constraints through a deterministic const
 - **In-Browser Preview & Conflict Detection** — Interactive popup preview with warning badges, subject count, and schedule selection
 - **Backend Import API** — `POST /api/v1/schedules/{id}/import/portal` with atomic transaction, conflict resolution, and `schedule_imports` audit trail
 
-### SmartSchedule AI Assistant & Tool Calling
+### SmartSchedule Full-Scope AI Agent (Autonomous Academic Operating System)
 
-- **Floating Mascot Widget** — Omnipresent assistant (`AIChatWidget.tsx`, `AIChatBubble.tsx`) accessible on any screen without route switching or dedicated tabs
-- **Draggable Bubble with Physics & Snap** — Smooth pointer/touch dragging with automatic viewport boundary constraints and `localStorage` position persistence
-- **Real-Time Streaming SSE** — Server-Sent Events streaming via `POST /api/v1/ai/chat/stream` powered by Google Gemini 1.5 Flash through Spring Boot backend (zero client-side API key leakage)
-- **Deterministic Read Tools (Real DB Data)**:
-  - `get_today_schedule()` — Live timetable retrieval for today in user timezone (`Asia/Ho_Chi_Minh`)
-  - `get_upcoming_schedule(days)` — Multi-day forward schedule retrieval
-  - `find_free_time(duration_minutes, date)` — High-precision free window calculator within active study hours (07:00–22:00)
-  - `check_schedule_conflict(start_time, end_time, exclude_event_id)` — Pre-flight collision checker against committed schedule events
-  - `get_schedule_details(event_id_or_title)` — Event metadata & location lookup
-- **Human-in-the-Loop Write Tools (Zero Auto-Mutation)**:
-  - `create_schedule(title, start_time, end_time, description, location, category)`
-  - `reschedule_event(event_id, new_start_time, new_end_time)`
-  - `update_schedule(event_id, title, start_time, end_time, description, location)`
-  - `delete_schedule(event_id, title)`
-- **Interactive Confirmation Cards (`AIActionCard.tsx`)** — 6-state lifecycle (`PROPOSED`, `CONFIRMED`, `EXECUTING`, `SUCCESS`, `FAILED`, `CANCELLED`) with 15-minute TTL, double-click protection, and real-time toast feedback
-- **Collision Detection & Alternative Finder** — Highlights schedule collisions in an amber/red warning banner and provides 1-click alternative search ("Tìm giờ khác")
-- **Context Injection (`ClientContextDto`)** — Transmits active screen pathname, selected calendar date, and focused event ID to the AI model
-- **One-Click Quick Actions** — Pre-engineered prompts including `[ Tối ưu ngày hôm nay ]` (Optimize my day), `[ Lịch học hôm nay ]`, and `[ Tìm giờ rảnh ]`
+- **Universal Multi-Intent Router (`AiAgentRouter.java`)** — Classifies complex, mixed user requests across 14 capability areas (`HELP`, `QUERY`, `SEARCH`, `NAVIGATION`, `SCHEDULE`, `TASK`, `DEADLINE`, `REMINDER`, `PLANNING`, `OPTIMIZATION`, `DOCUMENT`, `ANALYTICS`, `SETTINGS`, `PROFILE`) with multi-intent decomposition and mutation intent preservation.
+- **Centralized Tool Registry (`AiToolRegistry.java`)** — Dynamic catalog defining and registering **28 OpenAPI/Gemini function declarations** covering live read tools, safe low-write mutations, important confirmed writes, and multi-step batch executions.
+- **Multi-Tier Risk Engine (`AiRiskEngine.java`)** — 4-tier security gating (`READ`, `LOW_WRITE`, `IMPORTANT_WRITE`, `HIGH_RISK`):
+  - `READ`: Automatic query execution for schedules, tasks, deadlines, free time, preferences, and analytics.
+  - `LOW_WRITE`: Smooth single-click mutations (`complete_task`, `navigate_to`, `update_user_preferences`).
+  - `IMPORTANT_WRITE`: Mandatory interactive Action Confirmation Card before modifying schedules, tasks, deadlines, or plans.
+  - `HIGH_RISK`: Hard policy blocking of hazardous actions (account deletion, database wipe) via AI, redirecting users to native system settings.
+- **Zero-Hallucination & Anti-Guessing Engine** — Enforces strict required-field schemas (`title`, `date`, `start_time`, `end_time`/`duration`). The AI NEVER silently invents or hallucinates times (e.g. 08:00 or 08:00–09:30) or rooms; it prompts targeted, concise clarification questions when details are missing.
+- **Single Source of Truth (`canonicalParams`)** — Ensures the proposed Action Card and actual database mutation use identical computed `Instant` timestamps and metadata, guarded by post-execution database verification.
+- **Atomic Multi-Step Batch Action Plans (`AiActionPlan.java`, Flyway `V21`)** — Coordinates chained actions (e.g., 10-day exam prep, swap/replace routines) under a single review plan with unified `[ Xác nhận tất cả (Do it) ]` execution and atomic rollback on failure.
+- **Whitelisted Client-Side Navigation** — Executes `navigate_to` strictly within a secure whitelist (`/dashboard`, `/calendar`, `/tasks`, `/scheduling`, `/rescheduling`, `/collaboration`, `/notifications`, `/settings`, `/profile`) via custom event dispatch (`smartschedule:navigate`).
+- **Academic Document & Syllabus Parser** — Analyzes syllabus and coursework text to extract assignments, test dates, and deadlines.
+- **Academic Performance Analytics** — Summarizes weekly committed study hours, free blocks, and task completion ratios.
+- **Subject Alias & Fuzzy Matching** — Recognizes academic shorthand (e.g., "lý" ↔ "Vật lý" / "Physics", "toán" ↔ "Toán học" / "Calculus") for natural, zero-friction schedule swaps.
+- **Floating Mascot & Draggable Physics** — Omnipresent assistant (`AIChatWidget.tsx`, `AIChatBubble.tsx`) with boundary snapping and conversation persistence across mobile and desktop.
+- **Interactive Action Cards (`AIActionCard.tsx`)** — 6-state lifecycle (`PROPOSED`, `CONFIRMED`, `EXECUTING`, `SUCCESS`, `FAILED`, `CANCELLED`), 15-minute TTL, double-click protection, conflict banners with alternative finder, and batch action step-by-step review list.
+
 
 ### Landing Page & 3D
 
@@ -899,94 +898,202 @@ flowchart LR
 
 ---
 
-## SmartSchedule AI Assistant (Gemini Function Calling)
+## SmartSchedule Full-Scope AI Agent (Autonomous Academic Operating System)
 
-SmartSchedule embeds an action-capable, conversational academic assistant powered by **Google Gemini 1.5 Flash**. The assistant appears globally as a floating 3D mascot chat bubble (`AIChatWidget.tsx`) accessible on any screen, requiring no dedicated route or separate page.
+SmartSchedule transforms from a conversational chat assistant into a **Full-Scope Autonomous Academic AI Agent** powered by **Google Gemini 3.8 Flash**. The agent serves as a unified natural-language control plane across the entire SmartSchedule platform — capable of understanding complex multi-intent requests, managing timetables, handling tasks and deadlines, scheduling exam prep plans, optimizing schedules, parsing syllabi, adjusting user preferences, and seamlessly navigating between views.
 
-### Human-in-the-Loop Architecture
+The agent appears globally as an omnipresent 3D mascot chat bubble (`AIChatWidget.tsx`) with draggable physics and state persistence across mobile and desktop.
 
-The AI assistant operates under a strict **Human-in-the-Loop** model: **the AI never automatically mutates the calendar database**. When the user asks the assistant to create, update, reschedule, or delete an event, the backend validates constraints, checks for calendar collisions, logs a proposal in `ai_actions`, and renders an interactive **Confirmation Card** for the user to explicitly accept or decline.
+### 1. Agentic Architecture & The 9-Step Execution Cycle
+
+The agent operates strictly under an explainable, safe, and verifiable 9-step agentic lifecycle:
+
+```text
+UNDERSTAND ➔ PLAN ➔ CLARIFY ➔ VALIDATE ➔ PROPOSE ➔ CONFIRM ➔ EXECUTE ➔ VERIFY ➔ RESPOND
+```
+
+1. **UNDERSTAND**: Parses user intent, natural language temporal expressions, subject aliases, and client screen context (`ClientContextDto`).
+2. **PLAN**: Universal Intent Router decomposes the request into one or multiple operational goals (single tool or multi-step batch plan).
+3. **CLARIFY**: If mandatory fields are missing, the agent halts mutation and asks targeted, contextual questions. **Zero silent defaults or guessing.**
+4. **VALIDATE**: Checks temporal integrity (start before end, valid ISO-8601, reasonable bounds) and verifies user identity against multi-tenant isolation rules.
+5. **PROPOSE**: Builds a canonical parameter map (`canonicalParams`), scans for schedule collisions, logs a `PROPOSED` action or `AiActionPlan` in PostgreSQL with a 15-minute TTL.
+6. **CONFIRM**: Renders a rich interactive Action Confirmation Card (`AIActionCard.tsx`) with conflict alerts, alternative slots, and reviewable sub-actions.
+7. **EXECUTE**: Triggered explicitly when the user clicks **[ Xác nhận / Do it ]**. Runs inside an atomic Spring Boot `@Transactional` boundary.
+8. **VERIFY**: Performs a post-mutation integrity check comparing actual database records against proposed canonical instants to guarantee 100% data fidelity.
+9. **RESPOND**: Dispatches client-side event bus notifications (`smartschedule:calendar-refresh`, `smartschedule:navigate`), toasts, and updates card status to `SUCCESS`.
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor User as User / Student
-    participant Chat as Floating Chat Widget
-    participant Backend as Spring Boot AI Engine
-    participant Gemini as Google Gemini 1.5 API
-    participant DB as PostgreSQL (ai_actions, events)
+    participant Chat as Floating Mascot Widget
+    participant Router as Universal Intent Router
+    participant Engine as Gemini 3.8 Flash + Tool Registry
+    participant Risk as AiRiskEngine
+    participant ActionSvc as AiActionService
+    participant DB as PostgreSQL (ai_actions, events, tasks, plans)
 
-    User->>Chat: "Reschedule team meeting to tomorrow 2 PM"
-    Chat->>Backend: POST /api/v1/ai/chat/stream + Client Context
-    Backend->>Gemini: Stream Chat + 9 Tool Declarations
-    Gemini-->>Backend: ToolCall: reschedule_event(event_id=..., new_start=..., new_end=...)
-    Backend->>DB: Check Schedule Collisions
-    Backend->>DB: INSERT into ai_actions (Status: PROPOSED, TTL: 15 min)
-    Backend-->>Chat: SSE stream chunk + ProposedActionDto
-    Chat-->>User: Render Interactive Confirmation Card (AIActionCard)
-
-    alt User clicks [ Confirm ]
-        User->>Chat: Click [ Confirm ]
-        Chat->>Backend: POST /api/v1/ai/actions/{actionId}/confirm
-        Backend->>DB: Atomic status transition PROPOSED -> EXECUTING -> SUCCESS
-        Backend->>DB: Execute Event Mutation in Calendar
-        Backend-->>Chat: ActionConfirmResponse (status: SUCCESS)
-        Chat->>User: Toast Alert + Card: "✓ Completed" + Auto-refresh Calendar
-    else User clicks [ Cancel ]
-        User->>Chat: Click [ Cancel ]
-        Chat->>Backend: POST /api/v1/ai/actions/{actionId}/cancel
-        Backend->>DB: Status -> CANCELLED
-        Chat->>User: Card: "Cancelled"
-    end
+    User->>Chat: "Xóa môn lý thứ 6 rồi tạo toán cùng giờ"
+    Chat->>Router: Classify prompt + Client Context
+    Router-->>Engine: Intents: [SCHEDULE, PLANNING]
+    Engine->>Engine: Multi-turn ReAct: Identify target 'lý', inherit time slots
+    Engine->>ActionSvc: Propose tool: replace_schedule (target='lý', new='toán')
+    ActionSvc->>Risk: Check Policy & Risk Level (IMPORTANT_WRITE)
+    Risk-->>ActionSvc: Policy Approved
+    ActionSvc->>DB: Scan Collisions & INSERT into ai_actions (Status: PROPOSED, TTL: 15 min)
+    ActionSvc-->>Chat: Render Action Confirmation Card with inherited time
+    User->>Chat: Click [ Xác nhận ] (or [ Do it ])
+    Chat->>ActionSvc: POST /api/v1/ai/actions/{actionId}/confirm
+    ActionSvc->>DB: Atomic @Transactional Mutation: Update old event to 'Toán'
+    ActionSvc->>ActionSvc: Verification Guard: Confirm DB timestamps == proposed canonical instants
+    ActionSvc->>DB: Mark status = SUCCESS
+    ActionSvc-->>Chat: ActionConfirmResponse (status: SUCCESS)
+    Chat->>User: Card: "✓ Đã thay lịch thành công" + Auto-refresh Calendar
 ```
 
-### Tool Catalog
+---
 
-The AI assistant is equipped with 9 deterministic function declarations:
+### 2. Universal Intent Router (`AiAgentRouter.java`)
 
-#### 1. Read Tools (Deterministic Database Inspection)
+SmartSchedule includes a multi-intent router that extracts and disambiguates user intents across 14 capability areas, supporting multi-intent combinations without falling into read-tool fallbacks:
 
-| Tool | Parameters | Purpose |
+| Intent Category | Supported User Expressions | Handled By |
 | :--- | :--- | :--- |
-| `get_today_schedule()` | — | Fetches all scheduled classes, workshops, and tasks for today in the user's timezone |
-| `get_upcoming_schedule()` | `days` (integer, default: 7) | Retrieves the agenda for the upcoming week or specified span |
-| `find_free_time()` | `duration_minutes` (int), `date` (ISO date) | Scans 07:00–22:00 to compute available gaps long enough for study or focus work |
-| `check_schedule_conflict()` | `start_time` (ISO), `end_time` (ISO), `exclude_event_id` | Verifies whether a candidate time window overlaps existing calendar events |
-| `get_schedule_details()` | `event_id_or_title` (string) | Looks up full event metadata, room location, and description |
+| `HELP` | "dùng thế nào", "cách dùng", "hướng dẫn phím tắt", "help" | Knowledge assistance & usage guidance |
+| `NAVIGATION` | "đưa tôi tới lịch", "mở màn hình tasks", "vào trang cài đặt" | `navigate_to` with client routing |
+| `SEARCH` | "tìm lịch thi", "tra cứu môn lý", "tìm kiếm phòng học" | `search_schedule` with alias matching |
+| `SCHEDULE` | "tạo lịch", "xóa lịch", "sửa lịch", "dời lịch", "thay môn" | Schedule mutation tools |
+| `TASK` | "thêm task làm bài tập", "xong lab 3 rồi", "xem danh sách việc" | Task management tools |
+| `DEADLINE` | "thứ 2 phải nộp Assignment 1", "xem deadline 7 ngày tới" | Deadline tracking tools |
+| `REMINDER` | "nhắc nhở trước 30 phút", "cài chuông báo tiết Toán" | `update_reminder` |
+| `PLANNING` | "lập kế hoạch ôn thi 10 ngày", "lộ trình tự học Physics" | `create_study_plan` & `batch_action` |
+| `OPTIMIZATION` | "tối ưu lịch hôm nay", "tối ưu tuần giữ nguyên lớp chính khóa" | `optimize_day`, `optimize_week` |
+| `DOCUMENT` | "đọc syllabus này trích xuất deadline", "phân tích đề cương" | `analyze_document` |
+| `ANALYTICS` | "tuần này tôi học bao nhiêu tiếng", "thống kê năng suất học" | `get_analytics_summary` |
+| `SETTINGS` | "đổi múi giờ sang Asia/Tokyo", "cập nhật tên hiển thị" | `update_user_preferences` |
+| `PROFILE` | "xem thông tin tài khoản", "hạng tài khoản của tôi" | `get_user_preferences` |
+| `QUERY` | "hôm nay có tiết gì", "tuần này học những gì", "tìm giờ rảnh" | Read tools |
 
-#### 2. Write Tools (Proposed Action Generation)
+---
 
-| Tool | Action Type | Confirmation Required? |
-| :--- | :--- | :---: |
-| `create_schedule()` | Create new calendar event | **Yes** (Generates `PROPOSED` action) |
-| `reschedule_event()` | Move existing event to new time slot | **Yes** (Generates `PROPOSED` action) |
-| `update_schedule()` | Modify title, time, location, or description | **Yes** (Generates `PROPOSED` action) |
-| `delete_schedule()` | Delete existing event | **Yes** (Generates `PROPOSED` action) |
+### 3. Centralized Tool Registry (28 Tools)
 
-### Interactive Confirmation Card (`AIActionCard.tsx`)
+All agent tools are declared in [`AiToolRegistry.java`](backend/src/main/java/com/smartschedule/ai/application/AiToolRegistry.java) with complete OpenAPI/Gemini function schemas and classified by security risk:
 
-Every write action triggers a rich card embedded within the message bubble with six lifecycle states:
+#### A. Read Tools (Deterministic Inspection — Auto-Executed)
 
-- **`PROPOSED`**: Action is pending user verification. Displays event title, formatted date & time, location, and action buttons (`[ Xác nhận ]` & `[ Hủy ]`). Monitored by a 15-minute TTL countdown.
-- **`CONFIRMED` / `EXECUTING`**: User clicked confirm. The UI enters a loading state with spinner and disables all buttons to prevent double-click duplicate mutations.
-- **`SUCCESS`**: The transaction was applied to PostgreSQL. Green indicator rendered, toast notification dispatched, and `smartschedule:calendar-refresh` event fired to reload the active calendar view instantly.
-- **`FAILED`**: The backend rejected execution (e.g. database error, concurrent modification). Red error message displayed.
-- **`CANCELLED`**: User clicked cancel or revoked the proposal. Gray badge rendered; no database changes made.
+| Tool | Parameters | Description |
+| :--- | :--- | :--- |
+| `get_today_schedule()` | — | Fetches scheduled classes, sessions, and events for today in user timezone |
+| `get_week_schedule()` | `days` (integer, default 7) | Forward agenda for the upcoming week or specified day count |
+| `find_free_time()` | `duration_minutes` (int), `date` (ISO date) | Computes available free slots (07:00–22:00) of sufficient length |
+| `check_schedule_conflict()` | `start_time` (ISO), `end_time` (ISO), `exclude_event_id` | Verifies whether a candidate time window overlaps existing commitments |
+| `get_schedule_details()` | `event_id_or_title` (string) | Looks up full event metadata, room, priority, and notes |
+| `search_schedule()` | `query` (string) | Searches events by keyword and academic subject aliases |
+| `get_tasks()` | `status` (`TODO`, `IN_PROGRESS`, `COMPLETED`, `ALL`) | Retrieves user tasks sorted by urgency and deadline |
+| `get_deadlines()` | `days` (integer, default 14) | Lists upcoming critical academic assignment deadlines |
+| `get_user_preferences()` | — | Reads timezone, locale, display name, and account subscription tier |
+| `get_analytics_summary()` | — | Calculates weekly study hours, workload balance, and task completion metrics |
+| `analyze_document()` | `document_text` (string) | Parses syllabus or course overview text to extract exam and assignment dates |
 
-### Collision Detection & Alternative Slots
+#### B. Safe Low-Write Tools (Smooth Execution)
 
-Before proposing a `create_schedule` or `reschedule_event`, the backend automatically scans the user's active calendar:
-- If a collision is detected, `hasConflict` is set to `true`, and `conflictDetails` lists the conflicting event title and hours (e.g. `⚠️ Trùng lịch với: Hội thảo AI (14:00 - 15:30)`).
-- The confirmation card renders a high-visibility warning banner and offers:
-  1. `[ Vẫn tạo / Vẫn dời ]` — Force creation despite the conflict
-  2. `[ Tìm giờ khác ]` — Prompts the AI to automatically run `find_free_time` for non-conflicting slots
-  3. `[ Hủy ]` — Abort the action
+| Tool | Parameters | Risk Level | Description |
+| :--- | :--- | :---: | :--- |
+| `complete_task()` | `task_id_or_title` (string) | `LOW_WRITE` | Marks a task as `COMPLETED` and sets remaining minutes to 0 |
+| `navigate_to()` | `target_screen` (string) | `LOW_WRITE` | Dispatches client-side navigation within whitelisted routes |
+| `update_user_preferences()`| `timezone`, `display_name` | `LOW_WRITE` | Updates user display preferences and active timezone |
 
-### Context Awareness & Security
+#### C. Important Write Tools (Mandatory User Confirmation Card)
 
-- **Server-Side Identity Enforcement**: The client never passes `userId` to the AI API. The backend strictly resolves the authenticated user from the Spring Security JWT session.
-- **Client Context (`ClientContextDto`)**: The frontend passes current screen pathname (e.g. `/calendar`), active date on the calendar, selected event, and local browser timezone (`Asia/Ho_Chi_Minh`).
-- **Audit Log & Idempotency**: All proposed actions are persisted in the `ai_actions` table with `expires_at = now() + 15 min`. State transitions are checked atomically (`canExecute()`) to prevent race conditions.
+| Tool | Parameters | Risk Level | Description |
+| :--- | :--- | :---: | :--- |
+| `create_schedule()` | `title`, `date`, `start_time`, `end_time`/`duration`, `location`, `description` | `IMPORTANT_WRITE` | Creates a new event. Strictly requires time inputs — no silent defaults |
+| `update_schedule()` | `event_id`, `title`, `start_time`, `end_time`, `location`, `description` | `IMPORTANT_WRITE` | Updates existing event properties |
+| `delete_schedule()` | `event_id`, `title` | `IMPORTANT_WRITE` | Deletes an event from the user's schedule |
+| `reschedule_event()` | `event_id`, `title`, `date`, `new_start_time`, `new_end_time` | `IMPORTANT_WRITE` | Moves an event to a new date and time window |
+| `replace_schedule()` | `target_title`, `new_title`, `date?`, `start_time?`, `end_time?` | `IMPORTANT_WRITE` | Swaps an existing subject with a new subject, inheriting time when omitted |
+| `create_task()` | `title`, `estimated_minutes`, `priority`, `deadline`, `description` | `IMPORTANT_WRITE` | Adds an actionable task with estimated duration |
+| `update_task()` | `task_id_or_title`, `new_title`, `priority`, `deadline`, `status` | `IMPORTANT_WRITE` | Modifies existing task details |
+| `delete_task()` | `task_id_or_title` | `IMPORTANT_WRITE` | Deletes a task from the user's task list |
+| `create_deadline()` | `title`, `deadline`, `priority`, `description` | `IMPORTANT_WRITE` | Creates a high-priority deadline item |
+| `update_reminder()` | `event_title`, `reminder_minutes` | `IMPORTANT_WRITE` | Sets notification minutes before an event |
+| `create_study_plan()` | `subject`, `total_days`, `daily_minutes`, `preferred_time` | `IMPORTANT_WRITE` | Generates a structured multi-day study schedule |
+| `optimize_day()` | `date`, `keep_fixed` | `IMPORTANT_WRITE` | Rearranges non-fixed items to consolidate gaps |
+| `optimize_week()` | `keep_classes`, `focus_area` | `IMPORTANT_WRITE` | Balances weekly study blocks preserving class times |
+| `batch_action()` | `title`, `summary`, `actions` (array of sub-actions) | `IMPORTANT_WRITE` | Executes multiple coordinated mutations as an atomic unit |
+
+---
+
+### 4. Zero-Hallucination & Anti-Guessing Engine
+
+SmartSchedule enforces strict validation against LLM hallucination:
+
+1. **Forbidden Silent Defaults**:
+   - The AI is strictly prohibited from inventing `start_time`, `end_time`, `duration`, `location`, or `description`.
+   - Saying *"Tạo lịch Tiết Vật lý Chủ nhật"* **will never** produce an arbitrary 08:00 or 08:00–09:30 event.
+2. **Smart Clarification Protocol**:
+   - Missing both start time & duration $\rightarrow$ *"Bạn muốn bắt đầu học lúc mấy giờ và trong bao nhiêu phút?"*
+   - Has start time, missing duration/end time $\rightarrow$ *"Bạn muốn học trong bao lâu hay kết thúc lúc mấy giờ?"*
+   - Has duration, missing start time $\rightarrow$ *"Bạn muốn bắt đầu lúc mấy giờ?"*
+   - Complete information provided $\rightarrow$ Calculates canonical timestamps and invokes `create_schedule`.
+3. **Single Source of Truth (`canonicalParams`)**:
+   - The time proposed to the user in the UI card is identical to the `Instant` passed to the database mutation.
+   - If a saved event's timestamps do not match proposed values, the transaction aborts with `DATA_MISMATCH`.
+
+---
+
+### 5. Multi-Step Batch Action Plans (`AiActionPlan.java`)
+
+When the user requests complex multi-stage changes (e.g. *"Lập kế hoạch ôn thi Giải tích 7 ngày"* or *"Thay môn Toán bằng Lý rồi đổi giờ Tiết Hóa sang 15h"*):
+
+1. **Plan Persistence (`ai_action_plans`, Flyway `V21`)**:
+   - A parent plan entity records `title`, `summary`, `action_count`, and `status = PROPOSED`.
+   - Individual sub-actions are persisted with foreign keys to `plan_id` and assigned an execution `step_order`.
+2. **Interactive Plan Review Card**:
+   - The UI displays the plan title along with a numbered list of all proposed sub-actions.
+   - A single prominent button **[ Xác nhận tất cả (Do it) ]** allows one-click approval.
+3. **Atomic Transactional Rollback**:
+   - Executed via `POST /api/v1/ai/plans/{planId}/confirm`.
+   - If any step encounters a conflict or fails validation, the entire batch rolls back via Spring `@Transactional`. No partial or corrupted calendar state can occur.
+
+---
+
+### 6. Whitelisted Client-Side Navigation
+
+The agent supports conversational screen navigation (e.g., *"Mở trang lịch"*, *"Đi tới màn hình công việc"*, *"Xem cài đặt"*):
+
+- **Whitelist Enforcement**: Permitted routes are strictly constrained to:
+  `/dashboard`, `/calendar`, `/tasks`, `/scheduling`, `/rescheduling`, `/collaboration`, `/notifications`, `/settings`, `/profile`.
+- **Event Bus Decoupling**: Upon user confirmation, a `smartschedule:navigate` DOM CustomEvent is dispatched with the target route. The frontend `Shell` component listens to the event and triggers React Router `navigate()` without reloading the page.
+
+---
+
+### 7. Subject Alias & Fuzzy Matching Engine
+
+When users express schedule modifications colloquially (e.g. *"xoá lịch lý đi thay giúp tôi thành toán"*), the system resolves shorthand aliases against full course titles:
+
+```java
+// Recognized Subject Alias Groups
+"lý"   <-> "Vật lý", "Physics", "Phy"
+"toán" <-> "Toán học", "Math", "Mathematics", "Calculus", "Giải tích", "Đại số"
+"hóa"  <-> "Hóa học", "Chemistry", "Chem"
+"anh"  <-> "Tiếng Anh", "English", "Eng"
+"văn"  <-> "Ngữ văn", "Literature"
+"tin"  <-> "Tin học", "CNTT", "Computer Science", "Lập trình", "Java", "Python"
+```
+
+When swapping subjects without specifying a new time, the system automatically **inherits** the existing event's date, start time, end time, duration, location, and notes.
+
+---
+
+### 8. Multi-Tier Security & Risk Engine (`AiRiskEngine.java`)
+
+- **Multi-Tenant Isolation**: All operations strictly filter by `owner_id = currentUserService.requireUser().getId()`. Users cannot read, modify, or delete any entity belonging to another user.
+- **Dangerous Action Blocking**: High-risk system operations (e.g., `delete_account`, `reset_all_data`, `wipe_database`) are blocked at the AI layer with `HIGH_RISK_ACTION_BLOCKED` and must be performed manually in System Settings.
+- **Rate Limiting**: Per-user in-memory sliding window limiter (configurable via `smartschedule.ai.requests-per-minute`, default: 20 req/min).
+
+---
 
 ---
 
@@ -1248,7 +1355,7 @@ k6 run load-tests/proxy_baseline.js
 - ✅ 3D landing page with scroll-driven storytelling
 - ✅ Dashboard analytics with KPI cards and workload charts
 - ✅ Natural language task input parser
-- ✅ SmartSchedule AI Assistant & Tool Calling (Google Gemini 1.5, 9 Function Calling tools with Human-in-the-Loop Confirmation Cards & Conflict Detection)
+- ✅ SmartSchedule Full-Scope AI Agent (Google Gemini 3.8 Flash, 28-tool registry, Universal Intent Router across 14 categories, 4-tier AiRiskEngine, Atomic Multi-step Action Plans with Rollback Guard, Whitelisted Navigation, Zero-Hallucination Guard, 104 backend tests + 209 frontend tests)
 - ✅ Universal Schedule Importer Browser Extension (Chrome/Edge Manifest V3, zero-credential timetable extraction)
 - ✅ Multi-provider Social OAuth (Google, GitHub, Facebook with cross-origin PostMessage preview support)
 - ✅ Docker Compose packaging for all three tiers
