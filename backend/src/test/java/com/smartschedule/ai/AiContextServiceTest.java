@@ -110,9 +110,9 @@ class AiContextServiceTest {
                 .thenReturn(List.of(testSchedule));
 
         ZoneId zone = ZoneId.of("Asia/Ho_Chi_Minh");
-        LocalDate today = LocalDate.now(zone);
-        Instant eventStart = today.atTime(8, 0).atZone(zone).toInstant();
-        Instant eventEnd = today.atTime(10, 0).atZone(zone).toInstant();
+        LocalDate tomorrow = LocalDate.now(zone).plusDays(1);
+        Instant eventStart = tomorrow.atTime(8, 0).atZone(zone).toInstant();
+        Instant eventEnd = tomorrow.atTime(10, 0).atZone(zone).toInstant();
 
         Event testEvent = new Event(
                 testSchedule, testCategory, "Kỹ Năng Mềm", "Workshop",
@@ -122,7 +122,7 @@ class AiContextServiceTest {
         when(eventRepository.search(eq(testSchedule.getId()), any(), any(), isNull(), isNull(), isNull()))
                 .thenReturn(List.of(testEvent));
 
-        String freeTimeResult = contextService.executeTool("find_free_time", testUser, Map.of());
+        String freeTimeResult = contextService.executeTool("find_free_time", testUser, Map.of("date", tomorrow.toString()));
 
         assertThat(freeTimeResult).contains("Khoảng trống thời gian");
     }
