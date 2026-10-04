@@ -379,7 +379,7 @@ public class GeminiProvider implements AiProvider {
             "gemini-1.0-pro"
     );
 
-    private List<String> getCandidateModels() {
+    public List<String> getCandidateModels() {
         List<String> list = new ArrayList<>();
         String configured = properties.geminiModel();
         if (configured != null && !configured.isBlank()) {
@@ -392,7 +392,6 @@ public class GeminiProvider implements AiProvider {
         }
         List<String> fallbacks = List.of(
                 "gemini-3.6-flash",
-                "gemini-3.5-flash",
                 "gemini-flash-lite-latest",
                 "gemini-flash-latest",
                 "gemini-3.8-flash",
