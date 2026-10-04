@@ -18,6 +18,12 @@ public class AiConversation {
     @Column(nullable = false, length = 255)
     private String title = "Cuộc trò chuyện mới";
 
+    @Column(name = "pinned_provider", length = 64)
+    private String pinnedProvider = "wayjet";
+
+    @Column(name = "pinned_model", length = 128)
+    private String pinnedModel;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -31,6 +37,7 @@ public class AiConversation {
         this.id = UUID.randomUUID();
         this.user = user;
         this.title = (title != null && !title.isBlank()) ? title.trim() : "Cuộc trò chuyện mới";
+        this.pinnedProvider = "wayjet";
         this.createdAt = Instant.now();
         this.updatedAt = Instant.now();
     }
@@ -51,6 +58,22 @@ public class AiConversation {
         if (title != null && !title.isBlank()) {
             this.title = title.trim();
         }
+    }
+
+    public String getPinnedProvider() {
+        return pinnedProvider;
+    }
+
+    public void setPinnedProvider(String pinnedProvider) {
+        this.pinnedProvider = pinnedProvider;
+    }
+
+    public String getPinnedModel() {
+        return pinnedModel;
+    }
+
+    public void setPinnedModel(String pinnedModel) {
+        this.pinnedModel = pinnedModel;
     }
 
     public Instant getCreatedAt() {

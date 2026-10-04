@@ -95,14 +95,14 @@ export function AIChatPanel() {
           <div className="ai-chat-header-info">
             <div className="ai-chat-header-mascot">
               <AIMascot state={mascotState} size={36} />
-              <span className="ai-status-pulse" title="Gemini AI Đang hoạt động" />
+              <span className="ai-status-pulse" title={preferredLanguage === 'en' ? 'SmartSchedule AI is active' : 'SmartSchedule AI đang hoạt động'} />
             </div>
             <div className="ai-chat-header-text">
               <div className="ai-chat-title-row">
                 <h2 id="ai-chat-title" className="ai-chat-title">
                   SmartSchedule AI
                 </h2>
-                <span className="ai-gemini-tag">Gemini</span>
+                <span className="ai-gemini-tag">{preferredLanguage === 'en' ? 'Copilot' : 'Trợ lý'}</span>
               </div>
               <p className="ai-chat-subtitle">
                 {preferredLanguage === 'en' ? 'Autonomous Academic Copilot' : 'Trợ lý học thuật thông minh'}

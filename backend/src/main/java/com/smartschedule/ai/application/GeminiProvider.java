@@ -55,6 +55,34 @@ public class GeminiProvider implements AiProvider {
         return !getApiKeys().isEmpty();
     }
 
+    @Override
+    public String getName() {
+        return "gemini";
+    }
+
+    @Override
+    public String getModel() {
+        return properties.geminiModel();
+    }
+
+    @Override
+    public boolean supportsTools() {
+        return true;
+    }
+
+    @Override
+    public boolean supportsStructuredOutput() {
+        return true;
+    }
+
+    @Override
+    public ProviderHealth healthCheck() {
+        if (!hasApiKey()) {
+            return new ProviderHealth(HealthStatus.UNAVAILABLE, "Gemini API key is not configured", 0);
+        }
+        return new ProviderHealth(HealthStatus.AVAILABLE, "Gemini configured with " + getApiKeys().size() + " key(s)", 0);
+    }
+
     public List<String> getApiKeys() {
         String raw = properties.geminiApiKey();
         if (raw == null || raw.isBlank()) return List.of();

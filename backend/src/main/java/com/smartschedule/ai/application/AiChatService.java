@@ -33,6 +33,7 @@ public class AiChatService {
     private final AiUnderstandingService understandingService;
     private final AiWrongToolGuard wrongToolGuard;
     private final AiResponseRelevanceValidator relevanceValidator;
+    private final AiUsageService usageService;
 
     // In-memory sliding window rate limiter: User ID -> List of request timestamps (epoch ms)
     private final Map<UUID, List<Long>> rateLimits = new ConcurrentHashMap<>();
@@ -48,7 +49,8 @@ public class AiChatService {
                          AiAgentRouter agentRouter,
                          @Autowired(required = false) AiUnderstandingService understandingService,
                          @Autowired(required = false) AiWrongToolGuard wrongToolGuard,
-                         @Autowired(required = false) AiResponseRelevanceValidator relevanceValidator) {
+                         @Autowired(required = false) AiResponseRelevanceValidator relevanceValidator,
+                         @Autowired(required = false) AiUsageService usageService) {
         this.conversationRepository = conversationRepository;
         this.messageRepository = messageRepository;
         this.contextService = contextService;
@@ -68,6 +70,7 @@ public class AiChatService {
         );
         this.wrongToolGuard = (wrongToolGuard != null) ? wrongToolGuard : new AiWrongToolGuard();
         this.relevanceValidator = (relevanceValidator != null) ? relevanceValidator : new AiResponseRelevanceValidator();
+        this.usageService = usageService;
     }
 
     public AiChatService(AiConversationRepository conversationRepository,
@@ -78,7 +81,7 @@ public class AiChatService {
                          AiProperties properties,
                          AiToolRegistry toolRegistry,
                          AiAgentRouter agentRouter) {
-        this(conversationRepository, messageRepository, contextService, actionService, aiProvider, properties, toolRegistry, agentRouter, null, null, null);
+        this(conversationRepository, messageRepository, contextService, actionService, aiProvider, properties, toolRegistry, agentRouter, null, null, null, null);
     }
 
     public AiChatService(AiConversationRepository conversationRepository,
@@ -87,13 +90,17 @@ public class AiChatService {
                          AiActionService actionService,
                          AiProvider aiProvider,
                          AiProperties properties) {
-        this(conversationRepository, messageRepository, contextService, actionService, aiProvider, properties, new AiToolRegistry(), new AiAgentRouter(), null, null, null);
+        this(conversationRepository, messageRepository, contextService, actionService, aiProvider, properties, new AiToolRegistry(), new AiAgentRouter(), null, null, null, null);
     }
 
     @Transactional
     public AiDtos.ChatResponse chat(User user, AiDtos.ChatRequest request) {
         validateRequest(user, request.message());
-        checkRateLimit(user.getId());
+        if (usageService != null) {
+            usageService.checkAndConsumeQuota(user);
+        } else {
+            checkRateLimit(user.getId());
+        }
 
         AiConversation conversation = resolveConversation(user, request.conversationId());
         String userPrompt = request.message().trim();
@@ -190,8 +197,8 @@ public class AiChatService {
             chatHistory.add(new AiProvider.ChatMessage(m.getRole(), m.getContent()));
         }
 
-        // Call Gemini
-        AiProvider.ProviderResponse response = aiProvider.generateResponse(systemInstruction, chatHistory, userPrompt);
+        // Call AI Provider (routed via primary/fallback chain)
+        AiProvider.ProviderResponse response = invokeProvider(conversation, user, systemInstruction, chatHistory, userPrompt);
 
         String replyContent = response.content();
         List<AiDtos.ProposedActionDto> proposedActions = new ArrayList<>();
@@ -259,7 +266,7 @@ public class AiChatService {
                         + "Nếu đây là yêu cầu thay đổi (lịch, task, deadline, nhắc nhở, điều hướng, kế hoạch), hãy gọi write tool tương ứng ngay lập tức. "
                         + "Nếu thiếu thông tin bắt buộc, hãy hỏi làm rõ ngắn gọn.";
 
-                AiProvider.ProviderResponse turn2Response = aiProvider.generateResponse(systemInstruction, turn2History, followUpPrompt);
+                AiProvider.ProviderResponse turn2Response = invokeProvider(conversation, user, systemInstruction, turn2History, followUpPrompt);
                 if (turn2Response.toolCalls() != null && !turn2Response.toolCalls().isEmpty()) {
                     for (AiProvider.ToolCall tool : turn2Response.toolCalls()) {
                         if (isWriteTool(tool.name()) && actionService != null) {
@@ -337,7 +344,11 @@ public class AiChatService {
                            Consumer<Throwable> onError) {
         try {
             validateRequest(user, request.message());
-            checkRateLimit(user.getId());
+            if (usageService != null) {
+                usageService.checkAndConsumeQuota(user);
+            } else {
+                checkRateLimit(user.getId());
+            }
 
             AiConversation conversation = resolveConversation(user, request.conversationId());
             String userPrompt = request.message().trim();
@@ -442,7 +453,9 @@ public class AiChatService {
 
             StringBuilder accumulatedResponse = new StringBuilder();
 
-            aiProvider.streamResponse(
+            invokeStreamProvider(
+                    conversation,
+                    user,
                     systemInstruction,
                     chatHistory,
                     userPrompt,
@@ -523,7 +536,7 @@ public class AiChatService {
                                         + "Nếu đây là yêu cầu thay đổi (lịch, task, deadline, nhắc nhở, điều hướng, kế hoạch), hãy gọi write tool tương ứng ngay lập tức. "
                                         + "Nếu thiếu thông tin bắt buộc, hãy hỏi làm rõ ngắn gọn.";
 
-                                AiProvider.ProviderResponse turn2Response = aiProvider.generateResponse(systemInstruction, turn2History, followUpPrompt);
+                                AiProvider.ProviderResponse turn2Response = invokeProvider(conversation, user, systemInstruction, turn2History, followUpPrompt);
                                 if (turn2Response.toolCalls() != null && !turn2Response.toolCalls().isEmpty()) {
                                     for (AiProvider.ToolCall tool : turn2Response.toolCalls()) {
                                         if (isWriteTool(tool.name()) && actionService != null) {
@@ -852,5 +865,25 @@ public class AiChatService {
 
                 NGỮ CẢNH DỮ LIỆU THỰC TẾ CỦA NGƯỜI DÙNG:
                 """ + scheduleContext;
+    }
+
+    private AiProvider.ProviderResponse invokeProvider(AiConversation conversation, User user,
+                                                       String systemInstruction, List<AiProvider.ChatMessage> chatHistory, String prompt) {
+        if (aiProvider instanceof AiProviderRouter router) {
+            return router.generateResponse(conversation, user, systemInstruction, chatHistory, prompt);
+        }
+        return aiProvider.generateResponse(systemInstruction, chatHistory, prompt);
+    }
+
+    private void invokeStreamProvider(AiConversation conversation, User user,
+                                      String systemInstruction, List<AiProvider.ChatMessage> chatHistory, String prompt,
+                                      Consumer<String> onChunk,
+                                      Consumer<List<AiProvider.ToolCall>> onCompleteWithTools,
+                                      Consumer<Throwable> onError) {
+        if (aiProvider instanceof AiProviderRouter router) {
+            router.streamResponse(conversation, user, systemInstruction, chatHistory, prompt, onChunk, onCompleteWithTools, onError);
+        } else {
+            aiProvider.streamResponse(systemInstruction, chatHistory, prompt, onChunk, onCompleteWithTools, onError);
+        }
     }
 }

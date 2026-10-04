@@ -37,10 +37,33 @@ smartschedule:
   jobs:
     reminder-delay-ms: ${SMARTSCHEDULE_REMINDER_DELAY_MS:60000}
   ai:
-    gemini-api-key: ${GEMINI_API_KEY:}
-    gemini-model: ${GEMINI_MODEL:gemini-3.6-flash}
+    primary-provider: ${AI_PRIMARY_PROVIDER:wayjet}
+    fallback-order: ${AI_FALLBACK_ORDER:gemini,groq,third_fallback}
+    daily-request-limit: ${AI_DAILY_REQUEST_LIMIT:20}
+    requests-per-minute: ${AI_REQUESTS_PER_MINUTE:5}
+    timeout-seconds: ${AI_TIMEOUT_SECONDS:30}
+    provider-cooldown-seconds: ${AI_PROVIDER_COOLDOWN_SECONDS:60}
+    circuit-failure-threshold: ${AI_CIRCUIT_FAILURE_THRESHOLD:5}
+    max-retries: ${AI_MAX_RETRIES:1}
     max-message-length: ${AI_MAX_MESSAGE_LENGTH:1500}
     max-output-tokens: ${AI_MAX_OUTPUT_TOKENS:1024}
-    requests-per-minute: ${AI_REQUESTS_PER_MINUTE:20}
-    timeout-seconds: ${AI_TIMEOUT_SECONDS:30}
+
+    # WayJet Primary Provider
+    wayjet-api-key: ${WAYJET_API_KEY:}
+    wayjet-base-url: ${WAYJET_BASE_URL:https://api.xah.io/v1}
+    wayjet-model: ${WAYJET_MODEL:mainnewnol/gpt-5.6-luna}
+
+    # Gemini Fallback Provider
+    gemini-api-key: ${GEMINI_API_KEY:}
+    gemini-model: ${GEMINI_MODEL:gemini-3.6-flash}
+
+    # Groq Fallback Provider
+    groq-api-key: ${GROQ_API_KEY:}
+    groq-base-url: ${GROQ_BASE_URL:https://api.groq.com/openai/v1}
+    groq-model: ${GROQ_MODEL:llama-3.3-70b-versatile}
+
+    # Third Fallback Provider
+    third-provider-api-key: ${THIRD_PROVIDER_API_KEY:}
+    third-provider-base-url: ${THIRD_PROVIDER_BASE_URL:https://api.openai.com/v1}
+    third-provider-model: ${THIRD_PROVIDER_MODEL:gpt-4o-mini}
 
