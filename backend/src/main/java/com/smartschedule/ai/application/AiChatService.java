@@ -172,6 +172,26 @@ public class AiChatService {
                 } catch (Exception ex) {
                     log.debug("Deterministic sync proposal skipped: {}", ex.getMessage());
                 }
+            } else if ("IMPORT_GOOGLE_SHEETS".equals(intent) && entities.containsKey("spreadsheet_url")) {
+                try {
+                    proposed = actionService.proposeAction(user, conversation, "import_google_sheet_events", entities, request.context());
+                } catch (AiException | com.smartschedule.common.error.ValidationException ex) {
+                    String reply = "⚠️ Không thể đọc Google Sheets: " + ex.getMessage();
+                    AiMessage modelMessage = new AiMessage(conversation, "model", reply);
+                    messageRepository.save(modelMessage);
+                    conversation.touch();
+                    conversationRepository.save(conversation);
+                    return new AiDtos.ChatResponse(conversation.getId(), modelMessage.getId(), modelMessage.getRole(), reply, modelMessage.getCreatedAt(), List.of());
+                } catch (Exception ex) {
+                    log.warn("Deterministic import google sheet proposal failed: {}", ex.getMessage());
+                }
+            } else if ("READ_GOOGLE_SHEET".equals(intent) && entities.containsKey("spreadsheet_url")) {
+                String reply = contextService.executeTool("read_google_sheet", user, entities);
+                AiMessage modelMessage = new AiMessage(conversation, "model", reply);
+                messageRepository.save(modelMessage);
+                conversation.touch();
+                conversationRepository.save(conversation);
+                return new AiDtos.ChatResponse(conversation.getId(), modelMessage.getId(), modelMessage.getRole(), reply, modelMessage.getCreatedAt(), List.of());
             }
 
             if (proposed != null) {
@@ -226,7 +246,7 @@ public class AiChatService {
                             toolResults.append("Tôi đề xuất: ").append(proposed.summary()).append(conflictNote)
                                     .append("\n\nVui lòng kiểm tra và xác nhận trong thẻ hành động bên dưới.\n");
                             continue;
-                        } catch (AiException valEx) {
+                        } catch (AiException | com.smartschedule.common.error.ValidationException valEx) {
                             toolResults.append("\n").append(valEx.getMessage()).append("\n");
                             continue;
                         }
@@ -246,7 +266,7 @@ public class AiChatService {
                                 : "\nKhông phát hiện xung đột thời gian.";
                         toolResults.append("Tôi đề xuất: ").append(proposed.summary()).append(conflictNote)
                                 .append("\n\nVui lòng kiểm tra và xác nhận trong thẻ hành động bên dưới.\n");
-                    } catch (AiException valEx) {
+                    } catch (AiException | com.smartschedule.common.error.ValidationException valEx) {
                         toolResults.append("\n").append(valEx.getMessage()).append("\n");
                     }
                 } else {
@@ -426,6 +446,30 @@ public class AiChatService {
                     } catch (Exception ex) {
                         log.debug("Deterministic sync proposal skipped: {}", ex.getMessage());
                     }
+                } else if ("IMPORT_GOOGLE_SHEETS".equals(intent) && entities.containsKey("spreadsheet_url")) {
+                    try {
+                        proposed = actionService.proposeAction(user, conversation, "import_google_sheet_events", entities, request.context());
+                    } catch (AiException | com.smartschedule.common.error.ValidationException ex) {
+                        String reply = "⚠️ Không thể đọc Google Sheets: " + ex.getMessage();
+                        AiMessage modelMessage = new AiMessage(conversation, "model", reply);
+                        messageRepository.save(modelMessage);
+                        conversation.touch();
+                        conversationRepository.save(conversation);
+                        onChunk.accept(reply);
+                        onComplete.accept(new AiDtos.ChatResponse(conversation.getId(), modelMessage.getId(), modelMessage.getRole(), reply, modelMessage.getCreatedAt(), List.of()));
+                        return;
+                    } catch (Exception ex) {
+                        log.warn("Deterministic import google sheet proposal failed in streamChat: {}", ex.getMessage());
+                    }
+                } else if ("READ_GOOGLE_SHEET".equals(intent) && entities.containsKey("spreadsheet_url")) {
+                    String reply = contextService.executeTool("read_google_sheet", user, entities);
+                    AiMessage modelMessage = new AiMessage(conversation, "model", reply);
+                    messageRepository.save(modelMessage);
+                    conversation.touch();
+                    conversationRepository.save(conversation);
+                    onChunk.accept(reply);
+                    onComplete.accept(new AiDtos.ChatResponse(conversation.getId(), modelMessage.getId(), modelMessage.getRole(), reply, modelMessage.getCreatedAt(), List.of()));
+                    return;
                 }
 
                 if (proposed != null) {
@@ -490,7 +534,7 @@ public class AiChatService {
                                             accumulatedResponse.append(text);
                                             onChunk.accept(text);
                                             continue;
-                                        } catch (AiException valEx) {
+                                        } catch (AiException | com.smartschedule.common.error.ValidationException valEx) {
                                             String text = "\n\n" + valEx.getMessage();
                                             accumulatedResponse.append(text);
                                             onChunk.accept(text);
@@ -514,7 +558,7 @@ public class AiChatService {
                                                 "\n\nVui lòng kiểm tra và xác nhận trong thẻ bên dưới.";
                                         accumulatedResponse.append(text);
                                         onChunk.accept(text);
-                                    } catch (AiException valEx) {
+                                    } catch (AiException | com.smartschedule.common.error.ValidationException valEx) {
                                         String text = "\n\n" + valEx.getMessage();
                                         accumulatedResponse.append(text);
                                         onChunk.accept(text);

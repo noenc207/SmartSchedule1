@@ -142,6 +142,14 @@ public class AiUnderstandingService {
         List<String> missingFields = new ArrayList<>();
         String detectedIntent = "QUERY";
 
+        // Extract Google Sheets URL if present in rawMessage or text
+        Matcher sheetUrlMatcher = Pattern.compile("https://docs\\.google\\.com/spreadsheets/d/([a-zA-Z0-9-_]+)[^\\s]*").matcher(rawMessage);
+        if (sheetUrlMatcher.find()) {
+            entities.put("spreadsheet_url", sheetUrlMatcher.group(0));
+            entities.put("spreadsheet_id", sheetUrlMatcher.group(1));
+            entities.put("provider", "GOOGLE_SHEETS");
+        }
+
         // A. Google Calendar Sync
         if (unaccented.contains("dong bo") || unaccented.contains("sync")) {
             if (unaccented.contains("google calendar") || unaccented.contains("gg cal") || unaccented.contains("calendar")) {
@@ -150,13 +158,27 @@ public class AiUnderstandingService {
             }
         }
 
-        // B. Google Sheets Import
-        if (lower.contains("docs.google.com/spreadsheets") || lower.contains("google sheet") || unaccented.contains("bang tinh")
-                || unaccented.contains("nhap toan bo vao lich") || unaccented.contains("nhap vao lich") || unaccented.contains("dua het vao lich")) {
-            if (unaccented.contains("nhap") || unaccented.contains("dong bo") || unaccented.contains("them") || unaccented.contains("dua vao") || unaccented.contains("dua het")) {
+        // B. Google Sheets Import & Read
+        boolean mentionsSheet = lower.contains("docs.google.com/spreadsheets")
+                || lower.contains("google sheet")
+                || unaccented.contains("bang tinh")
+                || entities.containsKey("spreadsheet_url")
+                || unaccented.contains("nhap toan bo vao lich")
+                || unaccented.contains("nhap vao lich")
+                || unaccented.contains("dua het vao lich");
+
+        if (mentionsSheet) {
+            if (unaccented.contains("nhap") || unaccented.contains("dong bo") || unaccented.contains("sync")
+                    || unaccented.contains("them") || unaccented.contains("dua vao") || unaccented.contains("dua het")
+                    || unaccented.contains("nhap vao lich") || unaccented.contains("nhap toan bo")) {
                 detectedIntent = "IMPORT_GOOGLE_SHEETS";
-                entities.put("provider", "GOOGLE_SHEETS");
+            } else if (unaccented.contains("doc") || unaccented.contains("xem") || unaccented.contains("kiem tra")
+                    || unaccented.contains("phan tich") || lower.contains("read") || lower.contains("check")) {
+                detectedIntent = "READ_GOOGLE_SHEET";
+            } else if (entities.containsKey("spreadsheet_url")) {
+                detectedIntent = "IMPORT_GOOGLE_SHEETS";
             }
+            entities.put("provider", "GOOGLE_SHEETS");
         }
 
         // C. Reschedule / Move Schedule: "dời toán sang tối", "đổi nó sang tối", "dời cái vừa tạo", "chuyển sang chiều"
@@ -248,6 +270,13 @@ public class AiUnderstandingService {
         // ---------------------------------------------------------------------
         // STEP 6: Second-Pass Recovery & Ambiguity Handling
         // ---------------------------------------------------------------------
+        // If operation targets Google Sheets, clear any false calendar event pronoun ambiguity
+        if (entities.containsKey("spreadsheet_url") || "IMPORT_GOOGLE_SHEETS".equals(detectedIntent) || "READ_GOOGLE_SHEET".equals(detectedIntent)) {
+            if (ref.hasReference() && ref.targetEventId() == null) {
+                ref = new AiReferenceResolverService.ResolvedReference(false, null, null, null, false, List.of());
+            }
+        }
+
         boolean isAmbiguous = ref.isAmbiguous();
         List<String> clarificationOptions = new ArrayList<>();
         String clarificationQuestion = null;
@@ -392,6 +421,7 @@ public class AiUnderstandingService {
     private boolean isCommandPhrase(String lower, String unaccented) {
         return unaccented.contains("xoa") || unaccented.contains("thay") || unaccented.contains("doi")
                 || unaccented.contains("tao") || unaccented.contains("them") || unaccented.contains("dong bo")
-                || unaccented.contains("nhap") || unaccented.contains("chuyen") || unaccented.contains("out");
+                || unaccented.contains("nhap") || unaccented.contains("chuyen") || unaccented.contains("out")
+                || lower.contains("docs.google.com/spreadsheets");
     }
 }

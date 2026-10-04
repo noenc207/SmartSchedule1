@@ -270,6 +270,48 @@ class AiUnderstandingTest {
     }
 
     @Test
+    @DisplayName("Case 17: Google Sheets URL with 'Đọc Google Sheet này và đồng bộ vào lịch' -> IMPORT_GOOGLE_SHEETS without pronoun hijack")
+    void testCase17_googleSheetsImport_noPronounHijack() {
+        Schedule sched = Mockito.mock(Schedule.class);
+        UUID schedId = UUID.randomUUID();
+        when(sched.getId()).thenReturn(schedId);
+        when(mockScheduleRepository.findAllByOwnerIdOrderByUpdatedAtDesc(testUser.getId()))
+                .thenReturn(List.of(sched));
+
+        Event ev1 = Mockito.mock(Event.class);
+        when(ev1.getId()).thenReturn(UUID.randomUUID());
+        when(ev1.getTitle()).thenReturn("Giải tích - Thầy Hoàng");
+        when(ev1.getStartsAt()).thenReturn(Instant.now());
+
+        Event ev2 = Mockito.mock(Event.class);
+        when(ev2.getId()).thenReturn(UUID.randomUUID());
+        when(ev2.getTitle()).thenReturn("Hẹn cafe với bạn");
+        when(ev2.getStartsAt()).thenReturn(Instant.now().plus(1, ChronoUnit.DAYS));
+
+        when(mockEventRepository.findAllByScheduleId(schedId)).thenReturn(List.of(ev1, ev2));
+
+        String prompt = "Đọc Google Sheet này và đồng bộ vào lịch giúp tôi: https://docs.google.com/spreadsheets/d/1ew4rG1tgs7f-DS1Xh9bUfX1ZaEdlcE7JgPhY_LjMktw";
+        var res = understandingService.analyze(testUser, prompt, UUID.randomUUID(), null);
+
+        assertThat(res.intent()).isEqualTo("IMPORT_GOOGLE_SHEETS");
+        assertThat(res.entities().get("spreadsheet_url")).isEqualTo("https://docs.google.com/spreadsheets/d/1ew4rG1tgs7f-DS1Xh9bUfX1ZaEdlcE7JgPhY_LjMktw");
+        assertThat(res.entities().get("spreadsheet_id")).isEqualTo("1ew4rG1tgs7f-DS1Xh9bUfX1ZaEdlcE7JgPhY_LjMktw");
+        assertThat(res.needsClarification()).isFalse();
+        assertThat(res.clarificationQuestion()).isNull();
+    }
+
+    @Test
+    @DisplayName("Case 18: Google Sheets URL with 'Đọc Google Sheet này' (read only) -> READ_GOOGLE_SHEET")
+    void testCase18_googleSheetsRead_only() {
+        String prompt = "Đọc Google Sheet này giúp tôi: https://docs.google.com/spreadsheets/d/1ew4rG1tgs7f-DS1Xh9bUfX1ZaEdlcE7JgPhY_LjMktw";
+        var res = understandingService.analyze(testUser, prompt, UUID.randomUUID(), null);
+
+        assertThat(res.intent()).isEqualTo("READ_GOOGLE_SHEET");
+        assertThat(res.entities().get("spreadsheet_url")).isEqualTo("https://docs.google.com/spreadsheets/d/1ew4rG1tgs7f-DS1Xh9bUfX1ZaEdlcE7JgPhY_LjMktw");
+        assertThat(res.needsClarification()).isFalse();
+    }
+
+    @Test
     @DisplayName("WrongToolGuard: Intercepts read-only tool calls when mutation requested")
     void testWrongToolGuard_interceptsReadWhenDeleteRequested() {
         var val1 = wrongToolGuard.validate("DELETE_SCHEDULE", "get_week_schedule", Map.of());
