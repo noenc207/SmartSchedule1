@@ -1,6 +1,7 @@
 package com.smartschedule.ai.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 
 @ConfigurationProperties(prefix = "smartschedule.ai")
 public record AiProperties(
@@ -27,6 +28,7 @@ public record AiProperties(
         String thirdProviderBaseUrl,
         String thirdProviderModel
 ) {
+    @ConstructorBinding
     public AiProperties {
         geminiModel = (geminiModel == null || geminiModel.isBlank()) ? "gemini-3.6-flash" : geminiModel;
         maxMessageLength = maxMessageLength <= 0 ? 2000 : maxMessageLength;
