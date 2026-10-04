@@ -123,7 +123,7 @@ class AiChatServiceTest {
         when(conversationRepository.findLatestByUserId(testUser.getId())).thenReturn(Optional.of(conversation));
         when(contextService.buildContextSummary(eq(testUser), any())).thenReturn("Mock Context");
 
-        String userPrompt = "xoá lịch lý đi thay giúp tôi thành toán";
+        String userPrompt = "hãy đổi sự kiện tuần này giúp tôi";
 
         // Turn 1: Gemini returns read tool get_upcoming_schedule
         AiProvider.ToolCall readToolCall = new AiProvider.ToolCall("get_upcoming_schedule", java.util.Map.of());

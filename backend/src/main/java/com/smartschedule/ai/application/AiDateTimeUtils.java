@@ -138,6 +138,13 @@ public final class AiDateTimeUtils {
 
         try {
             String lower = str.toLowerCase();
+
+            boolean hasRuoi = lower.contains("rưỡi") || lower.contains("ruoi");
+            boolean isNuaTieng = lower.contains("nửa tiếng") || lower.contains("nua tieng") || lower.contains("nửa giờ") || lower.contains("nua gio");
+            if (isNuaTieng) {
+                return 30;
+            }
+
             // Check minute units first: "phút", "min", "m"
             if (lower.contains("phút") || lower.contains("min") || (lower.contains("p") && !lower.contains("tiếng") && !lower.contains("giờ"))) {
                 String numPart = lower.replaceAll("[^0-9]", "").trim();
@@ -151,7 +158,12 @@ public final class AiDateTimeUtils {
                 String numPart = lower.replaceAll("[^0-9.]", "").trim();
                 if (!numPart.isEmpty()) {
                     double hours = Double.parseDouble(numPart);
+                    if (hasRuoi) {
+                        hours += 0.5;
+                    }
                     return (int) Math.round(hours * 60);
+                } else if (hasRuoi) {
+                    return 30;
                 }
             }
         } catch (Exception ignored) {}

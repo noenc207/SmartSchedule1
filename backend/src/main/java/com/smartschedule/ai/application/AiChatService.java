@@ -30,6 +30,9 @@ public class AiChatService {
     private final AiProperties properties;
     private final AiToolRegistry toolRegistry;
     private final AiAgentRouter agentRouter;
+    private final AiUnderstandingService understandingService;
+    private final AiWrongToolGuard wrongToolGuard;
+    private final AiResponseRelevanceValidator relevanceValidator;
 
     // In-memory sliding window rate limiter: User ID -> List of request timestamps (epoch ms)
     private final Map<UUID, List<Long>> rateLimits = new ConcurrentHashMap<>();
@@ -42,15 +45,40 @@ public class AiChatService {
                          AiProvider aiProvider,
                          AiProperties properties,
                          AiToolRegistry toolRegistry,
-                         AiAgentRouter agentRouter) {
+                         AiAgentRouter agentRouter,
+                         @Autowired(required = false) AiUnderstandingService understandingService,
+                         @Autowired(required = false) AiWrongToolGuard wrongToolGuard,
+                         @Autowired(required = false) AiResponseRelevanceValidator relevanceValidator) {
         this.conversationRepository = conversationRepository;
         this.messageRepository = messageRepository;
         this.contextService = contextService;
         this.actionService = actionService;
         this.aiProvider = aiProvider;
         this.properties = properties;
-        this.toolRegistry = toolRegistry;
-        this.agentRouter = agentRouter;
+        this.toolRegistry = toolRegistry != null ? toolRegistry : new AiToolRegistry();
+        this.agentRouter = agentRouter != null ? agentRouter : new AiAgentRouter();
+
+        this.understandingService = (understandingService != null) ? understandingService : new AiUnderstandingService(
+                new AiQueryRepairService(),
+                new AiAliasService(),
+                new AiReferenceResolverService(null, null, new AiAliasService()),
+                new AiPendingIntentService(),
+                new AiConfidenceEngine(),
+                this.agentRouter
+        );
+        this.wrongToolGuard = (wrongToolGuard != null) ? wrongToolGuard : new AiWrongToolGuard();
+        this.relevanceValidator = (relevanceValidator != null) ? relevanceValidator : new AiResponseRelevanceValidator();
+    }
+
+    public AiChatService(AiConversationRepository conversationRepository,
+                         AiMessageRepository messageRepository,
+                         AiContextService contextService,
+                         AiActionService actionService,
+                         AiProvider aiProvider,
+                         AiProperties properties,
+                         AiToolRegistry toolRegistry,
+                         AiAgentRouter agentRouter) {
+        this(conversationRepository, messageRepository, contextService, actionService, aiProvider, properties, toolRegistry, agentRouter, null, null, null);
     }
 
     public AiChatService(AiConversationRepository conversationRepository,
@@ -59,7 +87,7 @@ public class AiChatService {
                          AiActionService actionService,
                          AiProvider aiProvider,
                          AiProperties properties) {
-        this(conversationRepository, messageRepository, contextService, actionService, aiProvider, properties, new AiToolRegistry(), new AiAgentRouter());
+        this(conversationRepository, messageRepository, contextService, actionService, aiProvider, properties, new AiToolRegistry(), new AiAgentRouter(), null, null, null);
     }
 
     @Transactional
@@ -73,6 +101,83 @@ public class AiChatService {
         // Save user message to database
         AiMessage userMessage = new AiMessage(conversation, "user", userPrompt);
         messageRepository.save(userMessage);
+
+        AiUnderstandingService.UnderstandingResult understanding =
+                understandingService.analyze(user, userPrompt, conversation.getId(), request.context());
+
+        // 1. Cancellation request
+        if (understanding.isCancel()) {
+            String cancelReply = "Đã hủy yêu cầu theo ý bạn.";
+            AiMessage modelMessage = new AiMessage(conversation, "model", cancelReply);
+            messageRepository.save(modelMessage);
+            conversation.touch();
+            conversationRepository.save(conversation);
+            return new AiDtos.ChatResponse(conversation.getId(), modelMessage.getId(), modelMessage.getRole(), cancelReply, modelMessage.getCreatedAt(), List.of());
+        }
+
+        // 2. Help query
+        if (understanding.isHelp()) {
+            String helpReply = "SmartSchedule AI hỗ trợ bạn quản lý lịch học và công việc nhanh chóng:\n"
+                    + "• Đổi/Xóa môn: \"xóa lịch lý\", \"thay lý bằng toán\", \"dời toán sang tối\"\n"
+                    + "• Tạo lịch: \"tạo lịch Toán Chủ nhật lúc 08:00 trong 90 phút\"\n"
+                    + "• Đồng bộ: \"đồng bộ Google Calendar\", \"đọc link Google Sheets này\"\n"
+                    + "• Quản lý việc: \"thêm task nộp lab\", \"xong bài tập rồi\"\n"
+                    + "• Giờ rảnh: \"cuối tuần tôi còn 2 tiếng trống không?\"\n"
+                    + "Bạn muốn thực hiện thao tác nào ngay bây giờ?";
+            AiMessage modelMessage = new AiMessage(conversation, "model", helpReply);
+            messageRepository.save(modelMessage);
+            conversation.touch();
+            conversationRepository.save(conversation);
+            return new AiDtos.ChatResponse(conversation.getId(), modelMessage.getId(), modelMessage.getRole(), helpReply, modelMessage.getCreatedAt(), List.of());
+        }
+
+        // 3. Needs clarification (missing required fields or ambiguous target)
+        if (understanding.needsClarification() && understanding.clarificationQuestion() != null) {
+            String clarifyReply = understanding.clarificationQuestion();
+            AiMessage modelMessage = new AiMessage(conversation, "model", clarifyReply);
+            messageRepository.save(modelMessage);
+            conversation.touch();
+            conversationRepository.save(conversation);
+            return new AiDtos.ChatResponse(conversation.getId(), modelMessage.getId(), modelMessage.getRole(), clarifyReply, modelMessage.getCreatedAt(), List.of());
+        }
+
+        // 4. High-confidence deterministic mutation shortcut
+        if (understanding.isCommand() && actionService != null) {
+            String intent = understanding.intent();
+            Map<String, Object> entities = understanding.entities();
+            AiDtos.ProposedActionDto proposed = null;
+
+            if ("REPLACE_SCHEDULE".equals(intent) && entities.containsKey("target_title") && entities.containsKey("new_title")) {
+                try {
+                    proposed = actionService.proposeAction(user, conversation, "replace_schedule", entities, request.context());
+                } catch (Exception ex) {
+                    log.debug("Deterministic replace proposal skipped: {}", ex.getMessage());
+                }
+            } else if ("DELETE_SCHEDULE".equals(intent) && (entities.containsKey("target_event_id") || entities.containsKey("target_title"))) {
+                try {
+                    proposed = actionService.proposeAction(user, conversation, "delete_schedule", entities, request.context());
+                } catch (Exception ex) {
+                    log.debug("Deterministic delete proposal skipped: {}", ex.getMessage());
+                }
+            } else if ("SYNC_GOOGLE_CALENDAR".equals(intent)) {
+                try {
+                    proposed = actionService.proposeAction(user, conversation, "sync_google_calendar", Map.of(), request.context());
+                } catch (Exception ex) {
+                    log.debug("Deterministic sync proposal skipped: {}", ex.getMessage());
+                }
+            }
+
+            if (proposed != null) {
+                String reply = "Tôi đề xuất: " + proposed.summary() +
+                        (proposed.hasConflict() ? "\n⚠️ " + proposed.conflictDetails() : "\nKhông phát hiện xung đột.") +
+                        "\n\nVui lòng kiểm tra và xác nhận trong thẻ bên dưới.";
+                AiMessage modelMessage = new AiMessage(conversation, "model", reply);
+                messageRepository.save(modelMessage);
+                conversation.touch();
+                conversationRepository.save(conversation);
+                return new AiDtos.ChatResponse(conversation.getId(), modelMessage.getId(), modelMessage.getRole(), reply, modelMessage.getCreatedAt(), List.of(proposed));
+            }
+        }
 
         // Build dynamic system instruction with SmartSchedule context & client view
         String systemInstruction = buildSystemPrompt(user, request.context());
@@ -96,6 +201,32 @@ public class AiChatService {
             StringBuilder toolResults = new StringBuilder();
             boolean hasWriteTool = false;
             for (AiProvider.ToolCall tool : response.toolCalls()) {
+                AiWrongToolGuard.ToolValidation guardVal = wrongToolGuard.validate(understanding.intent(), tool.name(), tool.arguments());
+                if (!guardVal.isValid()) {
+                    log.warn("WrongToolGuard intercepted tool call: {} for intent: {}. Reason: {}", tool.name(), understanding.intent(), guardVal.reason());
+                    if (guardVal.suggestedTool() != null && isWriteTool(guardVal.suggestedTool()) && actionService != null) {
+                        try {
+                            AiDtos.ProposedActionDto proposed = actionService.proposeAction(
+                                    user, conversation, guardVal.suggestedTool(),
+                                    understanding.entities().isEmpty() ? tool.arguments() : understanding.entities(),
+                                    request.context()
+                            );
+                            proposedActions.add(proposed);
+                            hasWriteTool = true;
+                            String conflictNote = proposed.hasConflict()
+                                    ? "\n⚠️ " + proposed.conflictDetails()
+                                    : "\nKhông phát hiện xung đột thời gian.";
+                            toolResults.append("Tôi đề xuất: ").append(proposed.summary()).append(conflictNote)
+                                    .append("\n\nVui lòng kiểm tra và xác nhận trong thẻ hành động bên dưới.\n");
+                            continue;
+                        } catch (AiException valEx) {
+                            toolResults.append("\n").append(valEx.getMessage()).append("\n");
+                            continue;
+                        }
+                    }
+                    continue;
+                }
+
                 if (isWriteTool(tool.name()) && actionService != null) {
                     hasWriteTool = true;
                     try {
@@ -168,6 +299,17 @@ public class AiChatService {
             replyContent = "Tôi đã tiếp nhận thông tin nhưng chưa thể đưa ra câu trả lời chi tiết. Bạn có câu hỏi nào khác không?";
         }
 
+        // Validate response relevance and guard against no-op acknowledgements
+        AiResponseRelevanceValidator.RelevanceAssessment relevance = relevanceValidator.validate(
+                understanding.intent(),
+                understanding.isCommand(),
+                replyContent,
+                !proposedActions.isEmpty()
+        );
+        if (!relevance.isRelevant() && relevance.suggestedFallback() != null) {
+            replyContent = relevance.suggestedFallback();
+        }
+
         // Save assistant reply to database
         AiMessage modelMessage = new AiMessage(conversation, "model", replyContent, response.tokensUsed());
         messageRepository.save(modelMessage);
@@ -204,6 +346,91 @@ public class AiChatService {
             AiMessage userMessage = new AiMessage(conversation, "user", userPrompt);
             messageRepository.save(userMessage);
 
+            AiUnderstandingService.UnderstandingResult understanding =
+                    understandingService.analyze(user, userPrompt, conversation.getId(), request.context());
+
+            // 1. Cancellation request
+            if (understanding.isCancel()) {
+                String cancelReply = "Đã hủy yêu cầu theo ý bạn.";
+                AiMessage modelMessage = new AiMessage(conversation, "model", cancelReply);
+                messageRepository.save(modelMessage);
+                conversation.touch();
+                conversationRepository.save(conversation);
+                onChunk.accept(cancelReply);
+                onComplete.accept(new AiDtos.ChatResponse(conversation.getId(), modelMessage.getId(), modelMessage.getRole(), cancelReply, modelMessage.getCreatedAt(), List.of()));
+                return;
+            }
+
+            // 2. Help query
+            if (understanding.isHelp()) {
+                String helpReply = "SmartSchedule AI hỗ trợ bạn quản lý lịch học và công việc nhanh chóng:\n"
+                        + "• Đổi/Xóa môn: \"xóa lịch lý\", \"thay lý bằng toán\", \"dời toán sang tối\"\n"
+                        + "• Tạo lịch: \"tạo lịch Toán Chủ nhật lúc 08:00 trong 90 phút\"\n"
+                        + "• Đồng bộ: \"đồng bộ Google Calendar\", \"đọc link Google Sheets này\"\n"
+                        + "• Quản lý việc: \"thêm task nộp lab\", \"xong bài tập rồi\"\n"
+                        + "• Giờ rảnh: \"cuối tuần tôi còn 2 tiếng trống không?\"\n"
+                        + "Bạn muốn thực hiện thao tác nào ngay bây giờ?";
+                AiMessage modelMessage = new AiMessage(conversation, "model", helpReply);
+                messageRepository.save(modelMessage);
+                conversation.touch();
+                conversationRepository.save(conversation);
+                onChunk.accept(helpReply);
+                onComplete.accept(new AiDtos.ChatResponse(conversation.getId(), modelMessage.getId(), modelMessage.getRole(), helpReply, modelMessage.getCreatedAt(), List.of()));
+                return;
+            }
+
+            // 3. Needs clarification (missing required fields or ambiguous target)
+            if (understanding.needsClarification() && understanding.clarificationQuestion() != null) {
+                String clarifyReply = understanding.clarificationQuestion();
+                AiMessage modelMessage = new AiMessage(conversation, "model", clarifyReply);
+                messageRepository.save(modelMessage);
+                conversation.touch();
+                conversationRepository.save(conversation);
+                onChunk.accept(clarifyReply);
+                onComplete.accept(new AiDtos.ChatResponse(conversation.getId(), modelMessage.getId(), modelMessage.getRole(), clarifyReply, modelMessage.getCreatedAt(), List.of()));
+                return;
+            }
+
+            // 4. High-confidence deterministic mutation shortcut
+            if (understanding.isCommand() && actionService != null) {
+                String intent = understanding.intent();
+                Map<String, Object> entities = understanding.entities();
+                AiDtos.ProposedActionDto proposed = null;
+
+                if ("REPLACE_SCHEDULE".equals(intent) && entities.containsKey("target_title") && entities.containsKey("new_title")) {
+                    try {
+                        proposed = actionService.proposeAction(user, conversation, "replace_schedule", entities, request.context());
+                    } catch (Exception ex) {
+                        log.debug("Deterministic replace proposal skipped: {}", ex.getMessage());
+                    }
+                } else if ("DELETE_SCHEDULE".equals(intent) && (entities.containsKey("target_event_id") || entities.containsKey("target_title"))) {
+                    try {
+                        proposed = actionService.proposeAction(user, conversation, "delete_schedule", entities, request.context());
+                    } catch (Exception ex) {
+                        log.debug("Deterministic delete proposal skipped: {}", ex.getMessage());
+                    }
+                } else if ("SYNC_GOOGLE_CALENDAR".equals(intent)) {
+                    try {
+                        proposed = actionService.proposeAction(user, conversation, "sync_google_calendar", Map.of(), request.context());
+                    } catch (Exception ex) {
+                        log.debug("Deterministic sync proposal skipped: {}", ex.getMessage());
+                    }
+                }
+
+                if (proposed != null) {
+                    String reply = "Tôi đề xuất: " + proposed.summary() +
+                            (proposed.hasConflict() ? "\n⚠️ " + proposed.conflictDetails() : "\nKhông phát hiện xung đột.") +
+                            "\n\nVui lòng kiểm tra và xác nhận trong thẻ bên dưới.";
+                    AiMessage modelMessage = new AiMessage(conversation, "model", reply);
+                    messageRepository.save(modelMessage);
+                    conversation.touch();
+                    conversationRepository.save(conversation);
+                    onChunk.accept(reply);
+                    onComplete.accept(new AiDtos.ChatResponse(conversation.getId(), modelMessage.getId(), modelMessage.getRole(), reply, modelMessage.getCreatedAt(), List.of(proposed)));
+                    return;
+                }
+            }
+
             String systemInstruction = buildSystemPrompt(user, request.context());
 
             List<AiMessage> pastMessages = messageRepository.findAllByConversationIdOrderByCreatedAtAsc(conversation.getId());
@@ -230,6 +457,36 @@ public class AiChatService {
                         if (streamedToolCalls != null && !streamedToolCalls.isEmpty()) {
                             boolean hasWriteTool = false;
                             for (AiProvider.ToolCall tool : streamedToolCalls) {
+                                AiWrongToolGuard.ToolValidation guardVal = wrongToolGuard.validate(understanding.intent(), tool.name(), tool.arguments());
+                                if (!guardVal.isValid()) {
+                                    log.warn("WrongToolGuard intercepted tool call in streamChat: {} for intent: {}. Reason: {}", tool.name(), understanding.intent(), guardVal.reason());
+                                    if (guardVal.suggestedTool() != null && isWriteTool(guardVal.suggestedTool()) && actionService != null) {
+                                        try {
+                                            AiDtos.ProposedActionDto proposed = actionService.proposeAction(
+                                                    user, conversation, guardVal.suggestedTool(),
+                                                    understanding.entities().isEmpty() ? tool.arguments() : understanding.entities(),
+                                                    request.context()
+                                            );
+                                            proposedActions.add(proposed);
+                                            hasWriteTool = true;
+                                            String conflictNote = proposed.hasConflict()
+                                                    ? "\n⚠️ " + proposed.conflictDetails()
+                                                    : "\nKhông phát hiện xung đột.";
+                                            String text = "\n\nTôi đề xuất: " + proposed.summary() + conflictNote +
+                                                    "\n\nVui lòng kiểm tra và xác nhận trong thẻ bên dưới.";
+                                            accumulatedResponse.append(text);
+                                            onChunk.accept(text);
+                                            continue;
+                                        } catch (AiException valEx) {
+                                            String text = "\n\n" + valEx.getMessage();
+                                            accumulatedResponse.append(text);
+                                            onChunk.accept(text);
+                                            continue;
+                                        }
+                                    }
+                                    continue;
+                                }
+
                                 if (isWriteTool(tool.name()) && actionService != null) {
                                     hasWriteTool = true;
                                     try {
@@ -322,6 +579,17 @@ public class AiChatService {
                             } else {
                                 fullContent = "Tôi đã ghi nhận câu hỏi của bạn. Bạn có thể cung cấp thêm chi tiết để tôi hỗ trợ nhé!";
                             }
+                        }
+
+                        // Validate response relevance and guard against no-op acknowledgements
+                        AiResponseRelevanceValidator.RelevanceAssessment relevance = relevanceValidator.validate(
+                                understanding.intent(),
+                                understanding.isCommand(),
+                                fullContent,
+                                !proposedActions.isEmpty()
+                        );
+                        if (!relevance.isRelevant() && relevance.suggestedFallback() != null) {
+                            fullContent = relevance.suggestedFallback();
                         }
 
                         AiMessage modelMessage = new AiMessage(conversation, "model", fullContent);
