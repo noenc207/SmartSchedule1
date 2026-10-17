@@ -4,6 +4,27 @@ import { demoAdapter } from './demoBackend';
 
 export const CUSTOM_API_URL_KEY = 'smartschedule_custom_api_url';
 
+export function sanitizeApiUrl(url: string): string {
+  if (!url) return '';
+  let cleaned = url.trim().replace(/\/+$/, '');
+
+  // If user pasted without protocol, e.g. "smartschedule-api.onrender.com", add https://
+  if (!cleaned.startsWith('http://') && !cleaned.startsWith('https://')) {
+    cleaned = `https://${cleaned}`;
+  }
+
+  // If user provided http:// for a remote domain (like Render), upgrade to https://
+  // to avoid 301 redirects that convert POST requests to GET (causing 405 Method Not Allowed)
+  if (cleaned.startsWith('http://') && !cleaned.includes('localhost') && !cleaned.includes('127.0.0.1')) {
+    cleaned = cleaned.replace(/^http:\/\//i, 'https://');
+  }
+
+  // Strip trailing /api/v1 or /api so getApiBaseUrl does not double-append it
+  cleaned = cleaned.replace(/\/api\/v1\/?$/i, '').replace(/\/api\/?$/i, '');
+
+  return cleaned;
+}
+
 export function getRawApiUrl(): string {
   if (typeof window !== 'undefined') {
     // 1. Check query parameter ?backendUrl=... or ?apiUrl=...
@@ -11,9 +32,11 @@ export function getRawApiUrl(): string {
       const urlParams = new URLSearchParams(window.location.search);
       const queryBackend = urlParams.get('backendUrl') || urlParams.get('apiUrl');
       if (queryBackend && queryBackend.trim()) {
-        const cleaned = queryBackend.trim().replace(/\/+$/, '');
-        localStorage.setItem(CUSTOM_API_URL_KEY, cleaned);
-        return cleaned;
+        const cleaned = sanitizeApiUrl(queryBackend.trim());
+        if (cleaned) {
+          localStorage.setItem(CUSTOM_API_URL_KEY, cleaned);
+          return cleaned;
+        }
       }
     } catch {}
 
@@ -21,19 +44,22 @@ export function getRawApiUrl(): string {
     try {
       const stored = localStorage.getItem(CUSTOM_API_URL_KEY);
       if (stored && stored.trim()) {
-        return stored.trim();
+        const cleaned = sanitizeApiUrl(stored.trim());
+        if (cleaned) {
+          return cleaned;
+        }
       }
     } catch {}
   }
 
-  // 3. Environment variables
+  // 3. Environment variables (only accept explicit host URLs, NEVER relative /api/v1)
   const envUrl =
     import.meta.env.VITEAPIURL ||
-    import.meta.env.VITE_API_URL ||
-    import.meta.env.VITE_API_BASE_URL;
+    import.meta.env.VITE_API_URL;
 
   if (envUrl && envUrl.trim() && envUrl !== 'http://localhost:8080') {
-    return envUrl.trim();
+    const sanitized = sanitizeApiUrl(envUrl.trim());
+    return sanitized || envUrl.trim();
   }
 
   return envUrl || 'http://localhost:8080';
@@ -47,9 +73,11 @@ export function getApiBaseUrl(): string {
 export function setCustomApiUrl(url: string | null): void {
   if (typeof window === 'undefined') return;
   if (url && url.trim()) {
-    const cleaned = url.trim().replace(/\/+$/, '');
-    localStorage.setItem(CUSTOM_API_URL_KEY, cleaned);
-    apiClient.defaults.baseURL = cleaned.endsWith('/api/v1') ? cleaned : `${cleaned}/api/v1`;
+    const cleaned = sanitizeApiUrl(url);
+    if (cleaned) {
+      localStorage.setItem(CUSTOM_API_URL_KEY, cleaned);
+      apiClient.defaults.baseURL = `${cleaned}/api/v1`;
+    }
   } else {
     localStorage.removeItem(CUSTOM_API_URL_KEY);
     apiClient.defaults.baseURL = getApiBaseUrl();
@@ -172,15 +200,24 @@ export function setAccessToken(token: string | null) {
 export async function refreshAccessToken(): Promise<string | null> {
   if (!refreshPromise) {
     const storedRefresh = getStoredRefreshToken();
-    refreshPromise = axios.post<{ accessToken: string; refreshToken?: string }>(
+    refreshPromise = axios.post<{ accessToken: string; refreshToken?: string; user?: any }>(
       `${getApiBaseUrl()}/auth/refresh`,
       storedRefresh ? { refreshToken: storedRefresh } : {},
       { withCredentials: true },
     ).then(({ data }) => {
       setStoredTokens(data.accessToken, data.refreshToken);
+      if (data.user) {
+        setStoredUser(data.user);
+      }
       return data.accessToken;
-    }).catch(() => {
-      clearStoredTokens();
+    }).catch((err) => {
+      // Only clear credentials if backend explicitly rejected the token (401/400/403)
+      // Do NOT clear on network error / 502 / 503 so session can survive cold starts
+      const status = err?.response?.status;
+      if (status === 401 || status === 400 || status === 403) {
+        clearStoredTokens();
+        clearStoredUser();
+      }
       return null;
     }).finally(() => {
       refreshPromise = null;
@@ -231,6 +268,10 @@ export function getApiErrorMessage(error: unknown): string {
     if (error.response?.status === 401) return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
     if (error.response?.status === 403) return 'Bạn không có quyền thực hiện thao tác này.';
     if (error.response?.status === 404) return 'Không tìm thấy tài nguyên yêu cầu.';
+    if (error.response?.status === 405) {
+      const currentTarget = getRawApiUrl();
+      return `Lỗi kết nối (405 Method Not Allowed): Yêu cầu bị máy chủ từ chối do URL backend (${currentTarget}) chưa trỏ đúng đến máy chủ Render. Vui lòng kiểm tra lại URL máy chủ Render của bạn ở ô cấu hình bên dưới.`;
+    }
     if (error.response?.status === 409) return 'Xung đột dữ liệu hoặc phiên bản lịch đã thay đổi.';
     if (error.response?.status === 422) return 'Dữ liệu gửi lên không hợp lệ.';
     if (error.response?.status && error.response.status >= 500) return 'Lỗi máy chủ nội bộ. Vui lòng thử lại sau.';

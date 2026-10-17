@@ -132,6 +132,18 @@ let bootstrapPromise: Promise<void> | null = null;
 
 const initialAuth = getInitialAuthState();
 
+const AUTH_SYNC_CHANNEL = 'smartschedule_auth_sync';
+
+function broadcastAuthEvent(type: 'LOGIN' | 'LOGOUT', user?: User | null) {
+  try {
+    if (typeof BroadcastChannel !== 'undefined') {
+      const channel = new BroadcastChannel(AUTH_SYNC_CHANNEL);
+      channel.postMessage({ type, user });
+      channel.close();
+    }
+  } catch {}
+}
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: initialAuth.user,
   status: initialAuth.status,
@@ -151,6 +163,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           setStoredUser(user);
         }
         set({ user, status: 'AUTHENTICATED', authInitialized: true, error: null });
+        broadcastAuthEvent('LOGIN', user);
       }
       return response;
     } catch (error) {
@@ -173,6 +186,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           setStoredUser(user);
         }
         set({ user, status: 'AUTHENTICATED', authInitialized: true, error: null });
+        broadcastAuthEvent('LOGIN', user);
       }
       return response;
     } catch (error) {
@@ -195,6 +209,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           setStoredUser(user);
         }
         set({ user, status: 'AUTHENTICATED', authInitialized: true, error: null });
+        broadcastAuthEvent('LOGIN', user);
       }
       return response;
     } catch (error) {
@@ -216,6 +231,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         setStoredUser(user);
       }
       set({ user, status: 'AUTHENTICATED', authInitialized: true, error: null });
+      broadcastAuthEvent('LOGIN', user);
     } catch (error) {
       set({ error: getApiErrorMessage(error) });
       throw error;
@@ -235,6 +251,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       authInitialized: true,
       error: null,
     });
+    broadcastAuthEvent('LOGIN', demoUser);
   },
 
   exitDemoMode: () => {
@@ -242,6 +259,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     localStorage.removeItem('smartschedule-demo-mode');
     clearStoredTokens();
     clearStoredUser();
+    broadcastAuthEvent('LOGOUT');
     set({ user: null, status: 'UNAUTHENTICATED', authInitialized: true, error: null });
   },
 
@@ -257,6 +275,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         setStoredUser(user);
       }
       set({ user, status: 'AUTHENTICATED', authInitialized: true, error: null });
+      broadcastAuthEvent('LOGIN', user);
     } catch (error) {
       set({ error: getApiErrorMessage(error) });
       throw error;
@@ -281,11 +300,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       try {
         const storedToken = getStoredAccessToken();
         const storedRefresh = getStoredRefreshToken();
+        const cached = getStoredUser<User>();
 
         // 1. If we have a valid unexpired access token:
         if (storedToken && !isJwtExpired(storedToken)) {
           setAccessToken(storedToken);
-          const cached = getStoredUser<User>();
           if (cached) {
             set({ user: cached });
           }
@@ -320,11 +339,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           }
           set({ user: userWithTier, status: 'AUTHENTICATED', authInitialized: true, error: null });
           return;
-        } catch {
-          // Both access token and refresh token / cookie failed (or were revoked / expired)
-          clearStoredTokens();
-          clearStoredUser();
-          set({ user: null, status: 'UNAUTHENTICATED', authInitialized: true });
+        } catch (refreshError: any) {
+          const isNetworkError =
+            refreshError?.message === 'Network Error' ||
+            refreshError?.code === 'ERR_NETWORK' ||
+            refreshError?.code === 'ECONNABORTED' ||
+            (refreshError?.response?.status && refreshError.response.status >= 500);
+
+          if (isNetworkError && cached) {
+            // Render cold start, temporary network disconnection, 5xx server error.
+            // If cached session exists, preserve it to prevent unwanted redirect loops on F5.
+            set({
+              user: cached,
+              status: 'AUTHENTICATED',
+              authInitialized: true,
+              error: null,
+            });
+          } else {
+            // Expired/revoked refresh token (401/403/400 or invalid token error)
+            clearStoredTokens();
+            clearStoredUser();
+            set({ user: null, status: 'UNAUTHENTICATED', authInitialized: true });
+          }
         }
       } finally {
         bootstrapPromise = null;
@@ -340,6 +376,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     localStorage.removeItem('smartschedule-demo-mode');
     clearStoredTokens();
     clearStoredUser();
+    broadcastAuthEvent('LOGOUT');
     try {
       if (refreshToken) {
         await authApi.logout(refreshToken);
@@ -384,11 +421,59 @@ if (typeof window !== 'undefined') {
   window.addEventListener('smartschedule:auth-expired', () => {
     clearStoredTokens();
     clearStoredUser();
+    broadcastAuthEvent('LOGOUT');
     useAuthStore.setState({
       user: null,
       status: 'UNAUTHENTICATED',
       authInitialized: true,
       error: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
     });
+  });
+
+  // Cross-tab synchronization using BroadcastChannel
+  try {
+    if (typeof BroadcastChannel !== 'undefined') {
+      const syncChannel = new BroadcastChannel(AUTH_SYNC_CHANNEL);
+      syncChannel.onmessage = (event) => {
+        if (event.data?.type === 'LOGOUT') {
+          clearStoredTokens();
+          clearStoredUser();
+          useAuthStore.setState({
+            user: null,
+            status: 'UNAUTHENTICATED',
+            authInitialized: true,
+          });
+        } else if (event.data?.type === 'LOGIN' && event.data?.user) {
+          useAuthStore.setState({
+            user: event.data.user,
+            status: 'AUTHENTICATED',
+            authInitialized: true,
+            error: null,
+          });
+        }
+      };
+    }
+  } catch {}
+
+  // Cross-tab synchronization fallback using storage events
+  window.addEventListener('storage', (event: StorageEvent) => {
+    if (
+      event.key === 'smartschedule_access_token' ||
+      event.key === 'smartschedule_refresh_token' ||
+      event.key === 'smartschedule_user'
+    ) {
+      if (!event.newValue) {
+        useAuthStore.setState({
+          user: null,
+          status: 'UNAUTHENTICATED',
+          authInitialized: true,
+        });
+      } else if (event.key === 'smartschedule_user' && event.newValue) {
+        try {
+          const parsed = JSON.parse(event.newValue);
+          useAuthStore.setState({ user: parsed, status: 'AUTHENTICATED' });
+        } catch {}
+      }
+    }
   });
 }

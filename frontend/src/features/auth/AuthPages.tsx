@@ -9,7 +9,7 @@ import { BrandLogo } from '../../components/BrandLogo';
 import { isDemoMode, isRealMode } from '../../services/demoMode';
 import { SocialAuthButtons, type SocialAuthPayload } from './SocialAuthButtons';
 import { SocialRegistrationView } from './GoogleRegistrationView';
-import { getApiErrorMessage, getRawApiUrl, setCustomApiUrl } from '../../services/apiClient';
+import { getApiErrorMessage, getRawApiUrl, setCustomApiUrl, CUSTOM_API_URL_KEY } from '../../services/apiClient';
 
 export const loginSchema = z.object({
   email: z.string().trim().email('Enter a valid email address.'),
@@ -23,7 +23,7 @@ export const registerSchema = z.object({
     .regex(/[A-Z]/, 'Add at least one uppercase letter.')
     .regex(/[0-9]/, 'Add at least one number.'),
   confirmPassword: z.string(),
-  activationKey: z.string().trim().min(1, 'Mã kích hoạt là bắt buộc (Activation key required).'),
+  activationKey: z.string().optional(),
 }).refine((value) => value.password === value.confirmPassword, {
   path: ['confirmPassword'], message: 'Passwords do not match.',
 });
@@ -253,7 +253,6 @@ export function RegisterPage() {
   const navigate = useNavigate();
   const { register, googleAuth, githubAuth, facebookAuth, error, clearError } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
-  const [showActivationKey, setShowActivationKey] = useState(false);
   const [socialLoading, setSocialLoading] = useState(false);
   const [socialNotice, setSocialNotice] = useState<string | null>(null);
   const [pendingSocialAuth, setPendingSocialAuth] = useState<PendingSocialAuthState | null>(null);
@@ -261,7 +260,7 @@ export function RegisterPage() {
 
   const form = useForm<RegisterInput & { confirmPassword: string }>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { displayName: '', email: '', password: '', confirmPassword: '', activationKey: '' },
+    defaultValues: { displayName: '', email: '', password: '', confirmPassword: '' },
   });
   useEffect(() => clearError(), [clearError]);
 
@@ -409,19 +408,6 @@ export function RegisterPage() {
         <Field label="Confirm password" error={form.formState.errors.confirmPassword?.message}>
           <input type={showPassword ? 'text' : 'password'} autoComplete="new-password" {...form.register('confirmPassword')} />
         </Field>
-        <Field label="Mã kích hoạt (Activation Key)" hint="Yêu cầu mã kích hoạt do ban quản trị cấp trong đợt thử nghiệm này." error={form.formState.errors.activationKey?.message}>
-          <div className="password-field">
-            <input
-              type={showActivationKey ? 'text' : 'password'}
-              autoComplete="off"
-              placeholder="Nhập mã kích hoạt của bạn"
-              {...form.register('activationKey')}
-            />
-            <button type="button" onClick={() => setShowActivationKey(!showActivationKey)}>
-              {showActivationKey ? 'Ẩn' : 'Hiện'}
-            </button>
-          </div>
-        </Field>
         <BackendConnectionAlert error={error} onClearError={clearError} />
         <button className="primary-button auth-submit" disabled={form.formState.isSubmitting || socialLoading}>
           {form.formState.isSubmitting ? 'Creating…' : 'Create account'}
@@ -433,7 +419,13 @@ export function RegisterPage() {
 }
 
 function BackendConnectionAlert({ error, onClearError }: { error: string | null; onClearError: () => void }) {
-  const [customUrl, setCustomUrl] = useState('');
+  const [customUrl, setCustomUrl] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(CUSTOM_API_URL_KEY) || '';
+    }
+    return '';
+  });
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [showConfig, setShowConfig] = useState(false);
   const isProduction =
     typeof window !== 'undefined' &&
@@ -443,6 +435,29 @@ function BackendConnectionAlert({ error, onClearError }: { error: string | null;
   const isLocalhost = rawUrl.includes('localhost') || rawUrl.includes('127.0.0.1');
 
   if (!error && !(isProduction && isLocalhost)) return null;
+
+  const handleSave = () => {
+    setValidationError(null);
+    const trimmed = customUrl.trim();
+    if (!trimmed) {
+      setValidationError('Vui lòng nhập URL máy chủ Backend.');
+      return;
+    }
+    if (typeof window !== 'undefined' && trimmed.includes(window.location.hostname)) {
+      setValidationError('Đây là tên miền Frontend (Vercel). Bạn cần nhập tên miền Backend Render (ví dụ: https://xxx.onrender.com).');
+      return;
+    }
+    setCustomApiUrl(trimmed);
+    onClearError();
+    window.location.reload();
+  };
+
+  const handleReset = () => {
+    setCustomApiUrl(null);
+    setCustomUrl('');
+    onClearError();
+    window.location.reload();
+  };
 
   return (
     <div
@@ -456,14 +471,14 @@ function BackendConnectionAlert({ error, onClearError }: { error: string | null;
         margin: '12px 0',
       }}
     >
-      {error && <div>{error}</div>}
+      {error && <div style={{ lineHeight: 1.5 }}>{error}</div>}
 
       {isProduction && (
         <div
           style={{
             marginTop: error ? '4px' : '0px',
             padding: '10px 12px',
-            background: 'rgba(255, 255, 255, 0.95)',
+            background: 'rgba(255, 255, 255, 0.98)',
             borderRadius: '8px',
             border: '1px solid #fed7aa',
             color: '#1e293b',
@@ -497,10 +512,13 @@ function BackendConnectionAlert({ error, onClearError }: { error: string | null;
               </p>
               <div style={{ display: 'flex', gap: '6px' }}>
                 <input
-                  type="url"
+                  type="text"
                   placeholder="https://your-backend.onrender.com"
                   value={customUrl}
-                  onChange={(e) => setCustomUrl(e.target.value)}
+                  onChange={(e) => {
+                    setCustomUrl(e.target.value);
+                    setValidationError(null);
+                  }}
                   style={{
                     flex: 1,
                     padding: '6px 8px',
@@ -514,13 +532,7 @@ function BackendConnectionAlert({ error, onClearError }: { error: string | null;
                 />
                 <button
                   type="button"
-                  onClick={() => {
-                    if (customUrl.trim()) {
-                      setCustomApiUrl(customUrl.trim());
-                      onClearError();
-                      window.location.reload();
-                    }
-                  }}
+                  onClick={handleSave}
                   style={{
                     padding: '6px 12px',
                     fontSize: '12px',
@@ -535,7 +547,30 @@ function BackendConnectionAlert({ error, onClearError }: { error: string | null;
                 >
                   Lưu & Thử lại
                 </button>
+                {typeof window !== 'undefined' && localStorage.getItem(CUSTOM_API_URL_KEY) && (
+                  <button
+                    type="button"
+                    onClick={handleReset}
+                    style={{
+                      padding: '6px 8px',
+                      fontSize: '11px',
+                      background: '#f1f5f9',
+                      color: '#475569',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    Xóa URL
+                  </button>
+                )}
               </div>
+              {validationError && (
+                <div style={{ color: '#dc2626', fontSize: '11px', marginTop: '4px' }}>
+                  {validationError}
+                </div>
+              )}
             </div>
           )}
         </div>

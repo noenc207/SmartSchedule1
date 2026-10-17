@@ -13,10 +13,10 @@ public final class AuthDtos {
             @NotBlank @Size(max = 120) String displayName,
             @NotBlank @Email @Size(max = 320) String email,
             @NotBlank @Size(min = 8, max = 72) String password,
-            @NotBlank(message = "Mã kích hoạt không được để trống.") String activationKey) {
+            String activationKey) {
 
         public RegisterRequest(String displayName, String email, String password) {
-            this(displayName, email, password, "");
+            this(displayName, email, password, null);
         }
     }
 

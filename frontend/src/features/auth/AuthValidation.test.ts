@@ -6,26 +6,33 @@ describe('authentication validation', () => {
     expect(loginSchema.safeParse({ email: 'not-an-email', password: 'secret' }).success).toBe(false);
   });
 
-  it('requires matching strong registration passwords and activation key', () => {
+  it('requires matching strong registration passwords', () => {
     expect(registerSchema.safeParse({
       displayName: 'Planner',
       email: 'planner@example.com',
       password: 'password',
       confirmPassword: 'different',
-      activationKey: 'SMART-2026',
     }).success).toBe(false);
 
-    // Missing activation key
+    // Rejects weak password
+    expect(registerSchema.safeParse({
+      displayName: 'Planner',
+      email: 'planner@example.com',
+      password: 'weak',
+      confirmPassword: 'weak',
+    }).success).toBe(false);
+  });
+
+  it('accepts a valid registration form without activation key', () => {
     expect(registerSchema.safeParse({
       displayName: 'Planner',
       email: 'planner@example.com',
       password: 'Password1',
       confirmPassword: 'Password1',
-      activationKey: '',
-    }).success).toBe(false);
+    }).success).toBe(true);
   });
 
-  it('accepts a valid registration form with activation key', () => {
+  it('optionally accepts activation key if provided', () => {
     expect(registerSchema.safeParse({
       displayName: 'Planner',
       email: 'planner@example.com',

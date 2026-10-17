@@ -28,7 +28,7 @@ export type RegisterInput = {
   displayName: string;
   email: string;
   password: string;
-  activationKey: string;
+  activationKey?: string;
 };
 
 export type SocialProvider = 'GOOGLE' | 'GITHUB' | 'FACEBOOK';

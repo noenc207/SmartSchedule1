@@ -109,20 +109,20 @@ public class AuthActivationAndRateLimitTest {
     }
 
     @Test
-    void register_withEmptyActivationKey_throwsInvalidActivationKeyException() {
+    void register_withoutActivationKey_succeeds() {
         RegisterRequest request = new RegisterRequest(
-                "Attacker",
-                "attacker@example.com",
-                "StrongPassword123",
-                ""
+                "New Student",
+                "newstudent@fpt.edu.vn",
+                "StrongPassword123"
         );
 
-        AuthException exception = assertThrows(AuthException.class, () ->
-                authService.register(request, "JUnit", "127.0.0.1")
-        );
+        AuthService.AuthSession session = authService.register(request, "JUnit", "127.0.0.1");
 
-        assertEquals("INVALID_ACTIVATION_KEY", exception.getCode());
-        verify(users, never()).save(any());
+        assertNotNull(session);
+        assertEquals("jwt_token_mock", session.response().accessToken());
+        assertEquals("PRO", session.response().user().tier());
+        assertEquals("New Student", session.response().user().displayName());
+        verify(users).save(any(User.class));
     }
 
     @Test

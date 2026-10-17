@@ -50,6 +50,6 @@ public record AuthProperties(
 
     public AuthProperties(String jwtSecret, Duration accessTokenTtl, Duration refreshTokenTtl,
                           String refreshCookieName, boolean secureCookie) {
-        this(jwtSecret, accessTokenTtl, refreshTokenTtl, refreshCookieName, secureCookie, "SMART-DEPLOY-2026", "");
+        this(jwtSecret, accessTokenTtl, refreshTokenTtl, refreshCookieName, secureCookie, "", "");
     }
 }

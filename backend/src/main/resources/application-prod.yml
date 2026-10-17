@@ -21,7 +21,7 @@ smartschedule:
   auth:
     jwt-secret: ${SMARTSCHEDULE_JWT_SECRET}
     secure-cookie: true
-    registration-key: ${SMARTSCHEDULE_REGISTRATION_KEY}
+    registration-key: ${SMARTSCHEDULE_REGISTRATION_KEY:}
     google-client-id: ${SMARTSCHEDULE_GOOGLE_CLIENT_ID:231472661796-1iegvpdu3jj9s845cbm46imktk73u5ss.apps.googleusercontent.com}
     github-client-id: ${SMARTSCHEDULE_GITHUB_CLIENT_ID:Ov23liGithubPreviewClientId}
     github-client-secret: ${SMARTSCHEDULE_GITHUB_CLIENT_SECRET:}

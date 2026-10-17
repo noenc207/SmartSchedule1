@@ -94,7 +94,9 @@ public class AuthService {
 
     @Transactional
     public AuthSession register(RegisterRequest request, String userAgent, String ipAddress) {
-        validateActivationKey(request.activationKey());
+        if (request.activationKey() != null && !request.activationKey().isBlank()) {
+            validateActivationKey(request.activationKey());
+        }
         String email = normalizeEmail(request.email());
         if (users.existsByEmailIgnoreCaseAndDeletedAtIsNull(email)) {
             throw new AuthException("EMAIL_ALREADY_REGISTERED", "An account with this email already exists.");
@@ -111,7 +113,7 @@ public class AuthService {
 
     private void validateActivationKey(String rawKey) {
         if (rawKey == null || rawKey.isBlank()) {
-            throw new AuthException("INVALID_ACTIVATION_KEY", "Mã kích hoạt là bắt buộc (Activation key required).");
+            return;
         }
         String configuredKey = properties.registrationKey();
         if (configuredKey == null || configuredKey.isBlank()) {
@@ -159,7 +161,8 @@ public class AuthService {
 
         // 2. Google user does NOT exist yet. Check if registration key was provided:
         String rawKey = request.registrationKey();
-        if (rawKey == null || rawKey.isBlank()) {
+        boolean keyEnforced = properties.registrationKey() != null && !properties.registrationKey().isBlank();
+        if ((rawKey == null || rawKey.isBlank()) && keyEnforced) {
             return new GoogleAuthResult(
                     GoogleAuthResponse.keyRequired(identity.email(), identity.name(), identity.picture()),
                     null,
@@ -167,7 +170,7 @@ public class AuthService {
             );
         }
 
-        // 3. User provided registration key. Validate key and create user atomically!
+        // 3. User provided registration key or key is not required. Validate key and create user atomically!
         String normalizedEmail = normalizeEmail(identity.email());
         Optional<User> emailUser = users.findByEmailIgnoreCaseAndDeletedAtIsNull(normalizedEmail);
         if (emailUser.isPresent() && emailUser.get().getGoogleId() != null
@@ -175,7 +178,10 @@ public class AuthService {
             throw new AuthException("EMAIL_ALREADY_REGISTERED", "Email này đã được liên kết với một tài khoản Google khác.");
         }
 
-        RegistrationKey consumedKey = validateAndLockRegistrationKey(rawKey.trim());
+        RegistrationKey consumedKey = null;
+        if (rawKey != null && !rawKey.isBlank()) {
+            consumedKey = validateAndLockRegistrationKey(rawKey.trim());
+        }
 
         User user;
         if (emailUser.isPresent()) {
@@ -195,7 +201,9 @@ public class AuthService {
             }
         }
 
-        consumeRegistrationKey(consumedKey, user, rawKey.trim());
+        if (rawKey != null && !rawKey.isBlank()) {
+            consumeRegistrationKey(consumedKey, user, rawKey.trim());
+        }
 
         Session session = issueSession(user, userAgent, ipAddress);
         return new GoogleAuthResult(GoogleAuthResponse.authenticated(session.response()), session.rawRefreshToken(), false);
@@ -222,9 +230,10 @@ public class AuthService {
             return new SocialAuthResult(SocialAuthResponse.authenticated(session.response(), "GITHUB"), session.rawRefreshToken(), false);
         }
 
-        // 2. New GitHub user: key required
+        // 2. New GitHub user: key required only if keyEnforced
         String rawKey = request.registrationKey();
-        if (rawKey == null || rawKey.isBlank()) {
+        boolean keyEnforced = properties.registrationKey() != null && !properties.registrationKey().isBlank();
+        if ((rawKey == null || rawKey.isBlank()) && keyEnforced) {
             return new SocialAuthResult(
                     SocialAuthResponse.keyRequired(identity.email(), identity.name(), identity.picture(), "GITHUB"),
                     null,
@@ -240,7 +249,10 @@ public class AuthService {
             throw new AuthException("EMAIL_ALREADY_REGISTERED", "Email này đã được liên kết với một tài khoản GitHub khác.");
         }
 
-        RegistrationKey consumedKey = validateAndLockRegistrationKey(rawKey.trim());
+        RegistrationKey consumedKey = null;
+        if (rawKey != null && !rawKey.isBlank()) {
+            consumedKey = validateAndLockRegistrationKey(rawKey.trim());
+        }
 
         User user;
         if (emailUser.isPresent()) {
@@ -260,7 +272,9 @@ public class AuthService {
             }
         }
 
-        consumeRegistrationKey(consumedKey, user, rawKey.trim());
+        if (rawKey != null && !rawKey.isBlank()) {
+            consumeRegistrationKey(consumedKey, user, rawKey.trim());
+        }
 
         Session session = issueSession(user, userAgent, ipAddress);
         return new SocialAuthResult(SocialAuthResponse.authenticated(session.response(), "GITHUB"), session.rawRefreshToken(), false);
@@ -287,9 +301,10 @@ public class AuthService {
             return new SocialAuthResult(SocialAuthResponse.authenticated(session.response(), "FACEBOOK"), session.rawRefreshToken(), false);
         }
 
-        // 2. New Facebook user: key required
+        // 2. New Facebook user: key required only if keyEnforced
         String rawKey = request.registrationKey();
-        if (rawKey == null || rawKey.isBlank()) {
+        boolean keyEnforced = properties.registrationKey() != null && !properties.registrationKey().isBlank();
+        if ((rawKey == null || rawKey.isBlank()) && keyEnforced) {
             return new SocialAuthResult(
                     SocialAuthResponse.keyRequired(identity.email(), identity.name(), identity.picture(), "FACEBOOK"),
                     null,
@@ -305,7 +320,10 @@ public class AuthService {
             throw new AuthException("EMAIL_ALREADY_REGISTERED", "Email này đã được liên kết với một tài khoản Facebook khác.");
         }
 
-        RegistrationKey consumedKey = validateAndLockRegistrationKey(rawKey.trim());
+        RegistrationKey consumedKey = null;
+        if (rawKey != null && !rawKey.isBlank()) {
+            consumedKey = validateAndLockRegistrationKey(rawKey.trim());
+        }
 
         User user;
         if (emailUser.isPresent()) {
@@ -325,7 +343,9 @@ public class AuthService {
             }
         }
 
-        consumeRegistrationKey(consumedKey, user, rawKey.trim());
+        if (rawKey != null && !rawKey.isBlank()) {
+            consumeRegistrationKey(consumedKey, user, rawKey.trim());
+        }
 
         Session session = issueSession(user, userAgent, ipAddress);
         return new SocialAuthResult(SocialAuthResponse.authenticated(session.response(), "FACEBOOK"), session.rawRefreshToken(), false);
