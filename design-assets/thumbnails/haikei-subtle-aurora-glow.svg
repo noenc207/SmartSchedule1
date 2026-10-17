@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 600" preserveAspectRatio="none">
+  <defs>
+    <filter id="aurora-blur" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="80"/>
+    </filter>
+    <linearGradient id="aurora-1" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ea580c" stop-opacity="0.25"/>
+      <stop offset="50%" stop-color="#f97316" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#0284c7" stop-opacity="0.18"/>
+    </linearGradient>
+  </defs>
+  <g filter="url(#aurora-blur)">
+    <path fill="url(#aurora-1)" d="M-100,100 Q400,300 800,150 T1600,200 L1600,500 L-100,500 Z"/>
+    <ellipse cx="720" cy="200" rx="500" ry="120" fill="#ea580c" fill-opacity="0.15"/>
+  </g>
+</svg>

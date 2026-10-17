@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@formkit/auto-animate": "^0.10.0",
     "@fullcalendar/core": "^6.1.21",
     "@fullcalendar/daygrid": "^6.1.15",
     "@fullcalendar/interaction": "^6.1.15",
@@ -21,12 +22,15 @@
     "@react-three/fiber": "^9.7.0",
     "@types/three": "^0.186.0",
     "axios": "^1.8.4",
+    "clsx": "^2.1.1",
     "framer-motion": "^13.4.0",
     "lucide-react": "^1.47.0",
+    "motion": "^12.43.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.55.0",
     "react-router-dom": "^7.5.0",
+    "tailwind-merge": "^3.7.0",
     "three": "^0.186.0",
     "zod": "^3.24.2",
     "zustand": "^5.0.3"

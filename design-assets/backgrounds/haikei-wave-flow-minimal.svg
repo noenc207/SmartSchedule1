@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 240" preserveAspectRatio="none">
+  <defs>
+    <linearGradient id="flow-minimal" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ea580c" stop-opacity="0.12"/>
+      <stop offset="50%" stop-color="#f97316" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#c2410c" stop-opacity="0.08"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#flow-minimal)" d="M0,64L80,85.3C160,107,320,149,480,154.7C640,160,800,128,960,117.3C1120,107,1280,117,1360,122.7L1440,128L1440,240L1360,240C1280,240,1120,240,960,240C800,240,640,240,480,240C320,240,160,240,80,240L0,240Z"/>
+  <path fill="none" stroke="#ea580c" stroke-width="1.5" stroke-opacity="0.35" d="M0,64L80,85.3C160,107,320,149,480,154.7C640,160,800,128,960,117.3C1120,107,1280,117,1360,122.7L1440,128"/>
+</svg>

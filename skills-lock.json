@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "animate-text": {
+      "source": "pixel-point/animate-text",
+      "sourceType": "github",
+      "skillPath": "skills/animate-text/SKILL.md",
+      "computedHash": "81b7719e45013fcf651f1f4c9a1ca2af9618e99667ff5cd3e5d102369235ec5e"
+    },
+    "motion": {
+      "source": "motiondivision/ai-kit",
+      "sourceType": "github",
+      "skillPath": "plugins/motion/skills/motion/SKILL.md",
+      "computedHash": "f0262fe55b2f7280cc321f2eca635abfe43d64bd8594a41c89347067c6554b55"
+    },
+    "ui-animation": {
+      "source": "mblode/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/ui-animation/SKILL.md",
+      "computedHash": "d24cffdc8442d5ac88604af27273e3c322528e8365eb3291d696dc4982cba249"
+    }
+  }
+}

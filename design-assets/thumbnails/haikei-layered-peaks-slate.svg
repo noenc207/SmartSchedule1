@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 400" preserveAspectRatio="none">
+  <defs>
+    <linearGradient id="peak-grad-bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#1e293b" stop-opacity="1"/>
+    </linearGradient>
+    <linearGradient id="peak-grad-1" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#334155" stop-opacity="0.6"/>
+      <stop offset="50%" stop-color="#ea580c" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#334155" stop-opacity="0.6"/>
+    </linearGradient>
+    <linearGradient id="peak-grad-2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ea580c" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#1e293b" stop-opacity="0.9"/>
+    </linearGradient>
+  </defs>
+  <rect width="1440" height="400" fill="url(#peak-grad-bg)"/>
+  <polygon points="0,400 0,220 180,280 360,190 540,260 720,140 900,240 1080,170 1260,250 1440,160 1440,400" fill="url(#peak-grad-1)"/>
+  <polygon points="0,400 0,310 240,240 480,320 720,210 960,300 1200,220 1440,290 1440,400" fill="url(#peak-grad-2)"/>
+  <polyline points="0,220 180,280 360,190 720,140 1080,170 1440,160" fill="none" stroke="#ea580c" stroke-width="2" stroke-opacity="0.6"/>
+</svg>

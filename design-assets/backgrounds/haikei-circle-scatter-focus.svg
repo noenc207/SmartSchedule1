@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="circle-stroke" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ea580c" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#f97316" stop-opacity="0.05"/>
+    </linearGradient>
+  </defs>
+  <!-- Concentric focus rings -->
+  <circle cx="200" cy="300" r="140" fill="none" stroke="url(#circle-stroke)" stroke-width="1.5" stroke-dasharray="4 6"/>
+  <circle cx="200" cy="300" r="90" fill="none" stroke="#ea580c" stroke-width="1" stroke-opacity="0.25"/>
+  <circle cx="200" cy="300" r="40" fill="#ea580c" fill-opacity="0.06"/>
+  
+  <circle cx="750" cy="220" r="180" fill="none" stroke="url(#circle-stroke)" stroke-width="1.5"/>
+  <circle cx="750" cy="220" r="120" fill="none" stroke="#f97316" stroke-width="1" stroke-opacity="0.2" stroke-dasharray="3 4"/>
+  <circle cx="750" cy="220" r="60" fill="#ea580c" fill-opacity="0.05"/>
+
+  <circle cx="500" cy="450" r="100" fill="none" stroke="url(#circle-stroke)" stroke-width="1"/>
+  <circle cx="500" cy="450" r="50" fill="#ea580c" fill-opacity="0.04"/>
+
+  <circle cx="850" cy="500" r="70" fill="none" stroke="#ea580c" stroke-width="1" stroke-opacity="0.2"/>
+</svg>

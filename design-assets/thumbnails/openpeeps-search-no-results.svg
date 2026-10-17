@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <!-- Open Peeps Style: No Results Found (CC0 - Pablo Stanley) -->
+  <circle cx="200" cy="200" r="140" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2"/>
+  <!-- Character Head looking confused/searching -->
+  <circle cx="170" cy="200" r="40" fill="#fed7aa"/>
+  <!-- Hair -->
+  <path d="M130 190 C130 155 155 150 185 150 C210 150 215 170 215 190 C200 165 160 165 130 190 Z" fill="#0f172a"/>
+  <!-- Looking Eye -->
+  <circle cx="160" cy="200" r="4" fill="#0f172a"/>
+  <path d="M152 215 Q162 210 172 215" fill="none" stroke="#0f172a" stroke-width="2" stroke-linecap="round"/>
+  <!-- Giant Magnifying Glass with Orange Ring -->
+  <circle cx="240" cy="180" r="48" fill="#ffffff" fill-opacity="0.8" stroke="#ea580c" stroke-width="5"/>
+  <line x1="274" y1="214" x2="320" y2="260" stroke="#0f172a" stroke-width="7" stroke-linecap="round"/>
+  <!-- Question mark inside lens -->
+  <text x="232" y="196" font-family="system-ui, sans-serif" font-size="42" font-weight="bold" fill="#ea580c">?</text>
+</svg>

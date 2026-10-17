@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { BrandLogo } from '../../components/BrandLogo';
+import { SmartConnectionExperience } from '../../components/feedback/SmartConnectionExperience';
 import type { SocialProvider } from '../../types/auth';
 
 export interface SocialOAuthCallbackProps {
@@ -29,6 +30,14 @@ export function SocialOAuthCallback({ defaultProvider }: SocialOAuthCallbackProp
 
   const [statusMessage, setStatusMessage] = useState(`Đang kết nối tài khoản ${providerLabel}…`);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [elapsedSec, setElapsedSec] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setElapsedSec((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     // 1. Extract params from URL hash (standard for implicit id_token / access_token) or query string
@@ -153,51 +162,75 @@ export function SocialOAuthCallback({ defaultProvider }: SocialOAuthCallbackProp
     })();
   }, [navigate, inferredProvider, providerLabel]);
 
+  const connectionStatus = errorMessage ? 'FAILED' : elapsedSec > 8 ? 'SLOW' : 'CONNECTING';
+
   return (
     <div
+      className="smart-variant-fullscreen"
       style={{
-        minHeight: '100vh',
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        background: '#f8fafc',
         padding: '24px',
-        fontFamily: 'Inter, system-ui, sans-serif',
+        minHeight: '100vh',
       }}
+      role="status"
+      aria-live="polite"
     >
-      <div
-        style={{
-          maxWidth: 440,
-          width: '100%',
-          textAlign: 'center',
-          padding: '36px 28px',
-          background: '#ffffff',
-          borderRadius: '16px',
-          border: '1px solid #e2e8f0',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
-        }}
-      >
-        <BrandLogo />
-        <h2 style={{ marginTop: 20, fontSize: '1.25rem', fontWeight: 600, color: '#0f172a' }}>
-          {errorMessage ? 'Lỗi xác thực' : statusMessage}
-        </h2>
-        <p style={{ marginTop: 8, fontSize: '0.875rem', color: errorMessage ? '#dc2626' : '#64748b' }}>
-          {errorMessage
-            ? errorMessage
-            : `Vui lòng giữ cửa sổ này trong khi SmartSchedule kiểm tra danh tính ${providerLabel} và thiết lập phiên của bạn.`}
-        </p>
+      <div style={{ maxWidth: 460, width: '100%' }}>
+        <div style={{ textAlign: 'center', marginBottom: 18 }}>
+          <div style={{ display: 'inline-flex', justifyContent: 'center', marginBottom: 12 }}>
+            <BrandLogo />
+          </div>
+          <div>
+            <span
+              style={{
+                display: 'inline-block',
+                fontSize: '11px',
+                fontWeight: 700,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                color: '#ea580c',
+                background: '#fff7ed',
+                border: '1px solid #fed7aa',
+                padding: '3px 12px',
+                borderRadius: '9999px',
+              }}
+            >
+              FPT University Quy Nhơn · AI Campus
+            </span>
+          </div>
+        </div>
+
+        <SmartConnectionExperience
+          variant="card"
+          status={connectionStatus}
+          error={errorMessage}
+          title={
+            errorMessage
+              ? `Lỗi xác thực ${providerLabel}`
+              : elapsedSec > 8
+              ? 'Máy chủ phản hồi chậm (Cold Start)'
+              : statusMessage
+          }
+          subtitle={
+            errorMessage
+              ? errorMessage
+              : elapsedSec > 8
+              ? 'Hệ thống SmartSchedule Cloud đang khởi động container dịch vụ. Vui lòng giữ nguyên cửa sổ này…'
+              : `Vui lòng giữ cửa sổ này trong khi SmartSchedule kiểm tra danh tính ${providerLabel} và thiết lập phiên học thuật của bạn.`
+          }
+          showConfigAction={Boolean(errorMessage)}
+          onRetry={errorMessage ? () => navigate('/login', { replace: true }) : undefined}
+        />
+
         {!errorMessage && (
-          <div
-            style={{
-              margin: '24px auto 0',
-              width: 32,
-              height: 32,
-              borderRadius: '50%',
-              border: '3px solid #e2e8f0',
-              borderTopColor: '#2563eb',
-              animation: 'spin 0.8s linear infinite',
-            }}
-          />
+          <div style={{ textAlign: 'center', marginTop: 14 }}>
+            <span style={{ fontSize: '11.5px', color: '#64748b' }}>
+              Thời gian xác thực: <strong>{elapsedSec}s</strong>
+            </span>
+          </div>
         )}
       </div>
     </div>

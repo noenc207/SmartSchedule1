@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <!-- Open Peeps Style: Welcome to SmartSchedule (CC0 - Pablo Stanley) -->
+  <defs>
+    <radialGradient id="welcome-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffedd5" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="200" cy="200" r="160" fill="url(#welcome-glow)"/>
+  <!-- Body -->
+  <path d="M140 360 C140 270 160 220 200 220 C240 220 260 270 260 360" fill="#0f172a"/>
+  <!-- FPT Orange Lanyard / Student ID Card -->
+  <path d="M185 220 L200 270 L215 220" fill="none" stroke="#ea580c" stroke-width="2.5"/>
+  <rect x="190" y="270" width="20" height="26" rx="2" fill="#ffffff" stroke="#ea580c" stroke-width="1.5"/>
+  <circle cx="200" cy="278" r="4" fill="#ea580c"/>
+  <!-- Head -->
+  <circle cx="200" cy="165" r="38" fill="#fed7aa"/>
+  <!-- Hair Style -->
+  <path d="M162 165 C160 120 185 110 200 110 C215 110 240 120 238 165 C230 135 210 125 200 125 C190 125 170 135 162 165 Z" fill="#0f172a"/>
+  <!-- Smiling Face -->
+  <circle cx="188" cy="162" r="3" fill="#0f172a"/>
+  <circle cx="212" cy="162" r="3" fill="#0f172a"/>
+  <path d="M192 180 Q200 190 208 180" fill="none" stroke="#0f172a" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Waving Right Hand -->
+  <path d="M255 240 L295 170 L280 160 L240 225" fill="#0f172a"/>
+  <circle cx="300" cy="160" r="14" fill="#fed7aa"/>
+  <!-- Sparkles around hand -->
+  <polygon points="325,140 330,148 338,150 330,152 325,160 320,152 312,150 320,148" fill="#ea580c"/>
+  <polygon points="285,120 288,125 293,126 288,127 285,132 282,127 277,126 282,125" fill="#f59e0b"/>
+</svg>

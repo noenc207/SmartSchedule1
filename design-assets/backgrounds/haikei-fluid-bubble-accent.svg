@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid meet">
+  <defs>
+    <linearGradient id="bubble-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ea580c" stop-opacity="0.3"/>
+      <stop offset="50%" stop-color="#f97316" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#fed7aa" stop-opacity="0.04"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#bubble-grad)" d="M680,240C720,340,640,430,520,450C400,470,240,420,160,340C80,260,80,150,170,90C260,30,440,20,550,70C660,120,640,140,680,240Z"/>
+  <circle cx="280" cy="180" r="30" fill="#ea580c" fill-opacity="0.1"/>
+  <circle cx="480" cy="320" r="45" fill="#f97316" fill-opacity="0.08"/>
+</svg>

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <!-- Open Peeps Style: Student Walking Across Campus (CC0 - Pablo Stanley) -->
+  <path d="M50 340 L350 340" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="6 6"/>
+  <!-- Character Striding -->
+  <!-- Back leg -->
+  <path d="M190 280 L160 340" stroke="#0f172a" stroke-width="12" stroke-linecap="round"/>
+  <!-- Front leg -->
+  <path d="M210 280 L240 340" stroke="#0f172a" stroke-width="12" stroke-linecap="round"/>
+  <!-- Body / Coat -->
+  <path d="M165 300 C165 220 185 190 205 190 C225 190 240 220 235 300 Z" fill="#0f172a"/>
+  <!-- Backpack (FPT Orange) -->
+  <rect x="150" y="200" width="24" height="50" rx="8" fill="#ea580c"/>
+  <!-- Head & Scarf -->
+  <circle cx="205" cy="145" r="32" fill="#fed7aa"/>
+  <path d="M185 170 C195 180 215 180 225 170 L230 200 L180 200 Z" fill="#f97316"/>
+  <!-- Hair & Profile -->
+  <path d="M180 140 C175 110 205 110 225 115 C240 120 240 135 235 145 Z" fill="#0f172a"/>
+  <circle cx="218" cy="142" r="3" fill="#0f172a"/>
+  <!-- Small map/schedule in hand -->
+  <rect x="235" y="220" width="22" height="30" rx="3" fill="#ffffff" stroke="#ea580c" stroke-width="2"/>
+  <line x1="240" y1="228" x2="252" y2="228" stroke="#ea580c" stroke-width="1.5"/>
+  <line x1="240" y1="236" x2="250" y2="236" stroke="#ea580c" stroke-width="1.5"/>
+</svg>

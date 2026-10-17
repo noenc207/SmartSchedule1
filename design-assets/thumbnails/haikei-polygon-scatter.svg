@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="poly-grad-1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ea580c" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#fb923c" stop-opacity="0.05"/>
+    </linearGradient>
+    <linearGradient id="poly-grad-2" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0284c7" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0.02"/>
+    </linearGradient>
+  </defs>
+  <g stroke="#ea580c" stroke-width="1" stroke-opacity="0.2" fill="url(#poly-grad-1)">
+    <polygon points="120,80 220,130 180,240 70,210"/>
+    <polygon points="450,110 570,70 620,180 500,220"/>
+    <polygon points="850,90 980,140 930,270 810,210"/>
+    <polygon points="260,350 390,310 420,440 290,480"/>
+    <polygon points="700,340 840,320 870,450 730,470"/>
+    <polygon points="1020,380 1150,420 1100,550 970,510"/>
+    <polygon points="150,580 290,540 320,680 180,720"/>
+    <polygon points="520,560 660,520 700,660 550,690"/>
+    <polygon points="820,590 950,560 980,700 850,730"/>
+  </g>
+  <g fill="url(#poly-grad-2)" stroke="#0284c7" stroke-width="1" stroke-opacity="0.15">
+    <polygon points="340,180 430,220 390,300 300,260"/>
+    <polygon points="680,200 770,160 820,250 730,290"/>
+    <polygon points="560,400 660,430 620,520 520,490"/>
+  </g>
+</svg>

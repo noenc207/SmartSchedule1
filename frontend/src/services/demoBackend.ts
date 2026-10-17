@@ -870,6 +870,18 @@ export const demoAdapter: AxiosAdapter = async (config) => {
   let data: unknown = {};
   let status = 200;
 
+  // Health Check
+  if (route === '/health' && method === 'GET') {
+    data = {
+      status: 'UP',
+      service: 'smartschedule-api-demo',
+      buildVersion: '2026.10.04-demo',
+      timestamp: now(),
+      demoMode: true,
+    };
+    return { data, status: 200, statusText: 'OK', headers: {}, config };
+  }
+
   // User Profile & Auth
   if ((route === '/users/me' || route === '/auth/me') && method === 'GET') {
     const demoTier = (typeof window !== 'undefined' && localStorage.getItem('smartschedule-demo-tier')) || 'PRO';

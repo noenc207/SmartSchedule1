@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmartSchedule — Visual Asset & Animation Library</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --border-focus: #ea580c;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --text-subtle: #94a3b8;
+      --fptu-orange: #ea580c;
+      --fptu-orange-hover: #c2410c;
+      --fptu-orange-soft: #fff7ed;
+      --fptu-orange-border: #fed7aa;
+      --radius: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      line-height: 1.5;
+      padding-bottom: 60px;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      backdrop-filter: blur(12px);
+      background-color: rgba(255, 255, 255, 0.94);
+    }
+
+    .header-inner {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 16px 24px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .brand-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-title h1 {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text-main);
+    }
+
+    .brand-badge {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      background: var(--fptu-orange-soft);
+      color: var(--fptu-orange);
+      border: 1px solid var(--fptu-orange-border);
+      padding: 3px 8px;
+      border-radius: 9999px;
+    }
+
+    .stats-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 12.5px;
+      color: var(--text-muted);
+    }
+
+    .stat-pill {
+      background: #f1f5f9;
+      border: 1px solid var(--border);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .stat-pill strong {
+      color: var(--fptu-orange);
+    }
+
+    /* Controls Bar */
+    .controls-wrapper {
+      max-width: 1400px;
+      margin: 24px auto 0;
+      padding: 0 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .search-row {
+      display: flex;
+      gap: 12px;
+    }
+
+    .search-input {
+      flex: 1;
+      padding: 12px 16px;
+      font-size: 14.5px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .search-input:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.12);
+    }
+
+    .filter-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .filter-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+
+    .filter-btn:hover {
+      background: #f1f5f9;
+      color: var(--text-main);
+    }
+
+    .filter-btn.active {
+      background: var(--fptu-orange);
+      color: #ffffff;
+      border-color: var(--fptu-orange);
+    }
+
+    /* Grid */
+    .grid-wrapper {
+      max-width: 1400px;
+      margin: 24px auto;
+      padding: 0 24px;
+    }
+
+    .asset-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+      gap: 20px;
+    }
+
+    .asset-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+      cursor: pointer;
+    }
+
+    .asset-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 24px -6px rgba(15, 23, 42, 0.08);
+      border-color: var(--fptu-orange-border);
+    }
+
+    .thumb-box {
+      width: 100%;
+      height: 190px;
+      background-color: #f1f5f9;
+      background-image: 
+        linear-gradient(45deg, #e2e8f0 25%, transparent 25%), 
+        linear-gradient(-45deg, #e2e8f0 25%, transparent 25%), 
+        linear-gradient(45deg, transparent 75%, #e2e8f0 75%), 
+        linear-gradient(-45deg, transparent 75%, #e2e8f0 75%);
+      background-size: 16px 16px;
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .thumb-img {
+      max-width: 90%;
+      max-height: 85%;
+      object-fit: contain;
+      transition: transform 0.25s ease;
+    }
+
+    .asset-card:hover .thumb-img {
+      transform: scale(1.04);
+    }
+
+    .thumb-badge-format {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      background: rgba(15, 23, 42, 0.75);
+      color: #ffffff;
+      padding: 3px 6px;
+      border-radius: 4px;
+      backdrop-filter: blur(4px);
+    }
+
+    .thumb-badge-size {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-size: 10px;
+      font-weight: 700;
+      background: rgba(255, 255, 255, 0.9);
+      color: var(--text-main);
+      padding: 3px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    .card-body {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      gap: 10px;
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-main);
+      line-height: 1.3;
+    }
+
+    .card-use-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--fptu-orange);
+      background: var(--fptu-orange-soft);
+      padding: 3px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--fptu-orange-border);
+      width: fit-content;
+    }
+
+    .color-swatches {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      margin-top: 2px;
+    }
+
+    .swatch {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+      border: 1px solid rgba(0, 0, 0, 0.15);
+      cursor: help;
+    }
+
+    .card-footer-info {
+      margin-top: auto;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* Modal */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(8px);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal-card {
+      background: var(--surface);
+      border-radius: 16px;
+      max-width: 820px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-header h2 {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      color: var(--text-muted);
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .modal-body {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .modal-preview-box {
+      width: 100%;
+      height: 320px;
+      background: #f1f5f9;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      padding: 16px;
+    }
+
+    .modal-preview-box img,
+    .modal-preview-box video {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+
+    .info-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13.5px;
+    }
+
+    .info-table th {
+      text-align: left;
+      width: 160px;
+      color: var(--text-muted);
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+    }
+
+    .info-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-main);
+    }
+
+    .code-snippet {
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 14px 18px;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 13px;
+      overflow-x: auto;
+      position: relative;
+    }
+
+    .copy-btn {
+      background: var(--fptu-orange);
+      color: #ffffff;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.18s;
+    }
+
+    .copy-btn:hover {
+      background: var(--fptu-orange-hover);
+    }
+
+    .copy-toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #0f172a;
+      color: #ffffff;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+      display: none;
+      z-index: 200;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-inner">
+      <div class="brand-title">
+        <h1>SmartSchedule Asset & Animation Library</h1>
+        <span class="brand-badge">Academic SaaS</span>
+      </div>
+      <div class="stats-bar">
+        <div class="stat-pill">Total: <strong id="total-count">48</strong> assets</div>
+        <div class="stat-pill">Footprint: <strong>2.34 MB</strong></div>
+        <div class="stat-pill">Categories: <strong>5 Collections</strong></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="controls-wrapper">
+    <div class="search-row">
+      <input 
+        type="text" 
+        id="search-input" 
+        class="search-input" 
+        placeholder="Search assets by name, tag, or usage (e.g., 'hero', '3d', 'loading', 'calendar', 'orange')..."
+      />
+    </div>
+    <div class="filter-tabs">
+      <button class="filter-btn active" data-cat="all">All (48)</button>
+      <button class="filter-btn" data-cat="animations">Animations & GIF (15)</button>
+      <button class="filter-btn" data-cat="backgrounds">Backgrounds (12)</button>
+      <button class="filter-btn" data-cat="textures">Textures (8)</button>
+      <button class="filter-btn" data-cat="illustrations">Illustrations (8)</button>
+      <button class="filter-btn" data-cat="photography">Photography (5)</button>
+    </div>
+  </div>
+
+  <div class="grid-wrapper">
+    <div class="asset-grid" id="asset-grid">
+      <!-- Injected via JavaScript -->
+    </div>
+  </div>
+
+  <!-- Detail Modal -->
+  <div class="modal-backdrop" id="modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="modal-title">Asset Detail</h2>
+        <button class="modal-close" id="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-preview-box" id="modal-preview-container">
+          <img id="modal-img" src="" alt="Asset Preview" />
+        </div>
+        <table class="info-table">
+          <tr>
+            <th>Category</th>
+            <td id="modal-cat"></td>
+          </tr>
+          <tr>
+            <th>Relative Path</th>
+            <td><code id="modal-path"></code></td>
+          </tr>
+          <tr>
+            <th>Dimensions & Size</th>
+            <td id="modal-size"></td>
+          </tr>
+          <tr>
+            <th>Suggested Use</th>
+            <td id="modal-use"></td>
+          </tr>
+          <tr>
+            <th>Available Formats</th>
+            <td id="modal-formats"></td>
+          </tr>
+          <tr>
+            <th>Palette</th>
+            <td id="modal-palette"></td>
+          </tr>
+          <tr>
+            <th>Source & License</th>
+            <td id="modal-license"></td>
+          </tr>
+        </table>
+        <div>
+          <h3 style="font-size: 13.5px; font-weight: 700; margin-bottom: 8px;">Integration Snippet</h3>
+          <pre class="code-snippet" id="modal-snippet"></pre>
+        </div>
+        <div style="display: flex; gap: 12px; justify-content: flex-end;">
+          <button class="copy-btn" id="btn-copy-path">Copy Path</button>
+          <button class="copy-btn" id="btn-copy-snippet" style="background: #334155;">Copy Code</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="copy-toast" id="toast">Copied to clipboard!</div>
+
+  <script>
+    const ASSETS = [{"id":"bg-layered-waves-orange","name":"Layered Waves Orange","category":"backgrounds","file":"backgrounds/haikei-layered-waves-orange.svg","thumbnail":"thumbnails/haikei-layered-waves-orange.svg","format":"svg","dimensions":"1440x320 (Scalable Vector)","dominantColors":["#ea580c","#f97316","#fb923c","#ffffff"],"tags":["waves","orange","warm","fluid","fptu","header","footer"],"suggestedUse":"login hero, page header, footer divider","source":"Haikei (haikei.app)","sourceUrl":"https://haikei.app/","author":"Haikei App","license":"Free for commercial and personal use (No attribution required)","attributionRequired":false,"sizeBytes":1830,"sizeFormatted":"1.8 KB"},{"id":"bg-layered-peaks-slate","name":"Layered Geometric Peaks Slate","category":"backgrounds","file":"backgrounds/haikei-layered-peaks-slate.svg","thumbnail":"thumbnails/haikei-layered-peaks-slate.svg","format":"svg","dimensions":"1440x400 (Scalable Vector)","dominantColors":["#0f172a","#1e293b","#ea580c","#334155"],"tags":["low-poly","peaks","slate","dark","horizon","contrast"],"suggestedUse":"dashboard hero, dark card banner, telemetry header","source":"Haikei (haikei.app)","sourceUrl":"https://haikei.app/","author":"Haikei App","license":"Free for commercial and personal use (No attribution required)","attributionRequired":false,"sizeBytes":1321,"sizeFormatted":"1.3 KB"},{"id":"bg-blob-cluster-academic","name":"Academic Soft Blob Cluster","category":"backgrounds","file":"backgrounds/haikei-blob-cluster-academic.svg","thumbnail":"thumbnails/haikei-blob-cluster-academic.svg","format":"svg","dimensions":"900x600 (Scalable Vector)","dominantColors":["#ea580c","#f59e0b","#0284c7","#fed7aa"],"tags":["blob","blur","ambient","organic","glassmorphism","backdrop"],"suggestedUse":"modal backdrop, card glow, spotlight layer","source":"Haikei (haikei.app)","sourceUrl":"https://haikei.app/","author":"Haikei App","license":"Free for commercial and personal use (No attribution required)","attributionRequired":false,"sizeBytes":1449,"sizeFormatted":"1.4 KB"},{"id":"bg-polygon-scatter","name":"Geometric Data Polygon Scatter","category":"backgrounds","file":"backgrounds/haikei-polygon-scatter.svg","thumbnail":"thumbnails/haikei-polygon-scatter.svg","format":"svg","dimensions":"1200x800 (Scalable Vector)","dominantColors":["#ea580c","#fb923c","#0284c7","#0f172a"],"tags":["polygons","facets","smart-data","ai","scatter","blocks"],"suggestedUse":"timetable canvas, background texture, AI scheduler card","source":"Haikei (haikei.app)","sourceUrl":"https://haikei.app/","author":"Haikei App","license":"Free for commercial and personal use (No attribution required)","attributionRequired":false,"sizeBytes":1447,"sizeFormatted":"1.4 KB"},{"id":"bg-wave-flow-minimal","name":"Minimal Wave Flow Divider","category":"backgrounds","file":"backgrounds/haikei-wave-flow-minimal.svg","thumbnail":"thumbnails/haikei-wave-flow-minimal.svg","format":"svg","dimensions":"1440x240 (Scalable Vector)","dominantColors":["#ea580c","#f97316","#ffffff"],"tags":["minimal","wave","line","divider","section","clean"],"suggestedUse":"landing section divider, card separator, header edge","source":"Haikei (haikei.app)","sourceUrl":"https://haikei.app/","author":"Haikei App","license":"Free for commercial and personal use (No attribution required)","attributionRequired":false,"sizeBytes":845,"sizeFormatted":"845 B"},{"id":"bg-stacked-steps-orange","name":"Academic Progression Steps","category":"backgrounds","file":"backgrounds/haikei-stacked-steps-orange.svg","thumbnail":"thumbnails/haikei-stacked-steps-orange.svg","format":"svg","dimensions":"1440x360 (Scalable Vector)","dominantColors":["#ea580c","#fb923c","#fed7aa","#fff7ed"],"tags":["steps","progression","curriculum","orange","timeline"],"suggestedUse":"milestones view, semester progress bar, onboarding flow","source":"Haikei (haikei.app)","sourceUrl":"https://haikei.app/","author":"Haikei App","license":"Free for commercial and personal use (No attribution required)","attributionRequired":false,"sizeBytes":1588,"sizeFormatted":"1.6 KB"},{"id":"bg-smooth-mesh-amber","name":"Smooth Amber Radial Mesh","category":"backgrounds","file":"backgrounds/haikei-smooth-mesh-amber.svg","thumbnail":"thumbnails/haikei-smooth-mesh-amber.svg","format":"svg","dimensions":"1200x600 (Scalable Vector)","dominantColors":["#f8fafc","#fed7aa","#ea580c","#ffffff"],"tags":["mesh","gradient","subtle","amber","light","clean"],"suggestedUse":"dashboard background, settings page canvas, subtle card fill","source":"Haikei (haikei.app)","sourceUrl":"https://haikei.app/","author":"Haikei App","license":"Free for commercial and personal use (No attribution required)","attributionRequired":false,"sizeBytes":994,"sizeFormatted":"994 B"},{"id":"bg-circle-scatter-focus","name":"Academic Focus Rings Scatter","category":"backgrounds","file":"backgrounds/haikei-circle-scatter-focus.svg","thumbnail":"thumbnails/haikei-circle-scatter-focus.svg","format":"svg","dimensions":"1000x600 (Scalable Vector)","dominantColors":["#ea580c","#f97316","#ffffff"],"tags":["rings","focus","radar","telemetry","circles","academic"],"suggestedUse":"exam countdown card, focus timer panel, metric widget","source":"Haikei (haikei.app)","sourceUrl":"https://haikei.app/","author":"Haikei App","license":"Free for commercial and personal use (No attribution required)","attributionRequired":false,"sizeBytes":1267,"sizeFormatted":"1.2 KB"},{"id":"bg-layered-waves-navy","name":"Coastal Deep Navy Waves","category":"backgrounds","file":"backgrounds/haikei-layered-waves-navy.svg","thumbnail":"thumbnails/haikei-layered-waves-navy.svg","format":"svg","dimensions":"1440x320 (Scalable Vector)","dominantColors":["#0b1120","#1e293b","#0284c7","#ea580c"],"tags":["navy","dark","coastal","waves","quynhon","deep"],"suggestedUse":"dark mode hero, terminal card background, footer","source":"Haikei (haikei.app)","sourceUrl":"https://haikei.app/","author":"Haikei App","license":"Free for commercial and personal use (No attribution required)","attributionRequired":false,"sizeBytes":1365,"sizeFormatted":"1.3 KB"},{"id":"bg-geometric-stripes","name":"Dynamic Academic Speed Stripes","category":"backgrounds","file":"backgrounds/haikei-geometric-stripes.svg","thumbnail":"thumbnails/haikei-geometric-stripes.svg","format":"svg","dimensions":"1000x400 (Scalable Vector)","dominantColors":["#ea580c","#fed7aa","#ffffff"],"tags":["stripes","speed","skew","performance","accent"],"suggestedUse":"optimization banner, speed metric card, callout ribbon","source":"Haikei (haikei.app)","sourceUrl":"https://haikei.app/","author":"Haikei App","license":"Free for commercial and personal use (No attribution required)","attributionRequired":false,"sizeBytes":861,"sizeFormatted":"861 B"},{"id":"bg-fluid-bubble-accent","name":"Fluid Asymmetric Bubble Accent","category":"backgrounds","file":"backgrounds/haikei-fluid-bubble-accent.svg","thumbnail":"thumbnails/haikei-fluid-bubble-accent.svg","format":"svg","dimensions":"800x500 (Scalable Vector)","dominantColors":["#ea580c","#f97316","#fed7aa"],"tags":["bubble","organic","callout","onboarding","accent"],"suggestedUse":"onboarding callout, tooltip backdrop, feature badge","source":"Haikei (haikei.app)","sourceUrl":"https://haikei.app/","author":"Haikei App","license":"Free for commercial and personal use (No attribution required)","attributionRequired":false,"sizeBytes":729,"sizeFormatted":"729 B"},{"id":"bg-subtle-aurora-glow","name":"Atmospheric Aurora Glow Field","category":"backgrounds","file":"backgrounds/haikei-subtle-aurora-glow.svg","thumbnail":"thumbnails/haikei-subtle-aurora-glow.svg","format":"svg","dimensions":"1440x600 (Scalable Vector)","dominantColors":["#ea580c","#f97316","#0284c7"],"tags":["aurora","glow","atmospheric","soft","diffuse","header"],"suggestedUse":"page ambient background, calendar backdrop, subtle glow","source":"Haikei (haikei.app)","sourceUrl":"https://haikei.app/","author":"Haikei App","license":"Free for commercial and personal use (No attribution required)","attributionRequired":false,"sizeBytes":765,"sizeFormatted":"765 B"},{"id":"tex-heropattern-topography","name":"Topography Contour Pattern","category":"textures","file":"textures/heropattern-topography.svg","thumbnail":"thumbnails/heropattern-topography.svg","format":"svg","dimensions":"100x100 (Seamless Repeat)","dominantColors":["#ea580c","#ffffff"],"tags":["topography","contour","elevation","campus","subtle"],"suggestedUse":"card subtle pattern, campus routing map background","source":"Hero Patterns (heropatterns.com)","sourceUrl":"https://heropatterns.com/","author":"Steve Schoger","license":"Creative Commons Attribution 4.0 International (CC BY 4.0)","attributionRequired":true,"attributionText":"Hero Patterns by Steve Schoger (heropatterns.com), CC BY 4.0","sizeBytes":415,"sizeFormatted":"415 B"},{"id":"tex-heropattern-circuit-board","name":"Circuit Board Intelligence Pattern","category":"textures","file":"textures/heropattern-circuit-board.svg","thumbnail":"thumbnails/heropattern-circuit-board.svg","format":"svg","dimensions":"120x120 (Seamless Repeat)","dominantColors":["#ea580c","#ffffff"],"tags":["circuit","ai","intelligence","fptu","tech","nodes"],"suggestedUse":"AI scheduling banner, optimization card, tech badge","source":"Hero Patterns (heropatterns.com)","sourceUrl":"https://heropatterns.com/","author":"Steve Schoger","license":"Creative Commons Attribution 4.0 International (CC BY 4.0)","attributionRequired":true,"attributionText":"Hero Patterns by Steve Schoger (heropatterns.com), CC BY 4.0","sizeBytes":725,"sizeFormatted":"725 B"},{"id":"tex-heropattern-architectural-grid","name":"Architectural Blueprint Grid","category":"textures","file":"textures/heropattern-architectural-grid.svg","thumbnail":"thumbnails/heropattern-architectural-grid.svg","format":"svg","dimensions":"40x40 (Seamless Repeat)","dominantColors":["#ea580c","#ffffff"],"tags":["grid","blueprint","coordinate","matrix","timetable","calendar"],"suggestedUse":"calendar grid background, timetable time-block container","source":"Hero Patterns / SmartSchedule","sourceUrl":"https://heropatterns.com/","author":"Steve Schoger / SmartSchedule","license":"Creative Commons Attribution 4.0 International (CC BY 4.0)","attributionRequired":true,"attributionText":"Hero Patterns by Steve Schoger (heropatterns.com), CC BY 4.0","sizeBytes":530,"sizeFormatted":"530 B"},{"id":"tex-heropattern-hexagons","name":"Hexagonal Lattice Pattern","category":"textures","file":"textures/heropattern-hexagons.svg","thumbnail":"thumbnails/heropattern-hexagons.svg","format":"svg","dimensions":"56x100 (Seamless Repeat)","dominantColors":["#ea580c","#ffffff"],"tags":["hexagons","honeycomb","modular","cluster","academic"],"suggestedUse":"course cluster card, module tree background","source":"Hero Patterns (heropatterns.com)","sourceUrl":"https://heropatterns.com/","author":"Steve Schoger","license":"Creative Commons Attribution 4.0 International (CC BY 4.0)","attributionRequired":true,"attributionText":"Hero Patterns by Steve Schoger (heropatterns.com), CC BY 4.0","sizeBytes":315,"sizeFormatted":"315 B"},{"id":"tex-heropattern-diagonal-stripes","name":"Micro Diagonal Hatching Pattern","category":"textures","file":"textures/heropattern-diagonal-stripes.svg","thumbnail":"thumbnails/heropattern-diagonal-stripes.svg","format":"svg","dimensions":"20x20 (Seamless Repeat)","dominantColors":["#ea580c","#ffffff"],"tags":["diagonal","stripes","hatch","texture","subtle","buffer"],"suggestedUse":"calendar break periods, reserved study blocks, warning stripes","source":"Hero Patterns (heropatterns.com)","sourceUrl":"https://heropatterns.com/","author":"Steve Schoger","license":"Creative Commons Attribution 4.0 International (CC BY 4.0)","attributionRequired":true,"attributionText":"Hero Patterns by Steve Schoger (heropatterns.com), CC BY 4.0","sizeBytes":281,"sizeFormatted":"281 B"},{"id":"tex-heropattern-polka-dots","name":"Academic Dot Matrix Pattern","category":"textures","file":"textures/heropattern-polka-dots.svg","thumbnail":"thumbnails/heropattern-polka-dots.svg","format":"svg","dimensions":"24x24 (Seamless Repeat)","dominantColors":["#ea580c","#ffffff"],"tags":["dots","matrix","clean","minimal","surface"],"suggestedUse":"hero surface background, card backdrop, side panel texture","source":"Hero Patterns (heropatterns.com)","sourceUrl":"https://heropatterns.com/","author":"Steve Schoger","license":"Creative Commons Attribution 4.0 International (CC BY 4.0)","attributionRequired":true,"attributionText":"Hero Patterns by Steve Schoger (heropatterns.com), CC BY 4.0","sizeBytes":502,"sizeFormatted":"502 B"},{"id":"tex-heropattern-plus-matrix","name":"Precision Plus Coordinate Grid","category":"textures","file":"textures/heropattern-plus-matrix.svg","thumbnail":"thumbnails/heropattern-plus-matrix.svg","format":"svg","dimensions":"32x32 (Seamless Repeat)","dominantColors":["#ea580c","#ffffff"],"tags":["plus","crosshair","coordinate","technical","telemetry"],"suggestedUse":"solver constraint view, telemetry graph backdrop","source":"Hero Patterns / SmartSchedule","sourceUrl":"https://heropatterns.com/","author":"Steve Schoger / SmartSchedule","license":"Creative Commons Attribution 4.0 International (CC BY 4.0)","attributionRequired":true,"attributionText":"Hero Patterns by Steve Schoger (heropatterns.com), CC BY 4.0","sizeBytes":294,"sizeFormatted":"294 B"},{"id":"tex-heropattern-wiggle","name":"Playful Sinusoidal Wiggle Pattern","category":"textures","file":"textures/heropattern-wiggle.svg","thumbnail":"thumbnails/heropattern-wiggle.svg","format":"svg","dimensions":"42x44 (Seamless Repeat)","dominantColors":["#ea580c","#ffffff"],"tags":["wiggle","wave","playful","activity","creative"],"suggestedUse":"extracurricular activity card, break reminder modal","source":"Hero Patterns (heropatterns.com)","sourceUrl":"https://heropatterns.com/","author":"Steve Schoger","license":"Creative Commons Attribution 4.0 International (CC BY 4.0)","attributionRequired":true,"attributionText":"Hero Patterns by Steve Schoger (heropatterns.com), CC BY 4.0","sizeBytes":347,"sizeFormatted":"347 B"},{"id":"ill-openpeeps-student-laptop","name":"Student Focusing on Laptop","category":"illustrations","file":"illustrations/openpeeps-student-laptop.svg","thumbnail":"thumbnails/openpeeps-student-laptop.svg","format":"svg","dimensions":"400x400 (Scalable Vector)","dominantColors":["#0f172a","#ea580c","#fed7aa","#f8fafc"],"tags":["student","laptop","coding","study","academic","focus"],"suggestedUse":"dashboard study widget, task automation card, empty task state","source":"Open Peeps (openpeeps.com)","sourceUrl":"https://www.openpeeps.com/","author":"Pablo Stanley","license":"CC0 1.0 Universal (Public Domain Dedication)","attributionRequired":false,"sizeBytes":2272,"sizeFormatted":"2.2 KB"},{"id":"ill-openpeeps-student-reading","name":"Student Reviewing Timetable","category":"illustrations","file":"illustrations/openpeeps-student-reading.svg","thumbnail":"thumbnails/openpeeps-student-reading.svg","format":"svg","dimensions":"400x400 (Scalable Vector)","dominantColors":["#0f172a","#ea580c","#fcd34d","#ffffff"],"tags":["reading","syllabus","review","timetable","student"],"suggestedUse":"syllabus import guide, exam schedule overview, guide modal","source":"Open Peeps (openpeeps.com)","sourceUrl":"https://www.openpeeps.com/","author":"Pablo Stanley","license":"CC0 1.0 Universal (Public Domain Dedication)","attributionRequired":false,"sizeBytes":2017,"sizeFormatted":"2.0 KB"},{"id":"ill-openpeeps-empty-calendar","name":"Clean Empty Calendar State","category":"illustrations","file":"illustrations/openpeeps-empty-calendar.svg","thumbnail":"thumbnails/openpeeps-empty-calendar.svg","format":"svg","dimensions":"400x400 (Scalable Vector)","dominantColors":["#ffffff","#ea580c","#0f172a","#fff7ed"],"tags":["calendar","empty","clear","day-off","no-classes","schedule"],"suggestedUse":"empty state for days with no classes, holiday state","source":"Open Peeps (openpeeps.com)","sourceUrl":"https://www.openpeeps.com/","author":"Pablo Stanley","license":"CC0 1.0 Universal (Public Domain Dedication)","attributionRequired":false,"sizeBytes":1375,"sizeFormatted":"1.3 KB"},{"id":"ill-openpeeps-success-celebration","name":"Schedule Optimized Celebration","category":"illustrations","file":"illustrations/openpeeps-success-celebration.svg","thumbnail":"thumbnails/openpeeps-success-celebration.svg","format":"svg","dimensions":"400x400 (Scalable Vector)","dominantColors":["#0f172a","#ea580c","#fed7aa","#10b981"],"tags":["success","celebrate","done","optimized","congrats","confetti"],"suggestedUse":"schedule generation success modal, exam pass celebration","source":"Open Peeps (openpeeps.com)","sourceUrl":"https://www.openpeeps.com/","author":"Pablo Stanley","license":"CC0 1.0 Universal (Public Domain Dedication)","attributionRequired":false,"sizeBytes":1736,"sizeFormatted":"1.7 KB"},{"id":"ill-openpeeps-search-no-results","name":"Search No Results Empty State","category":"illustrations","file":"illustrations/openpeeps-search-no-results.svg","thumbnail":"thumbnails/openpeeps-search-no-results.svg","format":"svg","dimensions":"400x400 (Scalable Vector)","dominantColors":["#ea580c","#0f172a","#fed7aa","#f8fafc"],"tags":["search","no-results","magnifier","filter","empty-state"],"suggestedUse":"command palette no matches, course search empty result","source":"Open Peeps (openpeeps.com)","sourceUrl":"https://www.openpeeps.com/","author":"Pablo Stanley","license":"CC0 1.0 Universal (Public Domain Dedication)","attributionRequired":false,"sizeBytes":1084,"sizeFormatted":"1.1 KB"},{"id":"ill-openpeeps-campus-walking","name":"Student Walking Across Campus","category":"illustrations","file":"illustrations/openpeeps-campus-walking.svg","thumbnail":"thumbnails/openpeeps-campus-walking.svg","format":"svg","dimensions":"400x400 (Scalable Vector)","dominantColors":["#0f172a","#ea580c","#fed7aa","#cbd5e1"],"tags":["walking","campus","backpack","mobility","routing","transit"],"suggestedUse":"campus routing drawer, walking time estimation between classes","source":"Open Peeps (openpeeps.com)","sourceUrl":"https://www.openpeeps.com/","author":"Pablo Stanley","license":"CC0 1.0 Universal (Public Domain Dedication)","attributionRequired":false,"sizeBytes":1366,"sizeFormatted":"1.3 KB"},{"id":"ill-openpeeps-conflict-alert","name":"Timetable Conflict Warning Alert","category":"illustrations","file":"illustrations/openpeeps-conflict-alert.svg","thumbnail":"thumbnails/openpeeps-conflict-alert.svg","format":"svg","dimensions":"400x400 (Scalable Vector)","dominantColors":["#dc2626","#ea580c","#0f172a","#fef2f2"],"tags":["conflict","warning","overlap","clash","solver","reconcile"],"suggestedUse":"schedule conflict notification, auto-reconciliation modal","source":"Open Peeps (openpeeps.com)","sourceUrl":"https://www.openpeeps.com/","author":"Pablo Stanley","license":"CC0 1.0 Universal (Public Domain Dedication)","attributionRequired":false,"sizeBytes":1661,"sizeFormatted":"1.6 KB"},{"id":"ill-openpeeps-welcome-onboarding","name":"Welcome to SmartSchedule Avatar","category":"illustrations","file":"illustrations/openpeeps-welcome-onboarding.svg","thumbnail":"thumbnails/openpeeps-welcome-onboarding.svg","format":"svg","dimensions":"400x400 (Scalable Vector)","dominantColors":["#0f172a","#ea580c","#fed7aa","#ffedd5"],"tags":["welcome","hello","wave","onboarding","student-id","avatar"],"suggestedUse":"first-time user onboarding modal, account creation confirmation","source":"Open Peeps (openpeeps.com)","sourceUrl":"https://www.openpeeps.com/","author":"Pablo Stanley","license":"CC0 1.0 Universal (Public Domain Dedication)","attributionRequired":false,"sizeBytes":1720,"sizeFormatted":"1.7 KB"},{"id":"photo-campus-modern-library","name":"Modern University Library Interior","category":"photography","file":"photography/photo-campus-modern-library.webp","thumbnail":"thumbnails/photo-campus-modern-library.webp","format":"webp","dimensions":"1200x800","dominantColors":["#475569","#334155","#94a3b8","#e2e8f0"],"tags":["library","books","quiet","study","academic","architecture"],"suggestedUse":"study spaces section, library room booking, hero card","source":"Unsplash (unsplash.com)","sourceUrl":"https://unsplash.com/photos/1521587760476-6c12a4b040da","author":"Giammarco Boscaro (@giammarcobs)","license":"Unsplash License (Free commercial & personal use)","attributionRequired":false,"attributionText":"Photo by Giammarco Boscaro on Unsplash","sizeBytes":321700,"sizeFormatted":"314.2 KB"},{"id":"photo-students-collaborative-study","name":"Students Collaborating on Laptops","category":"photography","file":"photography/photo-students-collaborative-study.webp","thumbnail":"thumbnails/photo-students-collaborative-study.webp","format":"webp","dimensions":"1200x800","dominantColors":["#334155","#e2e8f0","#94a3b8","#1e293b"],"tags":["students","collaboration","laptops","teamwork","campus","group-study"],"suggestedUse":"group study session banner, project collaboration card","source":"Unsplash (unsplash.com)","sourceUrl":"https://unsplash.com/photos/1522202176988-66273c2fd55f","author":"Annie Spratt (@anniespratt)","license":"Unsplash License (Free commercial & personal use)","attributionRequired":false,"attributionText":"Photo by Annie Spratt on Unsplash","sizeBytes":139396,"sizeFormatted":"136.1 KB"},{"id":"photo-focus-desk-laptop","name":"Focused Desk with Laptop & Notebook","category":"photography","file":"photography/photo-focus-desk-laptop.webp","thumbnail":"thumbnails/photo-focus-desk-laptop.webp","format":"webp","dimensions":"1200x800","dominantColors":["#1e293b","#64748b","#cbd5e1","#0f172a"],"tags":["desk","laptop","coffee","notebook","minimal","coding"],"suggestedUse":"focus mode header, personal timetable workspace hero","source":"Unsplash (unsplash.com)","sourceUrl":"https://unsplash.com/photos/1498050108023-c5249f4df085","author":"Christopher Gower (@cgower)","license":"Unsplash License (Free commercial & personal use)","attributionRequired":false,"attributionText":"Photo by Christopher Gower on Unsplash","sizeBytes":101574,"sizeFormatted":"99.2 KB"},{"id":"photo-coastal-horizon-sunrise","name":"Coastal Horizon & Sunrise (Quy Nhon Campus Ambience)","category":"photography","file":"photography/photo-coastal-horizon-sunrise.webp","thumbnail":"thumbnails/photo-coastal-horizon-sunrise.webp","format":"webp","dimensions":"1200x800","dominantColors":["#0284c7","#38bdf8","#f8fafc","#ea580c"],"tags":["coast","ocean","sunrise","quynhon","fptu","horizon","sky"],"suggestedUse":"campus weather banner, outdoor events hero, Quy Nhơn AI campus mood","source":"Unsplash (unsplash.com)","sourceUrl":"https://unsplash.com/photos/1507525428034-b723cf961d3e","author":"Sean Oulashin (@oulashin)","license":"Unsplash License (Free commercial & personal use)","attributionRequired":false,"attributionText":"Photo by Sean Oulashin on Unsplash","sizeBytes":138990,"sizeFormatted":"135.7 KB"},{"id":"photo-futuristic-lecture-hall","name":"Modern Collaborative Lecture & Workshop Hall","category":"photography","file":"photography/photo-futuristic-lecture-hall.webp","thumbnail":"thumbnails/photo-futuristic-lecture-hall.webp","format":"webp","dimensions":"1200x800","dominantColors":["#1e293b","#475569","#f1f5f9","#ea580c"],"tags":["lecture-hall","auditorium","smart-classroom","seminar","fptu"],"suggestedUse":"campus room booking modal, departmental lecture schedule","source":"Unsplash (unsplash.com)","sourceUrl":"https://unsplash.com/photos/1517245386807-bb43f82c33c4","author":"Headway (@headwayio)","license":"Unsplash License (Free commercial & personal use)","attributionRequired":false,"attributionText":"Photo by Headway on Unsplash","sizeBytes":100490,"sizeFormatted":"98.1 KB"},{"id":"anim-aurora-glow-loop","name":"Aurora Ambient Glow Loop","category":"animations","file":"animations/gif/anim-aurora-glow-loop.gif","thumbnail":"animations/thumbnails/anim-aurora-glow-loop.png","format":"gif","dimensions":"320x320","duration":"2.0s seamless loop (24 frames)","sizeBytes":547533,"sizeFormatted":"534.7 KB","dominantColors":["#0b1120","#ea580c","#f97316","#0284c7"],"tags":["hero","abstract","aurora","ambient","glow","background","loop"],"suggestedUse":"auth visual hero backdrop, dashboard header glow","source":"SmartSchedule Project (Native Algorithmic Render)","sourceUrl":"https://smartschedule.fpt.edu.vn","author":"SmartSchedule Design Engineering","license":"MIT License (Free commercial & personal SaaS use)","attributionRequired":false,"formatsAvailable":["gif","webm","webp","poster"],"optimizedWebm":"animations/webm/anim-aurora-glow-loop.webm","optimizedWebp":"animations/webp/anim-aurora-glow-loop.webp","lottieJson":null},{"id":"anim-particle-wave-flow","name":"Particle Wave Matrix Flow","category":"animations","file":"animations/gif/anim-particle-wave-flow.gif","thumbnail":"animations/thumbnails/anim-particle-wave-flow.png","format":"gif","dimensions":"320x320","duration":"2.0s seamless loop (24 frames)","sizeBytes":127191,"sizeFormatted":"124.2 KB","dominantColors":["#0f172a","#ea580c","#fb923c"],"tags":["abstract","particles","wave","flow","subtle-motion","timeline","hero"],"suggestedUse":"timetable solver canvas, telemetry header banner","source":"SmartSchedule Project (Native Algorithmic Render)","sourceUrl":"https://smartschedule.fpt.edu.vn","author":"SmartSchedule Design Engineering","license":"MIT License (Free commercial & personal SaaS use)","attributionRequired":false,"formatsAvailable":["gif","webm","webp","poster"],"optimizedWebm":"animations/webm/anim-particle-wave-flow.webm","optimizedWebp":"animations/webp/anim-particle-wave-flow.webp","lottieJson":null},{"id":"anim-geometric-pulse-core","name":"Geometric AI Pulse Core","category":"animations","file":"animations/gif/anim-geometric-pulse-core.gif","thumbnail":"animations/thumbnails/anim-geometric-pulse-core.png","format":"gif","dimensions":"320x320","duration":"2.0s seamless loop (24 frames)","sizeBytes":102043,"sizeFormatted":"99.7 KB","dominantColors":["#ea580c","#f97316","#0f172a"],"tags":["abstract","geometric","pulse","ai","subtle-motion","loading"],"suggestedUse":"AI scheduling status indicator, active solver badge","source":"SmartSchedule Project (Native Algorithmic Render)","sourceUrl":"https://smartschedule.fpt.edu.vn","author":"SmartSchedule Design Engineering","license":"MIT License (Free commercial & personal SaaS use)","attributionRequired":false,"formatsAvailable":["gif","webm","webp","poster"],"optimizedWebm":"animations/webm/anim-geometric-pulse-core.webm","optimizedWebp":"animations/webp/anim-geometric-pulse-core.webp","lottieJson":"animations/lottie/anim-geometric-pulse-core.json"},{"id":"anim-light-sweep-beam","name":"Cinematic Light Sweep Beam","category":"animations","file":"animations/gif/anim-light-sweep-beam.gif","thumbnail":"animations/thumbnails/anim-light-sweep-beam.png","format":"gif","dimensions":"320x320","duration":"2.0s seamless loop (24 frames)","sizeBytes":290847,"sizeFormatted":"284.0 KB","dominantColors":["#1e293b","#ea580c","#fb923c"],"tags":["abstract","light-sweep","shimmer","accent","card","subtle-motion"],"suggestedUse":"feature card hover effect, premium badge highlight","source":"SmartSchedule Project (Native Algorithmic Render)","sourceUrl":"https://smartschedule.fpt.edu.vn","author":"SmartSchedule Design Engineering","license":"MIT License (Free commercial & personal SaaS use)","attributionRequired":false,"formatsAvailable":["gif","webm","webp","poster"],"optimizedWebm":"animations/webm/anim-light-sweep-beam.webm","optimizedWebp":"animations/webp/anim-light-sweep-beam.webp","lottieJson":null},{"id":"anim-academic-calendar-flip","name":"Academic Calendar Flip","category":"animations","file":"animations/gif/anim-academic-calendar-flip.gif","thumbnail":"animations/thumbnails/anim-academic-calendar-flip.png","format":"gif","dimensions":"320x320","duration":"2.0s seamless loop (24 frames)","sizeBytes":47592,"sizeFormatted":"46.5 KB","dominantColors":["#ffffff","#ea580c","#0f172a"],"tags":["education","academic","calendar","schedule","timetable"],"suggestedUse":"semester planning guide, timetable import view","source":"SmartSchedule Project (Native Algorithmic Render)","sourceUrl":"https://smartschedule.fpt.edu.vn","author":"SmartSchedule Design Engineering","license":"MIT License (Free commercial & personal SaaS use)","attributionRequired":false,"formatsAvailable":["gif","webm","webp","poster","lottie"],"optimizedWebm":"animations/webm/anim-academic-calendar-flip.webm","optimizedWebp":"animations/webp/anim-academic-calendar-flip.webp","lottieJson":"animations/lottie/anim-academic-calendar-flip.json"},{"id":"anim-focus-study-clock","name":"Focus Study Pomodoro Clock","category":"animations","file":"animations/gif/anim-focus-study-clock.gif","thumbnail":"animations/thumbnails/anim-focus-study-clock.png","format":"gif","dimensions":"320x320","duration":"2.0s seamless loop (24 frames)","sizeBytes":63620,"sizeFormatted":"62.1 KB","dominantColors":["#f1f5f9","#ea580c","#0f172a"],"tags":["education","focus","timer","clock","pomodoro","study"],"suggestedUse":"focus pacing widget, study timer session","source":"SmartSchedule Project (Native Algorithmic Render)","sourceUrl":"https://smartschedule.fpt.edu.vn","author":"SmartSchedule Design Engineering","license":"MIT License (Free commercial & personal SaaS use)","attributionRequired":false,"formatsAvailable":["gif","webm","webp","poster","lottie"],"optimizedWebm":"animations/webm/anim-focus-study-clock.webm","optimizedWebp":"animations/webp/anim-focus-study-clock.webp","lottieJson":"animations/lottie/anim-focus-study-clock.json"},{"id":"anim-exam-milestone-path","name":"Exam Milestone Progression Path","category":"animations","file":"animations/gif/anim-exam-milestone-path.gif","thumbnail":"animations/thumbnails/anim-exam-milestone-path.png","format":"gif","dimensions":"320x320","duration":"2.0s seamless loop (24 frames)","sizeBytes":23291,"sizeFormatted":"22.7 KB","dominantColors":["#e2e8f0","#ea580c","#10b981"],"tags":["education","milestone","curriculum","progress","academic"],"suggestedUse":"curriculum progress tracker, degree audit view","source":"SmartSchedule Project (Native Algorithmic Render)","sourceUrl":"https://smartschedule.fpt.edu.vn","author":"SmartSchedule Design Engineering","license":"MIT License (Free commercial & personal SaaS use)","attributionRequired":false,"formatsAvailable":["gif","webm","webp","poster","lottie"],"optimizedWebm":"animations/webm/anim-exam-milestone-path.webm","optimizedWebp":"animations/webp/anim-exam-milestone-path.webp","lottieJson":"animations/lottie/anim-exam-milestone-path.json"},{"id":"anim-campus-transit-route","name":"Campus Mobility Transit Route","category":"animations","file":"animations/gif/anim-campus-transit-route.gif","thumbnail":"animations/thumbnails/anim-campus-transit-route.png","format":"gif","dimensions":"320x320","duration":"2.0s seamless loop (24 frames)","sizeBytes":42389,"sizeFormatted":"41.4 KB","dominantColors":["#0f172a","#ea580c","#f97316"],"tags":["education","campus","transit","mobility","routing","quynhon"],"suggestedUse":"campus routing drawer, inter-building transit estimate","source":"SmartSchedule Project (Native Algorithmic Render)","sourceUrl":"https://smartschedule.fpt.edu.vn","author":"SmartSchedule Design Engineering","license":"MIT License (Free commercial & personal SaaS use)","attributionRequired":false,"formatsAvailable":["gif","webm","webp","poster","lottie"],"optimizedWebm":"animations/webm/anim-campus-transit-route.webm","optimizedWebp":"animations/webp/anim-campus-transit-route.webp","lottieJson":"animations/lottie/anim-campus-transit-route.json"},{"id":"anim-schedule-solver-loading","name":"Schedule Solver Orbital Spinner","category":"animations","file":"animations/gif/anim-schedule-solver-loading.gif","thumbnail":"animations/thumbnails/anim-schedule-solver-loading.png","format":"gif","dimensions":"320x320","duration":"2.0s seamless loop (24 frames)","sizeBytes":44465,"sizeFormatted":"43.4 KB","dominantColors":["#ea580c","#f97316","#fb923c"],"tags":["loading","processing","solver","spinner","ui-state"],"suggestedUse":"schedule auto-generation loading modal, compute overlay","source":"SmartSchedule Project (Native Algorithmic Render)","sourceUrl":"https://smartschedule.fpt.edu.vn","author":"SmartSchedule Design Engineering","license":"MIT License (Free commercial & personal SaaS use)","attributionRequired":false,"formatsAvailable":["gif","webm","webp","poster","lottie"],"optimizedWebm":"animations/webm/anim-schedule-solver-loading.webm","optimizedWebp":"animations/webp/anim-schedule-solver-loading.webp","lottieJson":"animations/lottie/anim-schedule-solver-loading.json"},{"id":"anim-schedule-optimized-success","name":"Schedule Optimized Victory Burst","category":"animations","file":"animations/gif/anim-schedule-optimized-success.gif","thumbnail":"animations/thumbnails/anim-schedule-optimized-success.png","format":"gif","dimensions":"320x320","duration":"2.0s seamless loop (24 frames)","sizeBytes":37985,"sizeFormatted":"37.1 KB","dominantColors":["#ea580c","#ffffff","#ffedd5"],"tags":["success","feedback","optimized","victory","ui-state"],"suggestedUse":"schedule generation success modal, activation complete","source":"SmartSchedule Project (Native Algorithmic Render)","sourceUrl":"https://smartschedule.fpt.edu.vn","author":"SmartSchedule Design Engineering","license":"MIT License (Free commercial & personal SaaS use)","attributionRequired":false,"formatsAvailable":["gif","webm","webp","poster","lottie"],"optimizedWebm":"animations/webm/anim-schedule-optimized-success.webm","optimizedWebp":"animations/webp/anim-schedule-optimized-success.webp","lottieJson":"animations/lottie/anim-schedule-optimized-success.json"},{"id":"anim-empty-schedule-zen","name":"Empty Schedule Zen Day","category":"animations","file":"animations/gif/anim-empty-schedule-zen.gif","thumbnail":"animations/thumbnails/anim-empty-schedule-zen.png","format":"gif","dimensions":"320x320","duration":"2.0s seamless loop (24 frames)","sizeBytes":52059,"sizeFormatted":"50.8 KB","dominantColors":["#fed7aa","#ea580c","#ffffff"],"tags":["empty-state","zen","day-off","relax","ui-state"],"suggestedUse":"empty calendar day state, semester break screen","source":"SmartSchedule Project (Native Algorithmic Render)","sourceUrl":"https://smartschedule.fpt.edu.vn","author":"SmartSchedule Design Engineering","license":"MIT License (Free commercial & personal SaaS use)","attributionRequired":false,"formatsAvailable":["gif","webm","webp","poster","lottie"],"optimizedWebm":"animations/webm/anim-empty-schedule-zen.webm","optimizedWebp":"animations/webp/anim-empty-schedule-zen.webp","lottieJson":"animations/lottie/anim-empty-schedule-zen.json"},{"id":"anim-conflict-resolution-wave","name":"Conflict Resolution Wave","category":"animations","file":"animations/gif/anim-conflict-resolution-wave.gif","thumbnail":"animations/thumbnails/anim-conflict-resolution-wave.png","format":"gif","dimensions":"320x320","duration":"2.0s seamless loop (24 frames)","sizeBytes":36779,"sizeFormatted":"35.9 KB","dominantColors":["#ea580c","#0284c7","#ffffff"],"tags":["ui-state","conflict","reconcile","resolve","solver"],"suggestedUse":"conflict alert notification banner, auto-reconcile preview","source":"SmartSchedule Project (Native Algorithmic Render)","sourceUrl":"https://smartschedule.fpt.edu.vn","author":"SmartSchedule Design Engineering","license":"MIT License (Free commercial & personal SaaS use)","attributionRequired":false,"formatsAvailable":["gif","webm","webp","poster","lottie"],"optimizedWebm":"animations/webm/anim-conflict-resolution-wave.webm","optimizedWebp":"animations/webp/anim-conflict-resolution-wave.webp","lottieJson":"animations/lottie/anim-conflict-resolution-wave.json"},{"id":"anim-3d-crystal-polyhedron","name":"3D Crystal Polyhedron Rotation","category":"animations","file":"animations/gif/anim-3d-crystal-polyhedron.gif","thumbnail":"animations/thumbnails/anim-3d-crystal-polyhedron.png","format":"gif","dimensions":"320x320","duration":"2.0s seamless loop (24 frames)","sizeBytes":46911,"sizeFormatted":"45.8 KB","dominantColors":["#ea580c","#fed7aa","#0f172a"],"tags":["3d","crystal","polyhedron","glass","hero","loop"],"suggestedUse":"auth visual hero overlay, AI engine card","source":"SmartSchedule Project (Native Algorithmic Render)","sourceUrl":"https://smartschedule.fpt.edu.vn","author":"SmartSchedule Design Engineering","license":"MIT License (Free commercial & personal SaaS use)","attributionRequired":false,"formatsAvailable":["gif","webm","webp","poster"],"optimizedWebm":"animations/webm/anim-3d-crystal-polyhedron.webm","optimizedWebp":"animations/webp/anim-3d-crystal-polyhedron.webp","lottieJson":null},{"id":"anim-3d-floating-schedule-blocks","name":"3D Floating Isometric Schedule Blocks","category":"animations","file":"animations/gif/anim-3d-floating-schedule-blocks.gif","thumbnail":"animations/thumbnails/anim-3d-floating-schedule-blocks.png","format":"gif","dimensions":"320x320","duration":"2.0s seamless loop (24 frames)","sizeBytes":41924,"sizeFormatted":"40.9 KB","dominantColors":["#ea580c","#f97316","#0284c7"],"tags":["3d","blocks","isometric","glassmorphism","hero","onboarding"],"suggestedUse":"onboarding feature showcase, landing product demonstration","source":"SmartSchedule Project (Native Algorithmic Render)","sourceUrl":"https://smartschedule.fpt.edu.vn","author":"SmartSchedule Design Engineering","license":"MIT License (Free commercial & personal SaaS use)","attributionRequired":false,"formatsAvailable":["gif","webm","webp","poster"],"optimizedWebm":"animations/webm/anim-3d-floating-schedule-blocks.webm","optimizedWebp":"animations/webp/anim-3d-floating-schedule-blocks.webp","lottieJson":null},{"id":"anim-3d-sphere-wireframe-globe","name":"3D Network Campus Wireframe Globe","category":"animations","file":"animations/gif/anim-3d-sphere-wireframe-globe.gif","thumbnail":"animations/thumbnails/anim-3d-sphere-wireframe-globe.png","format":"gif","dimensions":"320x320","duration":"2.0s seamless loop (24 frames)","sizeBytes":110586,"sizeFormatted":"108.0 KB","dominantColors":["#ea580c","#fed7aa","#0f172a"],"tags":["3d","globe","network","sync","multi-campus"],"suggestedUse":"campus selector header, sync status modal","source":"SmartSchedule Project (Native Algorithmic Render)","sourceUrl":"https://smartschedule.fpt.edu.vn","author":"SmartSchedule Design Engineering","license":"MIT License (Free commercial & personal SaaS use)","attributionRequired":false,"formatsAvailable":["gif","webm","webp","poster"],"optimizedWebm":"animations/webm/anim-3d-sphere-wireframe-globe.webm","optimizedWebp":"animations/webp/anim-3d-sphere-wireframe-globe.webp","lottieJson":null}];
+
+    let currentFilter = 'all';
+    let searchQuery = '';
+
+    const grid = document.getElementById('asset-grid');
+    const searchInput = document.getElementById('search-input');
+    const filterBtns = document.querySelectorAll('.filter-btn');
+
+    const modal = document.getElementById('modal');
+    const modalClose = document.getElementById('modal-close');
+    const toast = document.getElementById('toast');
+
+    let selectedAsset = null;
+
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.style.display = 'block';
+      setTimeout(() => { toast.style.display = 'none'; }, 2000);
+    }
+
+    function renderGrid() {
+      const filtered = ASSETS.filter(item => {
+        const matchCat = (currentFilter === 'all') || (item.category === currentFilter);
+        const q = searchQuery.toLowerCase().trim();
+        const matchSearch = !q || 
+          item.name.toLowerCase().includes(q) || 
+          item.tags.some(t => t.toLowerCase().includes(q)) ||
+          item.suggestedUse.toLowerCase().includes(q) ||
+          item.format.toLowerCase().includes(q);
+        return matchCat && matchSearch;
+      });
+
+      if (filtered.length === 0) {
+        grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 60px 20px; color: #64748b;">No assets match your query.</div>';
+        return;
+      }
+
+      grid.innerHTML = filtered.map(item => {
+        const isAnim = item.category === 'animations';
+        const formatBadge = isAnim ? (item.lottieJson ? 'LOTTIE · GIF' : 'WEBM · GIF') : item.format.toUpperCase();
+        return `
+          <div class="asset-card" onclick="openModal('${item.id}')">
+            <div class="thumb-box" 
+                 onmouseenter="playCardAnim(this, '${item.id}', '${item.category}')" 
+                 onmouseleave="stopCardAnim(this, '${item.id}', '${item.category}')">
+              <span class="thumb-badge-format">${formatBadge}</span>
+              <span class="thumb-badge-size">${item.sizeFormatted}</span>
+              <img class="thumb-img" id="thumb-${item.id}" src="${item.thumbnail}" alt="${item.name}" loading="lazy" />
+            </div>
+            <div class="card-body">
+              <h3 class="card-title">${item.name}</h3>
+              <span class="card-use-badge">${item.suggestedUse.split(',')[0]}</span>
+              <div class="color-swatches">
+                ${item.dominantColors.map(c => `<span class="swatch" style="background: ${c}" title="${c}"></span>`).join('')}
+              </div>
+              <div class="card-footer-info">
+                <span>${item.category}</span>
+                <span>${item.source.split(' ')[0]}</span>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function playCardAnim(box, id, cat) {
+      if (cat !== 'animations') return;
+      const img = box.querySelector('.thumb-img');
+      if (img) img.src = 'animations/gif/' + id + '.gif';
+    }
+
+    function stopCardAnim(box, id, cat) {
+      if (cat !== 'animations') return;
+      const img = box.querySelector('.thumb-img');
+      if (img) img.src = 'animations/thumbnails/' + id + '.png';
+    }
+
+    function openModal(id) {
+      const item = ASSETS.find(a => a.id === id);
+      if (!item) return;
+      selectedAsset = item;
+
+      document.getElementById('modal-title').textContent = item.name;
+      document.getElementById('modal-cat').textContent = item.category.toUpperCase();
+      document.getElementById('modal-path').textContent = item.file;
+      document.getElementById('modal-size').textContent = `${item.dimensions} — ${item.sizeFormatted} (${item.sizeBytes} bytes)`;
+      document.getElementById('modal-use').textContent = item.suggestedUse;
+
+      const container = document.getElementById('modal-preview-container');
+      if (item.category === 'animations') {
+        container.innerHTML = `
+          <video autoplay loop muted playsinline style="max-width:100%; max-height:100%; border-radius:8px;">
+            <source src="${item.optimizedWebm}" type="video/webm">
+            <img src="${item.file}" alt="${item.name}">
+          </video>
+        `;
+      } else {
+        container.innerHTML = `<img src="${item.file}" alt="${item.name}" style="max-width:100%; max-height:100%; object-fit:contain;" />`;
+      }
+
+      document.getElementById('modal-formats').innerHTML = (item.formatsAvailable || [item.format]).map(f => `
+        <span style="display:inline-block; background:#e2e8f0; font-size:11px; font-weight:700; padding:2px 8px; border-radius:4px; margin-right:4px;">${f.toUpperCase()}</span>
+      `).join('');
+
+      document.getElementById('modal-palette').innerHTML = item.dominantColors.map(c => `
+        <span style="display:inline-flex; align-items:center; gap:4px; margin-right:8px; font-size:12px; font-family:monospace;">
+          <span class="swatch" style="background:${c}; display:inline-block;"></span> ${c}
+        </span>
+      `).join('');
+
+      document.getElementById('modal-license').innerHTML = `
+        <strong>${item.source}</strong> — ${item.license}
+        ${item.attributionText ? `<br><span style="color:#64748b; font-size:11px;">Attribution: ${item.attributionText}</span>` : ''}
+      `;
+
+      let code = '';
+      if (item.category === 'animations') {
+        code = `// Option 1: Modern WebM Video with Poster fallback\n<video autoPlay loop muted playsInline poster="@/assets/ui/${item.id}.png" className="w-48 h-48">\n  <source src="@/assets/ui/${item.id}.webm" type="video/webm" />\n  <img src="@/assets/ui/${item.id}.gif" alt="${item.name}" />\n</video>\n\n// Option 2: Direct GIF import\nimport ${item.id.replace(/-/g, '_')} from '@/assets/ui/${item.id}.gif';\n<img src={${item.id.replace(/-/g, '_')}} alt="${item.name}" loading="lazy" />`;
+      } else if (item.format === 'svg') {
+        code = `// Copy to frontend/src/assets/ui/\nimport ${item.id.replace(/-/g, '_')} from '@/assets/ui/${item.file.split('/').pop()}';`;
+      } else {
+        code = `// Copy to frontend/src/assets/ui/\nimport ${item.id.replace(/-/g, '_')} from '@/assets/ui/${item.file.split('/').pop()}';\n<img src={${item.id.replace(/-/g, '_')}} alt="${item.name}" loading="lazy" />`;
+      }
+      document.getElementById('modal-snippet').textContent = code;
+
+      modal.classList.add('open');
+    }
+
+    modalClose.onclick = () => modal.classList.remove('open');
+    modal.onclick = (e) => { if (e.target === modal) modal.classList.remove('open'); };
+
+    document.getElementById('btn-copy-path').onclick = () => {
+      if (selectedAsset) {
+        navigator.clipboard.writeText(selectedAsset.file).then(() => showToast('File path copied!'));
+      }
+    };
+
+    document.getElementById('btn-copy-snippet').onclick = () => {
+      if (selectedAsset) {
+        const snippet = document.getElementById('modal-snippet').textContent;
+        navigator.clipboard.writeText(snippet).then(() => showToast('Import snippet copied!'));
+      }
+    };
+
+    searchInput.oninput = (e) => {
+      searchQuery = e.target.value;
+      renderGrid();
+    };
+
+    filterBtns.forEach(btn => {
+      btn.onclick = () => {
+        filterBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentFilter = btn.dataset.cat;
+        renderGrid();
+      };
+    });
+
+    renderGrid();
+  </script>
+</body>
+</html>

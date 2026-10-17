@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 360" preserveAspectRatio="none">
+  <defs>
+    <linearGradient id="step-grad-1" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fff7ed" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#ffedd5" stop-opacity="0.5"/>
+    </linearGradient>
+    <linearGradient id="step-grad-2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fed7aa" stop-opacity="0.75"/>
+      <stop offset="100%" stop-color="#fdba74" stop-opacity="0.4"/>
+    </linearGradient>
+    <linearGradient id="step-grad-3" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fb923c" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#f97316" stop-opacity="0.4"/>
+    </linearGradient>
+    <linearGradient id="step-grad-4" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ea580c" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#c2410c" stop-opacity="0.95"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#step-grad-1)" d="M0,120 L240,120 L240,160 L480,160 L480,200 L720,200 L720,240 L960,240 L960,280 L1200,280 L1200,320 L1440,320 L1440,360 L0,360 Z"/>
+  <path fill="url(#step-grad-2)" d="M0,170 L280,170 L280,210 L560,210 L560,250 L840,250 L840,290 L1120,290 L1120,330 L1440,330 L1440,360 L0,360 Z"/>
+  <path fill="url(#step-grad-3)" d="M0,230 L360,230 L360,270 L720,270 L720,310 L1080,310 L1080,340 L1440,340 L1440,360 L0,360 Z"/>
+  <path fill="url(#step-grad-4)" d="M0,290 L480,290 L480,320 L960,320 L960,350 L1440,350 L1440,360 L0,360 Z"/>
+</svg>

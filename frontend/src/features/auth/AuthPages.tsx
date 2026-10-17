@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -9,6 +9,13 @@ import { BrandLogo } from '../../components/BrandLogo';
 import { isDemoMode, isRealMode } from '../../services/demoMode';
 import { SocialAuthButtons, type SocialAuthPayload } from './SocialAuthButtons';
 import { SocialRegistrationView } from './GoogleRegistrationView';
+import { AuthSpotlight } from './AuthSpotlight';
+import { AuthVisual3D } from './AuthVisual3D';
+import BlurText from '../../components/BlurText';
+import { MicroScaleFadeText, ShimmerSweepBadge } from '../../components/effects/AnimateText';
+import { SmartConnectionExperience } from '../../components/feedback/SmartConnectionExperience';
+import { SmartSubmitLoading } from '../../components/feedback/SmartSubmitLoading';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { getApiErrorMessage, getRawApiUrl, setCustomApiUrl, CUSTOM_API_URL_KEY } from '../../services/apiClient';
 import './login.css';
 
@@ -20,7 +27,8 @@ export const loginSchema = z.object({
 export const registerSchema = z.object({
   displayName: z.string().trim().min(2, 'Enter at least 2 characters.').max(120),
   email: z.string().trim().email('Enter a valid email address.'),
-  password: z.string().min(8, 'Use at least 8 characters.').max(72)
+  password: z.string().min(8, 'Use at least 8 characters.')
+    .max(72)
     .regex(/[A-Z]/, 'Add at least one uppercase letter.')
     .regex(/[0-9]/, 'Add at least one number.'),
   confirmPassword: z.string(),
@@ -48,18 +56,14 @@ export function LoginPage() {
   const [socialNotice, setSocialNotice] = useState<string | null>(null);
   const [pendingSocialAuth, setPendingSocialAuth] = useState<PendingSocialAuthState | null>(null);
   const [keyModalError, setKeyModalError] = useState<string | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    containerRef.current.style.setProperty('--spotlight-x', `${x}px`);
-    containerRef.current.style.setProperty('--spotlight-y', `${y}px`);
-  };
+  const [formRef] = useAutoAnimate<HTMLFormElement>({ duration: 180 });
 
-  const form = useForm<LoginInput>({ resolver: zodResolver(loginSchema), defaultValues: { email: '', password: '' } });
+  const form = useForm<LoginInput>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: '', password: '' },
+  });
+
   useEffect(() => clearError(), [clearError]);
 
   // 1. Check state from OAuth redirect flow
@@ -125,10 +129,8 @@ export function LoginPage() {
       }
 
       if (res.status === 'AUTHENTICATED') {
-        // CASE: Existing social account -> directly enter Dashboard!
         navigate((location.state as { from?: string } | null)?.from ?? '/dashboard', { replace: true });
       } else if (res.status === 'KEY_REQUIRED') {
-        // CASE: First time social sign up -> require Registration Key
         setPendingSocialAuth({
           provider: auth.provider,
           idToken: auth.idToken,
@@ -185,162 +187,191 @@ export function LoginPage() {
     }
   };
 
-  // If new social user detected, show the dedicated Create Account screen
+  // If first-time social sign up requires Registration Key, render in split layout
   if (pendingSocialAuth) {
     return (
-      <AuthLayout
-        title="Create your SmartSchedule account"
-        subtitle="Registration Key is required only for your first registration."
-      >
-        <SocialRegistrationView
-          provider={pendingSocialAuth.provider}
-          email={pendingSocialAuth.email}
-          displayName={pendingSocialAuth.displayName}
-          avatarUrl={pendingSocialAuth.avatarUrl}
-          isLoading={socialLoading}
-          error={keyModalError}
-          onSubmit={handleKeySubmit}
-          onBack={() => {
-            setPendingSocialAuth(null);
-            setKeyModalError(null);
-            clearError();
-          }}
-        />
-      </AuthLayout>
+      <div className="auth-split-wrapper">
+        <AuthVisual3D mode="login" />
+
+        <div className="auth-form-panel">
+          <AuthSpotlight />
+          <main className="login-card">
+            <header className="login-header">
+              <div className="login-brand-wrapper">
+                <BrandLogo />
+              </div>
+              <ShimmerSweepBadge as="span" className="login-campus-badge" delay={0.05}>
+                FPT University Quy Nhơn · AI Campus
+              </ShimmerSweepBadge>
+              <h1 className="login-title">
+                <MicroScaleFadeText text="Complete your registration" delay={0.12} />
+              </h1>
+              <p className="login-subtitle">
+                Registration Key is required only for your first registration.
+              </p>
+            </header>
+
+            <SocialRegistrationView
+              provider={pendingSocialAuth.provider}
+              email={pendingSocialAuth.email}
+              displayName={pendingSocialAuth.displayName}
+              avatarUrl={pendingSocialAuth.avatarUrl}
+              isLoading={socialLoading}
+              error={keyModalError}
+              onSubmit={handleKeySubmit}
+              onBack={() => {
+                setPendingSocialAuth(null);
+                setKeyModalError(null);
+                clearError();
+              }}
+            />
+          </main>
+          <footer className="login-watermark">
+            SmartSchedule · Academic Scheduling Platform · FPT University Quy Nhơn
+          </footer>
+        </div>
+      </div>
     );
   }
 
   return (
-    <div
-      ref={containerRef}
-      className="login-page-wrapper"
-      onMouseMove={handleMouseMove}
-    >
-      <div className="login-spotlight" aria-hidden="true" />
+    <div className="auth-split-wrapper">
+      <AuthVisual3D mode="login" />
 
-      <main className="login-card">
-        <header className="login-header">
-          <div className="login-brand-wrapper">
-            <BrandLogo />
-          </div>
-          <span className="login-campus-badge">FPT University Quy Nhơn · AI Campus</span>
-          <h1 className="login-title">Welcome back</h1>
-          <p className="login-subtitle">
-            Sign in to turn your academic commitments into a realistic study plan.
-          </p>
-        </header>
+      <div className="auth-form-panel">
+        <AuthSpotlight />
 
-        {socialNotice && (
-          <div className="login-notice" role="alert">
-            {socialNotice}
-          </div>
-        )}
+        <main className="login-card">
+          <header className="login-header">
+            <div className="login-brand-wrapper">
+              <BrandLogo />
+            </div>
+            <ShimmerSweepBadge as="span" className="login-campus-badge" delay={0.05}>
+              FPT University Quy Nhơn · AI Campus
+            </ShimmerSweepBadge>
+            <h1 className="login-title">
+              <MicroScaleFadeText text="Welcome back" delay={0.15} />
+            </h1>
+            <p className="login-subtitle">
+              Sign in to turn your academic commitments into a realistic study plan.
+            </p>
+          </header>
 
-        <SocialAuthButtons
-          onGoogleToken={handleGoogleToken}
-          onSocialAuth={handleSocialAuth}
-          isLoading={socialLoading}
-          onNotice={(msg) => setSocialNotice(msg)}
-          noIcons={true}
-        />
+          {socialNotice && (
+            <div className="login-notice" role="alert">
+              {socialNotice}
+            </div>
+          )}
 
-        <div className="login-divider">
-          <span>or continue with email</span>
-        </div>
+          <SocialAuthButtons
+            onGoogleToken={handleGoogleToken}
+            onSocialAuth={handleSocialAuth}
+            isLoading={socialLoading}
+            onNotice={(msg) => setSocialNotice(msg)}
+            noIcons={true}
+          />
 
-        <form className="login-form" onSubmit={form.handleSubmit(onSubmit)} noValidate>
-          <div className="login-field">
-            <label htmlFor="login-email-input" className="login-label">Email</label>
-            <input
-              id="login-email-input"
-              type="email"
-              autoComplete="email"
-              placeholder="student@fpt.edu.vn"
-              className={`login-input ${form.formState.errors.email ? 'login-input-error' : ''}`}
-              {...form.register('email')}
-            />
-            {form.formState.errors.email && (
-              <span className="login-field-error" role="alert">
-                {form.formState.errors.email.message}
-              </span>
-            )}
+          <div className="login-divider">
+            <span>or continue with email</span>
           </div>
 
-          <div className="login-field">
-            <label htmlFor="login-password-input" className="login-label">Password</label>
-            <div className="login-password-container">
+          <form ref={formRef} className="login-form" onSubmit={form.handleSubmit(onSubmit)} noValidate>
+            <div className="login-field">
+              <label htmlFor="login-email-input" className="login-label">Email</label>
               <input
-                id="login-password-input"
-                type={showPassword ? 'text' : 'password'}
-                autoComplete="current-password"
-                placeholder="••••••••"
-                className={`login-password-input ${form.formState.errors.password ? 'login-input-error' : ''}`}
-                {...form.register('password')}
+                id="login-email-input"
+                type="email"
+                autoComplete="email"
+                placeholder="student@fpt.edu.vn"
+                className={`login-input ${form.formState.errors.email ? 'login-input-error' : ''}`}
+                {...form.register('email')}
               />
+              {form.formState.errors.email && (
+                <span className="login-field-error" role="alert">
+                  {form.formState.errors.email.message}
+                </span>
+              )}
+            </div>
+
+            <div className="login-field">
+              <label htmlFor="login-password-input" className="login-label">Password</label>
+              <div className="login-password-container">
+                <input
+                  id="login-password-input"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  className={`login-password-input ${form.formState.errors.password ? 'login-input-error' : ''}`}
+                  {...form.register('password')}
+                />
+                <button
+                  type="button"
+                  className="login-password-toggle"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
+              {form.formState.errors.password && (
+                <span className="login-field-error" role="alert">
+                  {form.formState.errors.password.message}
+                </span>
+              )}
+            </div>
+
+            <div className="login-aux-row">
+              <label className="login-remember-label">
+                <input
+                  type="checkbox"
+                  className="login-remember-checkbox"
+                  defaultChecked={true}
+                />
+                <span>Remember this device</span>
+              </label>
+            </div>
+
+            <BackendConnectionAlert error={error} onClearError={clearError} />
+
+            <button
+              type="submit"
+              className={`login-submit-btn ${form.formState.isSubmitting ? 'login-submit-submitting' : ''}`}
+              disabled={form.formState.isSubmitting || socialLoading}
+            >
+              {form.formState.isSubmitting ? 'Signing in…' : 'Sign in'}
+            </button>
+
+            <SmartSubmitLoading isSubmitting={form.formState.isSubmitting} mode="login" />
+            {socialLoading && <SmartSubmitLoading isSubmitting={true} mode="oauth" />}
+          </form>
+
+          {!isRealMode() && (import.meta.env.DEV || isDemoMode()) && (
+            <div style={{ marginTop: '12px' }}>
               <button
+                className="login-demo-btn"
                 type="button"
-                className="login-password-toggle"
-                onClick={() => setShowPassword((prev) => !prev)}
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                onClick={() => {
+                  demoLogin();
+                  navigate('/dashboard', { replace: true });
+                }}
               >
-                {showPassword ? 'Hide' : 'Show'}
+                Continue in demo mode (Alex Nguyen · FPT University Quy Nhơn)
               </button>
             </div>
-            {form.formState.errors.password && (
-              <span className="login-field-error" role="alert">
-                {form.formState.errors.password.message}
-              </span>
-            )}
-          </div>
+          )}
 
-          <div className="login-aux-row">
-            <label className="login-remember-label">
-              <input
-                type="checkbox"
-                className="login-remember-checkbox"
-                defaultChecked={true}
-              />
-              <span>Remember this device</span>
-            </label>
-          </div>
+          <p className="login-switch-text">
+            New to SmartSchedule?
+            <Link to="/register" className="login-switch-link">
+              Create an account
+            </Link>
+          </p>
+        </main>
 
-          <BackendConnectionAlert error={error} onClearError={clearError} />
-
-          <button
-            type="submit"
-            className="login-submit-btn"
-            disabled={form.formState.isSubmitting || socialLoading}
-          >
-            {form.formState.isSubmitting ? 'Signing in…' : 'Sign in'}
-          </button>
-        </form>
-
-        {!isRealMode() && (import.meta.env.DEV || isDemoMode()) && (
-          <div style={{ marginTop: '12px' }}>
-            <button
-              className="login-demo-btn"
-              type="button"
-              onClick={() => {
-                demoLogin();
-                navigate('/dashboard', { replace: true });
-              }}
-            >
-              Continue in demo mode (Alex Nguyen · FPT University Quy Nhơn)
-            </button>
-          </div>
-        )}
-
-        <p className="login-switch-text">
-          New to SmartSchedule?
-          <Link to="/register" className="login-switch-link">
-            Create an account
-          </Link>
-        </p>
-      </main>
-
-      <footer className="login-watermark">
-        SmartSchedule · AI-Powered Academic Scheduling Platform
-      </footer>
+        <footer className="login-watermark">
+          SmartSchedule · Academic Scheduling Platform · FPT University Quy Nhơn
+        </footer>
+      </div>
     </div>
   );
 }
@@ -349,15 +380,19 @@ export function RegisterPage() {
   const navigate = useNavigate();
   const { register, googleAuth, githubAuth, facebookAuth, error, clearError } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [socialLoading, setSocialLoading] = useState(false);
   const [socialNotice, setSocialNotice] = useState<string | null>(null);
   const [pendingSocialAuth, setPendingSocialAuth] = useState<PendingSocialAuthState | null>(null);
   const [keyModalError, setKeyModalError] = useState<string | null>(null);
 
+  const [formRef] = useAutoAnimate<HTMLFormElement>({ duration: 180 });
+
   const form = useForm<RegisterInput & { confirmPassword: string }>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { displayName: '', email: '', password: '', confirmPassword: '' },
+    defaultValues: { displayName: '', email: '', password: '', confirmPassword: '', activationKey: '' },
   });
+
   useEffect(() => clearError(), [clearError]);
 
   const onSubmit = async ({ confirmPassword: _confirmPassword, ...values }: RegisterInput & { confirmPassword: string }) => {
@@ -447,82 +482,232 @@ export function RegisterPage() {
 
   if (pendingSocialAuth) {
     return (
-      <AuthLayout
-        title="Create your SmartSchedule account"
-        subtitle="Registration Key is required only for your first registration."
-      >
-        <SocialRegistrationView
-          provider={pendingSocialAuth.provider}
-          email={pendingSocialAuth.email}
-          displayName={pendingSocialAuth.displayName}
-          avatarUrl={pendingSocialAuth.avatarUrl}
-          isLoading={socialLoading}
-          error={keyModalError}
-          onSubmit={handleKeySubmit}
-          onBack={() => {
-            setPendingSocialAuth(null);
-            setKeyModalError(null);
-            clearError();
-          }}
-        />
-      </AuthLayout>
+      <div className="auth-split-wrapper">
+        <AuthVisual3D mode="register" />
+
+        <div className="auth-form-panel">
+          <AuthSpotlight />
+          <main className="login-card">
+            <header className="login-header">
+              <div className="login-brand-wrapper">
+                <BrandLogo />
+              </div>
+              <ShimmerSweepBadge as="span" className="login-campus-badge" delay={0.05}>
+                FPT University Quy Nhơn · AI Campus
+              </ShimmerSweepBadge>
+              <h1 className="login-title">
+                <MicroScaleFadeText text="Complete your registration" delay={0.12} />
+              </h1>
+              <p className="login-subtitle">
+                Registration Key is required only for your first registration.
+              </p>
+            </header>
+
+            <SocialRegistrationView
+              provider={pendingSocialAuth.provider}
+              email={pendingSocialAuth.email}
+              displayName={pendingSocialAuth.displayName}
+              avatarUrl={pendingSocialAuth.avatarUrl}
+              isLoading={socialLoading}
+              error={keyModalError}
+              onSubmit={handleKeySubmit}
+              onBack={() => {
+                setPendingSocialAuth(null);
+                setKeyModalError(null);
+                clearError();
+              }}
+            />
+          </main>
+          <footer className="login-watermark">
+            SmartSchedule · Academic Scheduling Platform · FPT University Quy Nhơn
+          </footer>
+        </div>
+      </div>
     );
   }
 
   return (
-    <AuthLayout title="Create your workspace" subtitle="Start with your university timetable, then let the engine find the time.">
-      {socialNotice && (
-        <div className="social-notice" role="alert">
-          {socialNotice}
-        </div>
-      )}
+    <div className="auth-split-wrapper">
+      <AuthVisual3D mode="register" />
 
-      <SocialAuthButtons
-        onGoogleToken={handleGoogleToken}
-        onSocialAuth={handleSocialAuth}
-        isLoading={socialLoading}
-        onNotice={(msg) => setSocialNotice(msg)}
-      />
+      <div className="auth-form-panel">
+        <AuthSpotlight />
 
-      <div className="auth-divider">
-        <span>or register with email</span>
-      </div>
+        <main className="login-card">
+          <header className="login-header">
+            <div className="login-brand-wrapper">
+              <BrandLogo />
+            </div>
+            <ShimmerSweepBadge as="span" className="login-campus-badge" delay={0.05}>
+              FPT University Quy Nhơn · AI Campus
+            </ShimmerSweepBadge>
+            <h1 className="login-title">
+              <MicroScaleFadeText text="Create your workspace" delay={0.15} />
+            </h1>
+            <p className="login-subtitle">
+              Start with your university timetable, then let the engine find the time.
+            </p>
+          </header>
 
-      <form className="auth-form" onSubmit={form.handleSubmit(onSubmit)} noValidate>
-        <Field label="Display name" error={form.formState.errors.displayName?.message}>
-          <input autoComplete="name" {...form.register('displayName')} />
-        </Field>
-        <Field label="Email" error={form.formState.errors.email?.message}>
-          <input type="email" autoComplete="email" {...form.register('email')} />
-        </Field>
-        <Field label="Password" hint="At least 8 characters, one uppercase letter, and one number." error={form.formState.errors.password?.message}>
-          <div className="password-field">
-            <input type={showPassword ? 'text' : 'password'} autoComplete="new-password" {...form.register('password')} />
-            <button type="button" onClick={() => setShowPassword(!showPassword)}>{showPassword ? 'Hide' : 'Show'}</button>
+          {socialNotice && (
+            <div className="login-notice" role="alert">
+              {socialNotice}
+            </div>
+          )}
+
+          <SocialAuthButtons
+            onGoogleToken={handleGoogleToken}
+            onSocialAuth={handleSocialAuth}
+            isLoading={socialLoading}
+            onNotice={(msg) => setSocialNotice(msg)}
+            noIcons={true}
+          />
+
+          <div className="login-divider">
+            <span>or register with email</span>
           </div>
-        </Field>
-        <Field label="Confirm password" error={form.formState.errors.confirmPassword?.message}>
-          <input type={showPassword ? 'text' : 'password'} autoComplete="new-password" {...form.register('confirmPassword')} />
-        </Field>
-        <BackendConnectionAlert error={error} onClearError={clearError} />
-        <button className="primary-button auth-submit" disabled={form.formState.isSubmitting || socialLoading}>
-          {form.formState.isSubmitting ? 'Creating…' : 'Create account'}
-        </button>
-      </form>
-      <p className="auth-switch">Already have an account? <Link to="/login">Sign in</Link></p>
-    </AuthLayout>
+
+          <form ref={formRef} className="login-form" onSubmit={form.handleSubmit(onSubmit)} noValidate>
+            <div className="login-field">
+              <label htmlFor="reg-name-input" className="login-label">Full Name</label>
+              <input
+                id="reg-name-input"
+                type="text"
+                autoComplete="name"
+                placeholder="Nguyen Van A"
+                className={`login-input ${form.formState.errors.displayName ? 'login-input-error' : ''}`}
+                {...form.register('displayName')}
+              />
+              {form.formState.errors.displayName && (
+                <span className="login-field-error" role="alert">
+                  {form.formState.errors.displayName.message}
+                </span>
+              )}
+            </div>
+
+            <div className="login-field">
+              <label htmlFor="reg-email-input" className="login-label">Email</label>
+              <input
+                id="reg-email-input"
+                type="email"
+                autoComplete="email"
+                placeholder="student@fpt.edu.vn"
+                className={`login-input ${form.formState.errors.email ? 'login-input-error' : ''}`}
+                {...form.register('email')}
+              />
+              {form.formState.errors.email && (
+                <span className="login-field-error" role="alert">
+                  {form.formState.errors.email.message}
+                </span>
+              )}
+            </div>
+
+            <div className="login-field">
+              <label htmlFor="reg-password-input" className="login-label">Password</label>
+              <div className="login-password-container">
+                <input
+                  id="reg-password-input"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  placeholder="••••••••"
+                  className={`login-password-input ${form.formState.errors.password ? 'login-input-error' : ''}`}
+                  {...form.register('password')}
+                />
+                <button
+                  type="button"
+                  className="login-password-toggle"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
+              {form.formState.errors.password ? (
+                <span className="login-field-error" role="alert">
+                  {form.formState.errors.password.message}
+                </span>
+              ) : (
+                <span className="login-field-hint">
+                  At least 8 characters, one uppercase letter, and one number.
+                </span>
+              )}
+            </div>
+
+            <div className="login-field">
+              <label htmlFor="reg-confirm-password-input" className="login-label">Confirm Password</label>
+              <div className="login-password-container">
+                <input
+                  id="reg-confirm-password-input"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  placeholder="••••••••"
+                  className={`login-password-input ${form.formState.errors.confirmPassword ? 'login-input-error' : ''}`}
+                  {...form.register('confirmPassword')}
+                />
+                <button
+                  type="button"
+                  className="login-password-toggle"
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                >
+                  {showConfirmPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
+              {form.formState.errors.confirmPassword && (
+                <span className="login-field-error" role="alert">
+                  {form.formState.errors.confirmPassword.message}
+                </span>
+              )}
+            </div>
+
+            <div className="login-field">
+              <label htmlFor="reg-activation-key-input" className="login-label">
+                Registration Key <span style={{ fontWeight: 400, color: '#94a3b8' }}>(Optional)</span>
+              </label>
+              <input
+                id="reg-activation-key-input"
+                type="text"
+                autoComplete="off"
+                placeholder="Enter key if required by your campus program"
+                className="login-input"
+                {...form.register('activationKey')}
+              />
+              <span className="login-field-hint">
+                Required only if your university program requires an activation key.
+              </span>
+            </div>
+
+            <BackendConnectionAlert error={error} onClearError={clearError} />
+
+            <button
+              type="submit"
+              className={`login-submit-btn ${form.formState.isSubmitting ? 'login-submit-submitting' : ''}`}
+              disabled={form.formState.isSubmitting || socialLoading}
+            >
+              {form.formState.isSubmitting ? 'Creating account…' : 'Create account'}
+            </button>
+
+            <SmartSubmitLoading isSubmitting={form.formState.isSubmitting} mode="register" />
+            {socialLoading && <SmartSubmitLoading isSubmitting={true} mode="oauth" />}
+          </form>
+
+          <p className="login-switch-text">
+            Already have an account?
+            <Link to="/login" className="login-switch-link">
+              Sign in
+            </Link>
+          </p>
+        </main>
+
+        <footer className="login-watermark">
+          SmartSchedule · Academic Scheduling Platform · FPT University Quy Nhơn
+        </footer>
+      </div>
+    </div>
   );
 }
 
 function BackendConnectionAlert({ error, onClearError }: { error: string | null; onClearError: () => void }) {
-  const [customUrl, setCustomUrl] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem(CUSTOM_API_URL_KEY) || '';
-    }
-    return '';
-  });
-  const [validationError, setValidationError] = useState<string | null>(null);
-  const [showConfig, setShowConfig] = useState(false);
   const isProduction =
     typeof window !== 'undefined' &&
     window.location.hostname !== 'localhost' &&
@@ -532,174 +717,47 @@ function BackendConnectionAlert({ error, onClearError }: { error: string | null;
 
   if (!error && !(isProduction && isLocalhost)) return null;
 
-  const handleSave = () => {
-    setValidationError(null);
-    const trimmed = customUrl.trim();
-    if (!trimmed) {
-      setValidationError('Vui lòng nhập URL máy chủ Backend.');
-      return;
-    }
-    if (typeof window !== 'undefined' && trimmed.includes(window.location.hostname)) {
-      setValidationError('Đây là tên miền Frontend (Vercel). Bạn cần nhập tên miền Backend Render (ví dụ: https://xxx.onrender.com).');
-      return;
-    }
-    setCustomApiUrl(trimmed);
-    onClearError();
-    window.location.reload();
-  };
+  const isNetworkOrColdStart =
+    !error ||
+    error.includes('Không thể kết nối') ||
+    error.includes('Network Error') ||
+    error.includes('Lỗi kết nối') ||
+    error.includes('timed out') ||
+    error.includes('timeout') ||
+    error.includes('502') ||
+    error.includes('503') ||
+    (isProduction && isLocalhost);
 
-  const handleReset = () => {
-    setCustomApiUrl(null);
-    setCustomUrl('');
-    onClearError();
-    window.location.reload();
-  };
+  if (isNetworkOrColdStart) {
+    return (
+      <div style={{ margin: '8px 0' }}>
+        <SmartConnectionExperience
+          variant="inline"
+          status="FAILED"
+          error={error || 'Frontend đang trỏ về localhost thay vì máy chủ Render.'}
+          onRetry={() => {
+            onClearError();
+            window.location.reload();
+          }}
+          showConfigAction={true}
+        />
+      </div>
+    );
+  }
 
   return (
     <div
-      className="form-error"
+      className="login-error-alert"
       role="alert"
       style={{
         display: 'flex',
         flexDirection: 'column',
         gap: '8px',
         textAlign: 'left',
-        margin: '12px 0',
+        margin: '8px 0',
       }}
     >
-      {error && <div style={{ lineHeight: 1.5 }}>{error}</div>}
-
-      {isProduction && (
-        <div
-          style={{
-            marginTop: error ? '4px' : '0px',
-            padding: '10px 12px',
-            background: 'rgba(255, 255, 255, 0.98)',
-            borderRadius: '8px',
-            border: '1px solid #fed7aa',
-            color: '#1e293b',
-            fontSize: '13px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontWeight: 600, color: '#c2410c' }}>Kết nối Backend Render</span>
-            <button
-              type="button"
-              onClick={() => setShowConfig(!showConfig)}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#2563eb',
-                fontSize: '12px',
-                cursor: 'pointer',
-                textDecoration: 'underline',
-                padding: 0,
-              }}
-            >
-              {showConfig ? 'Đóng' : 'Nhập URL kết nối ngay'}
-            </button>
-          </div>
-
-          {(showConfig || error) && (
-            <div style={{ marginTop: '8px' }}>
-              <p style={{ margin: '0 0 6px 0', fontSize: '12px', color: '#64748b', lineHeight: 1.4 }}>
-                Dán URL máy chủ Render (ví dụ: <code style={{ color: '#0f172a' }}>https://xxx.onrender.com</code>) để kết nối trực tiếp:
-              </p>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <input
-                  type="text"
-                  placeholder="https://your-backend.onrender.com"
-                  value={customUrl}
-                  onChange={(e) => {
-                    setCustomUrl(e.target.value);
-                    setValidationError(null);
-                  }}
-                  style={{
-                    flex: 1,
-                    padding: '6px 8px',
-                    fontSize: '12px',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '4px',
-                    outline: 'none',
-                    color: '#0f172a',
-                    background: '#fff',
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  style={{
-                    padding: '6px 12px',
-                    fontSize: '12px',
-                    background: '#ea580c',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  Lưu & Thử lại
-                </button>
-                {typeof window !== 'undefined' && localStorage.getItem(CUSTOM_API_URL_KEY) && (
-                  <button
-                    type="button"
-                    onClick={handleReset}
-                    style={{
-                      padding: '6px 8px',
-                      fontSize: '11px',
-                      background: '#f1f5f9',
-                      color: '#475569',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    Xóa URL
-                  </button>
-                )}
-              </div>
-              {validationError && (
-                <div style={{ color: '#dc2626', fontSize: '11px', marginTop: '4px' }}>
-                  {validationError}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+      <div style={{ lineHeight: 1.5 }}>{error}</div>
     </div>
-  );
-}
-
-function AuthLayout({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
-  return (
-    <main className="auth-page">
-      <section className="auth-card">
-        <div className="auth-brand-wrapper" style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
-          <BrandLogo />
-        </div>
-        <div className="auth-copy">
-          <p className="eyebrow">FPT University Quy Nhơn AI Campus</p>
-          <h1>{title}</h1>
-          <p className="muted">{subtitle}</p>
-        </div>
-        {children}
-      </section>
-    </main>
-  );
-}
-
-function Field({ label, hint, error, children }: { label: string; hint?: string; error?: string; children: React.ReactNode }) {
-  return (
-    <label className="field">
-      <span>{label}</span>
-      {children}
-      {hint && !error && <small>{hint}</small>}
-      {error && <small className="field-error">{error}</small>}
-    </label>
   );
 }

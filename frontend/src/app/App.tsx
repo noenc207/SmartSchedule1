@@ -366,14 +366,6 @@ function Page({ title, detail }: { title: string; detail: string }) {
 export default function App() {
   const bootstrap = useAuthStore((state) => state.bootstrap);
   useEffect(() => { void bootstrap(); }, [bootstrap]);
-  useEffect(() => {
-    const handleAuthExpired = () => {
-      useAuthStore.getState().clearError();
-      useAuthStore.setState({ user: null, status: 'UNAUTHENTICATED' });
-    };
-    window.addEventListener('smartschedule:auth-expired', handleAuthExpired);
-    return () => window.removeEventListener('smartschedule:auth-expired', handleAuthExpired);
-  }, []);
   return (
     <>
       <Routes>

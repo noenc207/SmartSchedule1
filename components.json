@@ -1,0 +1,38 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "default",
+  "rsc": false,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "frontend/src/styles.css",
+    "baseColor": "slate",
+    "cssVariables": true
+  },
+  "aliases": {
+    "components": "frontend/src/components",
+    "utils": "frontend/src/lib/utils",
+    "ui": "frontend/src/components/ui",
+    "lib": "frontend/src/lib",
+    "hooks": "frontend/src/hooks"
+  },
+  "registries": {
+    "@react-bits": "https://reactbits.dev/r/{name}.json",
+    "@reactbits-starter": {
+      "url": "https://pro.reactbits.dev/api/r/starter/{name}.json",
+      "headers": {
+        "Authorization": "Bearer ${REACTBITS_LICENSE_KEY}"
+      }
+    },
+    "@reactbits-pro": {
+      "url": "https://pro.reactbits.dev/api/r/pro/{name}.json",
+      "headers": {
+        "Authorization": "Bearer ${REACTBITS_LICENSE_KEY}"
+      }
+    },
+    "@magicui": "https://magicui.design/r/{name}.json",
+    "@motion-primitives": "https://motion-primitives.com/c/{name}.json",
+    "@aceternity": "https://ui.aceternity.com/registry/{name}.json",
+    "@animate-ui": "https://animate-ui.com/r/{name}.json"
+  }
+}

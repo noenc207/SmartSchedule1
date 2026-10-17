@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <!-- Open Peeps Style: Student with Laptop (CC0 - Pablo Stanley) -->
+  <defs>
+    <linearGradient id="laptop-glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ea580c" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#ffedd5" stop-opacity="0.6"/>
+    </linearGradient>
+  </defs>
+  <!-- Background circle -->
+  <circle cx="200" cy="200" r="160" fill="url(#laptop-glow)"/>
+  <circle cx="200" cy="200" r="150" fill="none" stroke="#ea580c" stroke-width="1.5" stroke-dasharray="4 6" stroke-opacity="0.3"/>
+  <!-- Desk surface -->
+  <line x1="60" y1="320" x2="340" y2="320" stroke="#0f172a" stroke-width="3" stroke-linecap="round"/>
+  <!-- Character Body -->
+  <path d="M140 320 C140 250 160 220 200 220 C240 220 260 250 260 320" fill="#0f172a"/>
+  <!-- FPT Orange Hoodie Collar -->
+  <path d="M175 220 L200 250 L225 220 Z" fill="#ea580c"/>
+  <!-- Head & Hair -->
+  <ellipse cx="200" cy="165" rx="36" ry="42" fill="#fed7aa"/>
+  <!-- Curly Hair -->
+  <path d="M160 160 C155 130 175 110 200 110 C225 110 245 130 240 160 C235 135 220 125 200 125 C180 125 165 135 160 160 Z" fill="#0f172a"/>
+  <!-- Eyeglasses -->
+  <rect x="175" y="152" width="20" height="15" rx="4" fill="none" stroke="#0f172a" stroke-width="2.5"/>
+  <rect x="205" y="152" width="20" height="15" rx="4" fill="none" stroke="#0f172a" stroke-width="2.5"/>
+  <line x1="195" y1="160" x2="205" y2="160" stroke="#0f172a" stroke-width="2.5"/>
+  <!-- Smile -->
+  <path d="M192 185 Q200 192 208 185" fill="none" stroke="#0f172a" stroke-width="2" stroke-linecap="round"/>
+  <!-- Laptop Base & Screen -->
+  <polygon points="150,315 250,315 240,265 160,265" fill="#f8fafc" stroke="#0f172a" stroke-width="2.5"/>
+  <rect x="170" y="275" width="60" height="32" rx="2" fill="#ea580c" fill-opacity="0.1"/>
+  <line x1="180" y1="285" x2="220" y2="285" stroke="#ea580c" stroke-width="2" stroke-linecap="round"/>
+  <line x1="180" y1="293" x2="210" y2="293" stroke="#ea580c" stroke-width="2" stroke-linecap="round"/>
+  <!-- Coffee Mug -->
+  <rect x="280" y="295" width="22" height="25" rx="3" fill="#ea580c"/>
+  <path d="M302 300 Q310 307 302 315" fill="none" stroke="#ea580c" stroke-width="2.5"/>
+</svg>

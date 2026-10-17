@@ -1,6 +1,7 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { LandingPage } from '../features/landing/LandingPage';
+import { WorkspaceLoading } from '../components/feedback/WorkspaceLoading';
 
 export function ProtectedRoute() {
   const { status, authInitialized } = useAuth();
@@ -9,20 +10,10 @@ export function ProtectedRoute() {
   // 1. While auth state is initializing or refreshing, never redirect anywhere!
   if (!authInitialized || status === 'INITIALIZING' || status === 'REFRESHING') {
     return (
-      <div
-        className="route-loading"
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '12px',
-        }}
-      >
-        <div className="proposal-spinner" style={{ width: '28px', height: '28px', borderWidth: '3px' }} />
-        <span>Loading your workspace…</span>
-      </div>
+      <WorkspaceLoading
+        title="Đang khởi tạo không gian làm việc"
+        defaultSubtitle="Đang kiểm tra chứng chỉ bảo mật và đồng bộ phiên làm việc của bạn…"
+      />
     );
   }
 
@@ -41,20 +32,10 @@ export function PublicOnlyRoute() {
   // 1. While auth state is initializing or refreshing, wait and show loading
   if (!authInitialized || status === 'INITIALIZING' || status === 'REFRESHING') {
     return (
-      <div
-        className="route-loading"
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '12px',
-        }}
-      >
-        <div className="proposal-spinner" style={{ width: '28px', height: '28px', borderWidth: '3px' }} />
-        <span>Loading…</span>
-      </div>
+      <WorkspaceLoading
+        title="Đang đồng bộ phiên truy cập"
+        defaultSubtitle="Đang xác minh trạng thái đăng nhập tài khoản…"
+      />
     );
   }
 
@@ -78,20 +59,10 @@ export function RootIndexRoute() {
 
   if (!authInitialized || status === 'INITIALIZING' || status === 'REFRESHING') {
     return (
-      <div
-        className="route-loading"
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '12px',
-        }}
-      >
-        <div className="proposal-spinner" style={{ width: '28px', height: '28px', borderWidth: '3px' }} />
-        <span>Loading SmartSchedule…</span>
-      </div>
+      <WorkspaceLoading
+        title="Đang kết nối SmartSchedule"
+        defaultSubtitle="Đang chuẩn bị môi trường học thuật AI Campus…"
+      />
     );
   }
 
@@ -101,3 +72,4 @@ export function RootIndexRoute() {
 
   return <LandingPage />;
 }
+
