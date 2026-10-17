@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -10,6 +10,7 @@ import { isDemoMode, isRealMode } from '../../services/demoMode';
 import { SocialAuthButtons, type SocialAuthPayload } from './SocialAuthButtons';
 import { SocialRegistrationView } from './GoogleRegistrationView';
 import { getApiErrorMessage, getRawApiUrl, setCustomApiUrl, CUSTOM_API_URL_KEY } from '../../services/apiClient';
+import './login.css';
 
 export const loginSchema = z.object({
   email: z.string().trim().email('Enter a valid email address.'),
@@ -47,6 +48,16 @@ export function LoginPage() {
   const [socialNotice, setSocialNotice] = useState<string | null>(null);
   const [pendingSocialAuth, setPendingSocialAuth] = useState<PendingSocialAuthState | null>(null);
   const [keyModalError, setKeyModalError] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    containerRef.current.style.setProperty('--spotlight-x', `${x}px`);
+    containerRef.current.style.setProperty('--spotlight-y', `${y}px`);
+  };
 
   const form = useForm<LoginInput>({ resolver: zodResolver(loginSchema), defaultValues: { email: '', password: '' } });
   useEffect(() => clearError(), [clearError]);
@@ -200,52 +211,137 @@ export function LoginPage() {
   }
 
   return (
-    <AuthLayout title="Welcome back" subtitle="Sign in to turn your academic commitments into a realistic study plan.">
-      {socialNotice && (
-        <div className="social-notice" role="alert">
-          {socialNotice}
-        </div>
-      )}
+    <div
+      ref={containerRef}
+      className="login-page-wrapper"
+      onMouseMove={handleMouseMove}
+    >
+      <div className="login-spotlight" aria-hidden="true" />
 
-      <SocialAuthButtons
-        onGoogleToken={handleGoogleToken}
-        onSocialAuth={handleSocialAuth}
-        isLoading={socialLoading}
-        onNotice={(msg) => setSocialNotice(msg)}
-      />
-
-      <div className="auth-divider">
-        <span>or continue with email</span>
-      </div>
-
-      <form className="auth-form" onSubmit={form.handleSubmit(onSubmit)} noValidate>
-        <Field label="Email" error={form.formState.errors.email?.message}>
-          <input type="email" autoComplete="email" {...form.register('email')} />
-        </Field>
-        <Field label="Password" error={form.formState.errors.password?.message}>
-          <div className="password-field">
-            <input type={showPassword ? 'text' : 'password'} autoComplete="current-password" {...form.register('password')} />
-            <button type="button" onClick={() => setShowPassword(!showPassword)}>{showPassword ? 'Hide' : 'Show'}</button>
+      <main className="login-card">
+        <header className="login-header">
+          <div className="login-brand-wrapper">
+            <BrandLogo />
           </div>
-        </Field>
-        <BackendConnectionAlert error={error} onClearError={clearError} />
-        <button className="primary-button auth-submit" disabled={form.formState.isSubmitting || socialLoading}>
-          {form.formState.isSubmitting ? 'Signing in…' : 'Sign in'}
-        </button>
-      </form>
+          <span className="login-campus-badge">FPT University Quy Nhơn · AI Campus</span>
+          <h1 className="login-title">Welcome back</h1>
+          <p className="login-subtitle">
+            Sign in to turn your academic commitments into a realistic study plan.
+          </p>
+        </header>
 
-      {!isRealMode() && (import.meta.env.DEV || isDemoMode()) && (
-        <button
-          className="secondary-button auth-demo"
-          type="button"
-          onClick={() => { demoLogin(); navigate('/dashboard', { replace: true }); }}
-        >
-          Continue in demo mode (Alex Nguyen · FPT University Quy Nhơn)
-        </button>
-      )}
+        {socialNotice && (
+          <div className="login-notice" role="alert">
+            {socialNotice}
+          </div>
+        )}
 
-      <p className="auth-switch">New to SmartSchedule? <Link to="/register">Create an account</Link></p>
-    </AuthLayout>
+        <SocialAuthButtons
+          onGoogleToken={handleGoogleToken}
+          onSocialAuth={handleSocialAuth}
+          isLoading={socialLoading}
+          onNotice={(msg) => setSocialNotice(msg)}
+          noIcons={true}
+        />
+
+        <div className="login-divider">
+          <span>or continue with email</span>
+        </div>
+
+        <form className="login-form" onSubmit={form.handleSubmit(onSubmit)} noValidate>
+          <div className="login-field">
+            <label htmlFor="login-email-input" className="login-label">Email</label>
+            <input
+              id="login-email-input"
+              type="email"
+              autoComplete="email"
+              placeholder="student@fpt.edu.vn"
+              className={`login-input ${form.formState.errors.email ? 'login-input-error' : ''}`}
+              {...form.register('email')}
+            />
+            {form.formState.errors.email && (
+              <span className="login-field-error" role="alert">
+                {form.formState.errors.email.message}
+              </span>
+            )}
+          </div>
+
+          <div className="login-field">
+            <label htmlFor="login-password-input" className="login-label">Password</label>
+            <div className="login-password-container">
+              <input
+                id="login-password-input"
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                placeholder="••••••••"
+                className={`login-password-input ${form.formState.errors.password ? 'login-input-error' : ''}`}
+                {...form.register('password')}
+              />
+              <button
+                type="button"
+                className="login-password-toggle"
+                onClick={() => setShowPassword((prev) => !prev)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
+            {form.formState.errors.password && (
+              <span className="login-field-error" role="alert">
+                {form.formState.errors.password.message}
+              </span>
+            )}
+          </div>
+
+          <div className="login-aux-row">
+            <label className="login-remember-label">
+              <input
+                type="checkbox"
+                className="login-remember-checkbox"
+                defaultChecked={true}
+              />
+              <span>Remember this device</span>
+            </label>
+          </div>
+
+          <BackendConnectionAlert error={error} onClearError={clearError} />
+
+          <button
+            type="submit"
+            className="login-submit-btn"
+            disabled={form.formState.isSubmitting || socialLoading}
+          >
+            {form.formState.isSubmitting ? 'Signing in…' : 'Sign in'}
+          </button>
+        </form>
+
+        {!isRealMode() && (import.meta.env.DEV || isDemoMode()) && (
+          <div style={{ marginTop: '12px' }}>
+            <button
+              className="login-demo-btn"
+              type="button"
+              onClick={() => {
+                demoLogin();
+                navigate('/dashboard', { replace: true });
+              }}
+            >
+              Continue in demo mode (Alex Nguyen · FPT University Quy Nhơn)
+            </button>
+          </div>
+        )}
+
+        <p className="login-switch-text">
+          New to SmartSchedule?
+          <Link to="/register" className="login-switch-link">
+            Create an account
+          </Link>
+        </p>
+      </main>
+
+      <footer className="login-watermark">
+        SmartSchedule · AI-Powered Academic Scheduling Platform
+      </footer>
+    </div>
   );
 }
 
@@ -487,7 +583,7 @@ function BackendConnectionAlert({ error, onClearError }: { error: string | null;
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontWeight: 600, color: '#c2410c' }}>⚙️ Kết nối Backend Render</span>
+            <span style={{ fontWeight: 600, color: '#c2410c' }}>Kết nối Backend Render</span>
             <button
               type="button"
               onClick={() => setShowConfig(!showConfig)}
