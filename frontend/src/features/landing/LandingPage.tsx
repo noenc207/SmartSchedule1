@@ -1,174 +1,104 @@
-import React, { Component, ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
 import { LandingNavbar } from './components/LandingNavbar';
-import { HeroScene } from './components/HeroScene';
-import { ProblemSection } from './components/ProblemSection';
-import { TransformationSection } from './components/TransformationSection';
-import { SmartPlanSection } from './components/SmartPlanSection';
-import { MobilitySection } from './components/MobilitySection';
-import { WhatIfSection } from './components/WhatIfSection';
-import { ControlSection } from './components/ControlSection';
+import { LandingHero } from './components/LandingHero';
+import { LandingChaos } from './components/LandingChaos';
+import { LandingFeatures } from './components/LandingFeatures';
+import { LandingAIAssistant } from './components/LandingAIAssistant';
+import { LandingProductPreview } from './components/LandingProductPreview';
+import { LandingHowItWorks } from './components/LandingHowItWorks';
+import { LandingTrust } from './components/LandingTrust';
+import { LandingFAQ } from './components/LandingFAQ';
 import { ClosingScene } from './components/ClosingScene';
 import { LandingFooter } from './components/LandingFooter';
-import { motion } from './components/AnimatedSection';
 import './landing.css';
 
-interface WebGLErrorBoundaryProps {
-  children: ReactNode;
-}
-
-interface WebGLErrorBoundaryState {
-  hasError: boolean;
-}
-
-class WebGLErrorBoundary extends Component<WebGLErrorBoundaryProps, WebGLErrorBoundaryState> {
-  constructor(props: WebGLErrorBoundaryProps) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.warn('WebGL render fallback triggered in Landing Page:', error, info);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="hero-3d-canvas-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '24px' }}>
-          <span className="status-badge badge-info" style={{ marginBottom: '12px' }}>3D SCHEDULE WORLD</span>
-          <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#ffffff', marginBottom: '8px' }}>
-            Mascot & Không gian Lịch trình
-          </div>
-          <p style={{ fontSize: '0.85rem', color: '#94a3b8', maxWidth: '320px' }}>
-            SmartSchedule kết nối bài tập, lịch học FPT University Quy Nhơn và đệm di chuyển.
-          </p>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
 export function LandingPage() {
-  const navigate = useNavigate();
+  useEffect(() => {
+    // Dynamic page title & meta for high SEO and clear branding
+    document.title = 'SmartSchedule · Tối ưu hóa lịch học FPT University Quy Nhơn với Trợ lý 3D & AI';
 
-  const scrollToProblem = () => {
-    const el = document.getElementById('problem');
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
+    let metaDesc = document.querySelector('meta[name="description"]');
+    if (!metaDesc) {
+      metaDesc = document.createElement('meta');
+      metaDesc.setAttribute('name', 'description');
+      document.head.appendChild(metaDesc);
     }
-  };
+    metaDesc.setAttribute(
+      'content',
+      'Nền tảng sắp xếp thời khóa biểu và kế hoạch học thuật thông minh cho sinh viên FPT University Quy Nhơn AI Campus cùng Mascot 3D Cóc AI. Tự động phát hiện xung đột, tính đệm di chuyển và quản lý deadline đồ án.',
+    );
+
+    // Passive, RAF-throttled pointer tracker for subtle ambient glow on desktop
+    let rafId: number | null = null;
+    const handlePointerMove = (e: MouseEvent) => {
+      if (rafId !== null) return;
+      rafId = requestAnimationFrame(() => {
+        document.documentElement.style.setProperty('--mouse-x', `${e.clientX}px`);
+        document.documentElement.style.setProperty('--mouse-y', `${e.clientY}px`);
+        rafId = null;
+      });
+    };
+    window.addEventListener('mousemove', handlePointerMove, { passive: true });
+    return () => {
+      window.removeEventListener('mousemove', handlePointerMove);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+  }, []);
 
   return (
     <div className="landing-page-root">
-      {/* Ambient background glows */}
-      <div className="landing-ambient-glow-1" />
-      <div className="landing-ambient-glow-2" />
+      {/* Accessible skip link for keyboard navigation */}
+      <a href="#main-content" className="landing-skip-link">
+        Chuyển đến nội dung chính
+      </a>
 
-      {/* Sticky Navigation Bar */}
+      {/* Subtle Ambient Mouse Glow (Desktop Only, Pointer-Events None) */}
+      <div className="landing-cursor-glow" aria-hidden="true" />
+
+      {/* Warm Ambient Radial Glows */}
+      <div className="landing-ambient-layer" aria-hidden="true">
+        <div className="landing-glow-top" />
+        <div className="landing-glow-mid" />
+        <div className="landing-glow-bottom" />
+      </div>
+
+      {/* Sticky Accessible Navigation Bar */}
       <LandingNavbar />
 
-      {/* Hero Section */}
-      <section className="landing-section cyber-hero-section">
-        <div className="hero-layout-full3d">
-          {/* Left Hero Content Card */}
-          <motion.div
-            className="hero-content-card"
-            initial={{ opacity: 0, y: 25 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <div className="landing-hero-badge-row">
-              <span className="hero-badge">AI CAMPUS · FPT UNIVERSITY QUY NHƠN</span>
-            </div>
+      {/* Semantic Main Content Storytelling Flow */}
+      <main id="main-content">
+        {/* Section 1: Hero with 3D Front-Facing Mascot Centerpiece */}
+        <LandingHero />
 
-            <h1 className="hero-title">
-              Your day, <br />
-              <span className="hero-title-accent">intelligently arranged.</span>
-            </h1>
+        {/* Section 2: The Academic Chaos (Student problem & live conflict simulation) */}
+        <LandingChaos />
 
-            <p className="hero-subtitle">
-              Lịch trình của bạn không chỉ là danh sách giờ học. SmartSchedule kết nối bài tập, deadline, lịch cố định và thời gian di chuyển để tạo nên một ngày rõ ràng hơn.
-            </p>
+        {/* Section 3: Smart Scheduling (6 FPT Slots & CSP Solver) */}
+        <LandingFeatures />
 
-            <div className="landing-hero-actions-row">
-              <button
-                type="button"
-                className="btn-primary-glow large-btn"
-                onClick={() => navigate('/calendar')}
-              >
-                Vào SmartSchedule →
-              </button>
-              <button
-                type="button"
-                className="btn-secondary-glass"
-                onClick={scrollToProblem}
-              >
-                Xem cách hoạt động
-              </button>
-            </div>
+        {/* Section 4: AI Academic Assistant (Interactive Chat Scenarios & Deep Work) */}
+        <LandingAIAssistant />
 
-            <div className="hero-metrics-strip">
-              <div className="hero-metric-item">
-                <span className="metric-val">100%</span>
-                <span className="metric-label">Khả thi thực tế</span>
-              </div>
-              <div className="hero-metric-item">
-                <span className="metric-val">0 Phút</span>
-                <span className="metric-label">Trễ hẹn do thiếu đệm</span>
-              </div>
-              <div className="hero-metric-item">
-                <span className="metric-val">5 Bước</span>
-                <span className="metric-label">Quyền kiểm soát cá nhân</span>
-              </div>
-            </div>
-          </motion.div>
+        {/* Section 5: Interactive Product Preview (3-Tab Simulator) */}
+        <LandingProductPreview />
 
-          {/* Right Hero 3D Diorama Stage (No Box Frame) */}
-          <motion.div
-            className="hero-3d-stage"
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.8, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <WebGLErrorBoundary>
-              <HeroScene interactive={true} />
-            </WebGLErrorBoundary>
-            <div className="hero-3d-hint-pill">✦ Di chuyển chuột để nghiêng góc nhìn · Kéo chuột để xoay 360°</div>
-          </motion.div>
-        </div>
-      </section>
+        {/* Section 6: How It Works (4-Step Flow) */}
+        <LandingHowItWorks />
 
-      {/* 1. Problem Section */}
-      <ProblemSection />
+        {/* Trust & Campus Security */}
+        <LandingTrust />
 
-      {/* 2. Transformation Section */}
-      <TransformationSection />
+        {/* FAQ */}
+        <LandingFAQ />
 
-      {/* 3. Smart Plan Engine Section */}
-      <SmartPlanSection />
-
-      {/* 4. Optional Campus Mobility Section */}
-      <MobilitySection />
-
-      {/* 5. What-if Simulator Section */}
-      <WhatIfSection />
-
-      {/* 6. User Control Section */}
-      <ControlSection />
-
-      {/* 7. Mascot Closing Scene */}
-      <WebGLErrorBoundary>
+        {/* Section 7: Final CTA with Front-Facing 3D Mascot Return */}
         <ClosingScene />
-      </WebGLErrorBoundary>
 
-      {/* 8. Institutional Footer */}
-      <LandingFooter />
+        {/* Footer */}
+        <LandingFooter />
+      </main>
     </div>
   );
 }
+
 export default LandingPage;

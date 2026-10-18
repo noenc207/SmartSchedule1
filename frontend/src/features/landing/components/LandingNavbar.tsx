@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { BRAND_ASSETS } from '../assets/brandAssets';
 
 export function LandingNavbar() {
@@ -9,7 +9,7 @@ export function LandingNavbar() {
 
   useEffect(() => {
     const handleScroll = () => {
-      setScrolled(window.scrollY > 20);
+      setScrolled(window.scrollY > 15);
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
@@ -24,104 +24,165 @@ export function LandingNavbar() {
   };
 
   return (
-    <header className={`landing-navbar ${scrolled ? 'scrolled' : ''}`}>
-      <div className="landing-navbar-inner">
+    <header className={`landing-navbar ${scrolled ? 'scrolled' : ''}`} role="banner">
+      <div className="landing-container landing-navbar-inner">
         {/* Brand identity: FPT Logo + SmartSchedule Title */}
-        <div
+        <Link
+          to="/"
           className="landing-brand"
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-          role="button"
-          tabIndex={0}
+          aria-label="SmartSchedule - Trang chủ"
         >
           <img
             src={BRAND_ASSETS.fptLogoUrl}
             alt="FPT University Logo"
-            className="landing-fpt-logo"
+            className="landing-brand-logo"
+            width={120}
+            height={34}
             onError={(e) => {
               (e.target as HTMLElement).style.display = 'none';
             }}
           />
           <div className="landing-brand-text">
-            <span className="landing-brand-name">SmartSchedule</span>
-            <span className="landing-brand-sub">FPTU Quy Nhơn</span>
+            <span className="landing-brand-title">
+              Smart<span>Schedule</span>
+            </span>
+            <span className="landing-brand-badge">AI Campus · FPTU</span>
           </div>
-        </div>
+        </Link>
 
         {/* Desktop Navigation Links */}
-        <nav className="landing-nav-links">
-          <button type="button" className="landing-nav-link" onClick={() => scrollToSection('problem')}>
-            Vấn đề
+        <nav className="landing-nav-links" aria-label="Điều hướng chính">
+          <button
+            type="button"
+            className="landing-nav-link"
+            onClick={() => scrollToSection('chaos')}
+          >
+            Thực trạng
           </button>
-          <button type="button" className="landing-nav-link" onClick={() => scrollToSection('transformation')}>
-            Chuyển đổi
+          <button
+            type="button"
+            className="landing-nav-link"
+            onClick={() => scrollToSection('features')}
+          >
+            Tính năng
           </button>
-          <button type="button" className="landing-nav-link" onClick={() => scrollToSection('smart-plan')}>
-            Smart Plan
+          <button
+            type="button"
+            className="landing-nav-link"
+            onClick={() => scrollToSection('ai-assistant')}
+          >
+            Trợ lý AI
           </button>
-          <button type="button" className="landing-nav-link" onClick={() => scrollToSection('mobility')}>
-            Di chuyển
+          <button
+            type="button"
+            className="landing-nav-link"
+            onClick={() => scrollToSection('product-preview')}
+          >
+            Trải nghiệm
           </button>
-          <button type="button" className="landing-nav-link" onClick={() => scrollToSection('what-if')}>
-            What-if
+          <button
+            type="button"
+            className="landing-nav-link"
+            onClick={() => scrollToSection('how-it-works')}
+          >
+            Quy trình
           </button>
-          <button type="button" className="landing-nav-link" onClick={() => scrollToSection('control')}>
-            Kiểm soát
+          <button
+            type="button"
+            className="landing-nav-link"
+            onClick={() => scrollToSection('faq')}
+          >
+            FAQ
           </button>
         </nav>
 
-        {/* CTA Button */}
+        {/* Navigation Action Buttons */}
         <div className="landing-nav-actions">
-          <button
-            type="button"
-            className="btn-primary-glow"
-            onClick={() => navigate('/calendar')}
-          >
-            Vào SmartSchedule →
-          </button>
+          <Link to="/login" className="landing-btn-login">
+            Đăng nhập
+          </Link>
+          <Link to="/register" className="landing-btn-cta">
+            Bắt đầu miễn phí
+          </Link>
 
-          {/* Mobile hamburger toggle */}
+          {/* Mobile hamburger menu toggle */}
           <button
             type="button"
-            className="mobile-menu-toggle"
+            className="landing-menu-toggle"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            aria-label="Toggle Navigation Menu"
+            aria-expanded={mobileMenuOpen}
+            aria-label={mobileMenuOpen ? 'Đóng menu điều hướng' : 'Mở menu điều hướng'}
           >
             {mobileMenuOpen ? '✕' : '☰'}
           </button>
         </div>
       </div>
 
-      {/* Mobile Menu Dropdown */}
+      {/* Mobile Drawer Navigation */}
       {mobileMenuOpen && (
-        <div className="landing-mobile-menu">
-          <button type="button" className="landing-mobile-nav-link" onClick={() => scrollToSection('problem')}>
-            Vấn đề thực tế
-          </button>
-          <button type="button" className="landing-mobile-nav-link" onClick={() => scrollToSection('transformation')}>
-            Dòng thời gian chuyển đổi
-          </button>
-          <button type="button" className="landing-mobile-nav-link" onClick={() => scrollToSection('smart-plan')}>
-            Cơ chế Smart Plan
-          </button>
-          <button type="button" className="landing-mobile-nav-link" onClick={() => scrollToSection('mobility')}>
-            Nhận thức di chuyển
-          </button>
-          <button type="button" className="landing-mobile-nav-link" onClick={() => scrollToSection('what-if')}>
-            Mô phỏng What-if
-          </button>
-          <button type="button" className="landing-mobile-nav-link" onClick={() => scrollToSection('control')}>
-            Quyền kiểm soát
+        <div className="landing-mobile-drawer open" role="dialog" aria-modal="true" aria-label="Menu di động">
+          <button
+            type="button"
+            className="landing-mobile-link"
+            onClick={() => scrollToSection('chaos')}
+          >
+            Thực trạng lịch học
           </button>
           <button
             type="button"
-            className="btn-primary-glow mobile-cta"
-            onClick={() => {
-              setMobileMenuOpen(false);
-              navigate('/calendar');
-            }}
+            className="landing-mobile-link"
+            onClick={() => scrollToSection('features')}
           >
-            Vào SmartSchedule →
+            Tính năng chuẩn FPTU
           </button>
+          <button
+            type="button"
+            className="landing-mobile-link"
+            onClick={() => scrollToSection('ai-assistant')}
+          >
+            Trợ lý Cóc AI 24/7
+          </button>
+          <button
+            type="button"
+            className="landing-mobile-link"
+            onClick={() => scrollToSection('product-preview')}
+          >
+            Trình mô phỏng Sandbox
+          </button>
+          <button
+            type="button"
+            className="landing-mobile-link"
+            onClick={() => scrollToSection('how-it-works')}
+          >
+            Quy trình đồng bộ FAP
+          </button>
+          <button
+            type="button"
+            className="landing-mobile-link"
+            onClick={() => scrollToSection('faq')}
+          >
+            Câu hỏi thường gặp
+          </button>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px' }}>
+            <Link
+              to="/login"
+              className="landing-btn-login"
+              style={{ textAlign: 'center' }}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Đăng nhập tài khoản FPT
+            </Link>
+            <Link
+              to="/register"
+              className="landing-btn-cta"
+              style={{ textAlign: 'center' }}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Tạo tài khoản mới
+            </Link>
+          </div>
         </div>
       )}
     </header>

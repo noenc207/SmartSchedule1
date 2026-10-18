@@ -4,7 +4,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { BRAND_ASSETS } from '../assets/brandAssets';
 
-interface MascotModelProps {
+export interface MascotModelProps {
   scale?: number;
   position?: [number, number, number];
   rotation?: [number, number, number];
@@ -13,8 +13,8 @@ interface MascotModelProps {
 }
 
 export function GeometricMascotFallback({
-  scale = 1.0,
-  position = [0, 0, 0],
+  scale = 0.85,
+  position = [0, -0.1, 0],
 }: {
   scale?: number;
   position?: [number, number, number];
@@ -24,7 +24,7 @@ export function GeometricMascotFallback({
   useFrame((state) => {
     if (!groupRef.current) return;
     const t = state.clock.getElapsedTime();
-    groupRef.current.position.y = position[1] + Math.sin(t * 1.5) * 0.05;
+    groupRef.current.position.y = position[1] + Math.sin(t * 1.5) * 0.035;
   });
 
   return (
@@ -32,36 +32,32 @@ export function GeometricMascotFallback({
       {/* Head */}
       <mesh position={[0, 1.05, 0]} castShadow receiveShadow>
         <sphereGeometry args={[0.36, 32, 32]} />
-        <meshStandardMaterial color="#f8fafc" roughness={0.2} metalness={0.1} />
+        <meshStandardMaterial color="#fffbf5" roughness={0.25} metalness={0.05} />
       </mesh>
-      {/* Glossy Visor / Eyes */}
+      {/* Glossy Visor / Friendly Eyes */}
       <mesh position={[0, 1.06, 0.28]} castShadow>
         <boxGeometry args={[0.32, 0.15, 0.1]} />
-        <meshStandardMaterial color="#050814" roughness={0.08} metalness={0.9} />
+        <meshStandardMaterial color="#0f172a" roughness={0.1} metalness={0.8} />
       </mesh>
-      {/* FPT Orange Ears / Accents */}
-      <mesh position={[-0.22, 1.36, 0]} rotation={[0, 0, -0.3]} castShadow>
-        <cylinderGeometry args={[0.04, 0.07, 0.24, 16]} />
-        <meshStandardMaterial color="#f27024" roughness={0.25} metalness={0.2} />
-      </mesh>
-      <mesh position={[0.22, 1.36, 0]} rotation={[0, 0, 0.3]} castShadow>
-        <cylinderGeometry args={[0.04, 0.07, 0.24, 16]} />
-        <meshStandardMaterial color="#f27024" roughness={0.25} metalness={0.2} />
+      {/* FPT Orange Accents / Cap */}
+      <mesh position={[0, 1.28, 0.05]} castShadow>
+        <cylinderGeometry args={[0.34, 0.38, 0.12, 32]} />
+        <meshStandardMaterial color="#ea580c" roughness={0.3} metalness={0.1} />
       </mesh>
       {/* Torso */}
       <mesh position={[0, 0.5, 0]} castShadow receiveShadow>
         <cylinderGeometry args={[0.3, 0.36, 0.65, 32]} />
-        <meshStandardMaterial color="#f27024" roughness={0.25} metalness={0.2} />
+        <meshStandardMaterial color="#ea580c" roughness={0.3} metalness={0.1} />
       </mesh>
-      {/* Chest Logo Emblem */}
-      <mesh position={[0, 0.55, 0.31]}>
-        <boxGeometry args={[0.16, 0.08, 0.02]} />
-        <meshStandardMaterial color="#0047ba" roughness={0.3} />
+      {/* Raised Index Finger (Iconic Mascot Pose) */}
+      <mesh position={[0.42, 0.95, 0.1]} rotation={[0, 0, -0.2]} castShadow>
+        <cylinderGeometry args={[0.04, 0.05, 0.25, 16]} />
+        <meshStandardMaterial color="#ea580c" roughness={0.3} metalness={0.1} />
       </mesh>
       {/* Base shadow disc */}
       <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <circleGeometry args={[0.45, 32]} />
-        <meshBasicMaterial color="#050814" transparent opacity={0.4} />
+        <circleGeometry args={[0.55, 32]} />
+        <meshBasicMaterial color="#fed7aa" transparent opacity={0.45} />
       </mesh>
     </group>
   );
@@ -75,7 +71,7 @@ class MascotErrorBoundary extends Component<{ children: ReactNode; fallback: Rea
   }
 
   componentDidCatch(err: unknown) {
-    console.warn('Mascot 3D GLTF load warning, displaying geometric diorama fallback', err);
+    console.warn('Mascot 3D GLTF load notice, using academic diorama fallback', err);
   }
 
   render() {
@@ -98,7 +94,7 @@ function RealMascotMesh({
   const clonedScene = useMemo(() => scene.clone(true), [scene]);
 
   useEffect(() => {
-    // Load the 2048x2048 emissive texture to give the mascot glowing neon accents
+    // Load emissive texture to illuminate glowing cyber accents & pedestal circuit paths
     const textureLoader = new THREE.TextureLoader();
     textureLoader.load(
       BRAND_ASSETS.mascotEmissiveUrl,
@@ -116,10 +112,9 @@ function RealMascotMesh({
               const mat = (mesh.material as THREE.MeshStandardMaterial).clone();
               mat.emissiveMap = emissiveTex;
               mat.emissive = new THREE.Color(0xffffff);
-              mat.emissiveIntensity = 1.6;
-              // Glossy PBR surface matching official 3D art
-              mat.roughness = 0.22;
-              mat.metalness = 0.12;
+              mat.emissiveIntensity = 1.2;
+              mat.roughness = 0.26;
+              mat.metalness = 0.08;
               mat.needsUpdate = true;
               mesh.material = mat;
             }
@@ -128,7 +123,7 @@ function RealMascotMesh({
       },
       undefined,
       () => {
-        // Fallback: enable shadows on basic material
+        // Fallback: enable shadows on original materials without emissive
         clonedScene.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
             child.castShadow = true;
@@ -143,18 +138,22 @@ function RealMascotMesh({
     if (!groupRef.current) return;
     const time = state.clock.getElapsedTime();
 
-    // Smooth idle float and breathing
+    // Natural idle floating motion
     if (floatIntensity > 0) {
-      groupRef.current.position.y = position[1] + Math.sin(time * 1.5) * 0.05 * floatIntensity;
-      groupRef.current.rotation.y = rotation[1] + Math.sin(time * 0.8) * 0.03 * floatIntensity;
+      groupRef.current.position.y = position[1] + Math.sin(time * 1.5) * 0.035 * floatIntensity;
     }
 
-    // Interactive cursor tracking parallax
+    // Responsive cursor parallax (strictly front-facing clamped angles)
     if (interactive) {
-      const targetRotY = rotation[1] + state.pointer.x * 0.22;
-      const targetRotX = rotation[0] - state.pointer.y * 0.10;
-      groupRef.current.rotation.y = THREE.MathUtils.damp(groupRef.current.rotation.y, targetRotY, 3, delta);
-      groupRef.current.rotation.x = THREE.MathUtils.damp(groupRef.current.rotation.x, targetRotX, 3, delta);
+      const isMobile = state.size.width < 768;
+      const targetRotY = isMobile
+        ? rotation[1]
+        : rotation[1] + THREE.MathUtils.clamp(state.pointer.x * 0.16, -0.20, 0.20);
+      const targetRotX = isMobile
+        ? rotation[0]
+        : rotation[0] - THREE.MathUtils.clamp(state.pointer.y * 0.08, -0.10, 0.10);
+      groupRef.current.rotation.y = THREE.MathUtils.damp(groupRef.current.rotation.y, targetRotY, 3.5, delta);
+      groupRef.current.rotation.x = THREE.MathUtils.damp(groupRef.current.rotation.x, targetRotX, 3.5, delta);
     }
   });
 
@@ -173,7 +172,7 @@ export function MascotModel(props: MascotModelProps) {
   );
 }
 
-// Preload the canonical PBR mascot model
+// Preload canonical PBR mascot model
 try {
   useGLTF.preload(BRAND_ASSETS.mascotModelUrl);
 } catch (e) {

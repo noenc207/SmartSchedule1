@@ -32,6 +32,7 @@ export interface SoftBlurInTextProps {
   highlight?: boolean; // FPTU orange text emphasis
   as?: 'div' | 'span';
   style?: React.CSSProperties;
+  trigger?: 'mount' | 'inView';
 }
 
 export function SoftBlurInText({
@@ -43,6 +44,7 @@ export function SoftBlurInText({
   highlight = false,
   as = 'span',
   style,
+  trigger = 'inView',
 }: SoftBlurInTextProps) {
   const shouldReduceMotion = useReducedMotion();
   const Component = as === 'div' ? 'div' : 'span';
@@ -99,21 +101,30 @@ export function SoftBlurInText({
               >
                 {Array.from(word).map((char, charIdx) => {
                   const globalIdx = startOffset + charIdx;
+                  const initialProps = shouldReduceMotion
+                    ? { opacity: 1, y: 0, filter: 'blur(0px)' }
+                    : { opacity: 0, y: 16, filter: 'blur(12px)' };
+                  const targetProps = { opacity: 1, y: 0, filter: 'blur(0px)' };
+                  const transitionProps = {
+                    duration,
+                    delay: delay + globalIdx * stagger,
+                    ease: ANIMATE_TEXT_EASINGS.softBlurIn,
+                  };
+
                   return (
                     <motion.span
                       key={charIdx}
                       className="inline-block"
-                      initial={
-                        shouldReduceMotion
-                          ? { opacity: 1, y: 0, filter: 'blur(0px)' }
-                          : { opacity: 0, y: 16, filter: 'blur(12px)' }
-                      }
-                      animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                      transition={{
-                        duration,
-                        delay: delay + globalIdx * stagger,
-                        ease: ANIMATE_TEXT_EASINGS.softBlurIn,
-                      }}
+                      initial={initialProps}
+                      {...(trigger === 'inView'
+                        ? {
+                            whileInView: targetProps,
+                            viewport: { once: true, amount: 0.1 },
+                          }
+                        : {
+                            animate: targetProps,
+                          })}
+                      transition={transitionProps}
                       style={{
                         display: 'inline-block',
                         willChange: 'transform, opacity, filter',
@@ -313,3 +324,87 @@ export function PerCharacterRiseText({
     </span>
   );
 }
+
+// ============================================================================
+// 5. ScrollWordRevealText — Section Headline per-word keynote entrance
+// ============================================================================
+
+export interface ScrollWordRevealTextProps {
+  text: string;
+  delay?: number; // Delay in seconds (default: 0)
+  duration?: number; // Duration in seconds (spec default: 0.65s = 650ms)
+  stagger?: number; // Per-word stagger (spec default: 0.04s = 40ms)
+  className?: string;
+  highlight?: boolean; // Highlight style
+  as?: 'h1' | 'h2' | 'h3' | 'p' | 'div' | 'span';
+  style?: React.CSSProperties;
+}
+
+export function ScrollWordRevealText({
+  text,
+  delay = 0,
+  duration = 0.65,
+  stagger = 0.04,
+  className = '',
+  highlight = false,
+  as = 'h2',
+  style,
+}: ScrollWordRevealTextProps) {
+  const shouldReduceMotion = useReducedMotion();
+  const words = useMemo(() => text.split(' '), [text]);
+  const Tag = as;
+
+  const highlightStyles: React.CSSProperties = highlight
+    ? {
+        color: '#ea580c',
+        textShadow: '0 0 24px rgba(234, 88, 12, 0.18)',
+      }
+    : {};
+
+  return (
+    <Tag
+      role="text"
+      aria-label={text}
+      className={`scroll-word-reveal ${highlight ? 'auth-text-highlight' : ''} ${className}`}
+      style={{
+        display: 'inline-block',
+        overflow: 'visible',
+        ...highlightStyles,
+        ...style,
+      }}
+    >
+      <span className="sr-only">{text}</span>
+
+      <span aria-hidden="true" style={{ display: 'inline', overflow: 'visible' }}>
+        {words.map((word, wordIdx) => (
+          <React.Fragment key={wordIdx}>
+            <motion.span
+              className="inline-block"
+              initial={shouldReduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 14 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.1 }}
+              transition={{
+                duration,
+                delay: delay + wordIdx * stagger,
+                ease: ANIMATE_TEXT_EASINGS.softBlurIn,
+              }}
+              style={{
+                display: 'inline-block',
+                willChange: 'transform, opacity',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {word}
+            </motion.span>
+            {wordIdx < words.length - 1 && (
+              <span className="inline-block" style={{ whiteSpace: 'pre' }}>
+                {' '}
+              </span>
+            )}
+          </React.Fragment>
+        ))}
+      </span>
+    </Tag>
+  );
+}
+

@@ -291,7 +291,7 @@ export function useDashboardData() {
       const endM = endD.getMinutes().toString().padStart(2, '0');
 
       let iconType: 'book' | 'code' | 'cpu' | 'lang' = 'book';
-      const lower = ev.title.toLowerCase();
+      const lower = (ev.title || '').toLowerCase();
       if (lower.includes('web') || lower.includes('lập trình') || lower.includes('code')) {
         iconType = 'code';
       } else if (lower.includes('ai') || lower.includes('trí tuệ') || lower.includes('mạng') || lower.includes('hệ điều hành')) {
@@ -332,7 +332,7 @@ export function useDashboardData() {
         const isPast = isRealToday ? now > e : activeDate < now;
 
         let iconType: 'book' | 'code' | 'cpu' | 'lang' = 'book';
-        const lower = ev.title.toLowerCase();
+        const lower = (ev.title || '').toLowerCase();
         if (lower.includes('web') || lower.includes('lập trình') || lower.includes('code')) iconType = 'code';
         else if (lower.includes('ai') || lower.includes('trí tuệ') || lower.includes('máy') || lower.includes('hệ điều hành')) iconType = 'cpu';
         else if (lower.includes('anh') || lower.includes('english')) iconType = 'lang';

@@ -28,7 +28,15 @@ import { BrandLogo } from '../components/BrandLogo';
 import { CommandPalette } from '../components/CommandPalette';
 import { OnboardingTour } from '../components/OnboardingTour';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
-import { MobileBottomNav } from '../components/MobileBottomNav';
+import { useIsMobile } from '../hooks/useIsMobile';
+import { MobileHomeScreen } from '../features/mobile/screens/MobileHomeScreen';
+import { MobileCalendarScreen } from '../features/mobile/screens/MobileCalendarScreen';
+import { MobileTasksScreen } from '../features/mobile/screens/MobileTasksScreen';
+import { MobileDeadlinesScreen } from '../features/mobile/screens/MobileDeadlinesScreen';
+import { MobileAIAssistantScreen } from '../features/mobile/screens/MobileAIAssistantScreen';
+import { MobileDocumentsScreen } from '../features/mobile/screens/MobileDocumentsScreen';
+import { MobileSettingsScreen } from '../features/mobile/screens/MobileSettingsScreen';
+import { MobileBottomNavigation } from '../components/mobile/MobileBottomNavigation';
 import {
   Search,
   Sun,
@@ -153,6 +161,20 @@ function Shell() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+  const isMobile = useIsMobile(768);
+
+  if (isMobile) {
+    return (
+      <div className="mobile-app-shell">
+        <main className="mobile-shell-main flex-1 w-full overflow-x-hidden">
+          <Outlet />
+        </main>
+        <MobileBottomNavigation />
+        <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} navigate={navigate} />
+      </div>
+    );
+  }
+
   return (
     <div className="mock-app-shell">
       {/* 1. Left Fixed Sidebar */}
@@ -340,7 +362,6 @@ function Shell() {
           <Outlet />
         </main>
       </div>
-      <MobileBottomNav />
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} navigate={navigate} />
       <OnboardingTour />
     </div>
@@ -363,6 +384,32 @@ function Page({ title, detail }: { title: string; detail: string }) {
   return <section className="page-placeholder"><p className="eyebrow">Workspace</p><h2>{title}</h2><p className="muted">{detail}</p><button className="secondary-button">Coming in the next phase</button></section>;
 }
 
+function AdaptiveDashboard() {
+  const isMobile = useIsMobile(768);
+  return isMobile ? <MobileHomeScreen /> : <DashboardPage />;
+}
+
+function AdaptiveCalendar() {
+  const isMobile = useIsMobile(768);
+  return isMobile ? (
+    <MobileCalendarScreen />
+  ) : (
+    <Suspense fallback={<div className="panel empty-state">Loading calendar...</div>}>
+      <CalendarPage />
+    </Suspense>
+  );
+}
+
+function AdaptiveTasks() {
+  const isMobile = useIsMobile(768);
+  return isMobile ? <MobileTasksScreen /> : <TasksPage />;
+}
+
+function AdaptiveSettings() {
+  const isMobile = useIsMobile(768);
+  return isMobile ? <MobileSettingsScreen /> : <SettingsPage />;
+}
+
 export default function App() {
   const bootstrap = useAuthStore((state) => state.bootstrap);
   useEffect(() => { void bootstrap(); }, [bootstrap]);
@@ -379,15 +426,18 @@ export default function App() {
         <Route path="/auth/callback" element={<SocialOAuthCallback />} />
         <Route element={<ProtectedRoute />}>
           <Route element={<Shell />}>
-            <Route path="/dashboard" element={<RouteErrorBoundary><DashboardPage /></RouteErrorBoundary>} />
-            <Route path="/calendar" element={<RouteErrorBoundary><Suspense fallback={<div className="panel empty-state">Loading calendar...</div>}><CalendarPage /></Suspense></RouteErrorBoundary>} />
+            <Route path="/dashboard" element={<RouteErrorBoundary><AdaptiveDashboard /></RouteErrorBoundary>} />
+            <Route path="/calendar" element={<RouteErrorBoundary><AdaptiveCalendar /></RouteErrorBoundary>} />
             <Route path="/scheduling" element={<RouteErrorBoundary><SchedulingPage /></RouteErrorBoundary>} />
             <Route path="/rescheduling" element={<RouteErrorBoundary><ReschedulingPage /></RouteErrorBoundary>} />
             <Route path="/collaboration" element={<RouteErrorBoundary><CollaborationPage /></RouteErrorBoundary>} />
-            <Route path="/tasks" element={<RouteErrorBoundary><TasksPage /></RouteErrorBoundary>} />
+            <Route path="/tasks" element={<RouteErrorBoundary><AdaptiveTasks /></RouteErrorBoundary>} />
+            <Route path="/deadlines" element={<RouteErrorBoundary><MobileDeadlinesScreen /></RouteErrorBoundary>} />
+            <Route path="/ai" element={<RouteErrorBoundary><MobileAIAssistantScreen /></RouteErrorBoundary>} />
+            <Route path="/documents" element={<RouteErrorBoundary><MobileDocumentsScreen /></RouteErrorBoundary>} />
             <Route path="/analytics" element={<RouteErrorBoundary><Analytics /></RouteErrorBoundary>} />
             <Route path="/schedules" element={<RouteErrorBoundary><SchedulesPage /></RouteErrorBoundary>} />
-            <Route path="/settings" element={<RouteErrorBoundary><SettingsPage /></RouteErrorBoundary>} />
+            <Route path="/settings" element={<RouteErrorBoundary><AdaptiveSettings /></RouteErrorBoundary>} />
             <Route path="/notifications" element={<RouteErrorBoundary><NotificationsPage /></RouteErrorBoundary>} />
           </Route>
         </Route>

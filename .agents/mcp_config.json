@@ -4,6 +4,14 @@
       "command": "npx",
       "args": ["shadcn@latest", "mcp"],
       "cwd": "D:\\SmartSchedul\\frontend"
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest", "--headless"]
+    },
+    "motion": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://mcp.motion.dev"]
     }
   }
 }

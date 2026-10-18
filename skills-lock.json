@@ -7,17 +7,83 @@
       "skillPath": "skills/animate-text/SKILL.md",
       "computedHash": "81b7719e45013fcf651f1f4c9a1ca2af9618e99667ff5cd3e5d102369235ec5e"
     },
+    "frontend-design": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-design/SKILL.md",
+      "computedHash": "106acf230014cbb43ca34e6410371321b56ca742f9ee0442e8ec05bf02eb0384"
+    },
+    "mobile-responsive": {
+      "source": "AsadSumbul/mobile-responsive",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "4da55ac0543c1efbf75a06ceaa71d79c3595ad32f0d4f26646a1aa52cb1eccf4"
+    },
     "motion": {
       "source": "motiondivision/ai-kit",
       "sourceType": "github",
       "skillPath": "plugins/motion/skills/motion/SKILL.md",
       "computedHash": "f0262fe55b2f7280cc321f2eca635abfe43d64bd8594a41c89347067c6554b55"
     },
+    "threejs-animation": {
+      "source": "cesartevisual/threejs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-animation/SKILL.md",
+      "computedHash": "396a8ee74c2eedac8ee56ef939e956187491a3dcf3e302a24850f87b64b0dae5"
+    },
+    "threejs-assets": {
+      "source": "cesartevisual/threejs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-assets/SKILL.md",
+      "computedHash": "9d9d31e2340b13c0192be3fe727e65a88bcade4a472b3bbfb9386069ae8cfc96"
+    },
+    "threejs-lighting": {
+      "source": "cesartevisual/threejs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-lighting/SKILL.md",
+      "computedHash": "4a4b74699c0c8e25d65b6a8591ad98240e68f7d68bb92606c1d4d3342fe6bafe"
+    },
+    "threejs-particles": {
+      "source": "cesartevisual/threejs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-particles/SKILL.md",
+      "computedHash": "af330cd8021eedf888c450dd076680d4674e6b5c255b8414ca10176ce0170ca3"
+    },
+    "threejs-performance": {
+      "source": "cesartevisual/threejs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-performance/SKILL.md",
+      "computedHash": "dc201e2c85d85a36fe322011db4eaf25257747c2bb641e161c085b1e03862be2"
+    },
+    "threejs-r3f": {
+      "source": "cesartevisual/threejs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-r3f/SKILL.md",
+      "computedHash": "c49e6e0fab4f449909556e1371e82c4dbabd58800064a1a14db64712587dc718"
+    },
+    "threejs-web": {
+      "source": "cesartevisual/threejs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-web/SKILL.md",
+      "computedHash": "de3c726eb3c46042dea5212688e3414ab925d15e107286a772a015a97bc5c7a5"
+    },
     "ui-animation": {
       "source": "mblode/agent-skills",
       "sourceType": "github",
       "skillPath": "skills/ui-animation/SKILL.md",
       "computedHash": "d24cffdc8442d5ac88604af27273e3c322528e8365eb3291d696dc4982cba249"
+    },
+    "vercel-react-best-practices": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/react-best-practices/SKILL.md",
+      "computedHash": "6b526d013e28073246a36f99b529bc43745d30832ecfa8217b359c34f260ca6b"
+    },
+    "web-design-guidelines": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/web-design-guidelines/SKILL.md",
+      "computedHash": "d8e7d3afe37dcc8a97b99ffb5afdb4d0919ae0092ea8b68f44eb201f035e33ac"
     }
   }
 }

@@ -15,4 +15,10 @@ describe('Landing page brand assets and configurations', () => {
     expect(BRAND_COLORS.fptBlue).toBe('#0047ba');
     expect(BRAND_COLORS.fptGreen).toBe('#009a3e');
   });
+
+  it('includes proper institution and campus metadata', () => {
+    expect(BRAND_ASSETS.institutionName).toBe('FPT University');
+    expect(BRAND_ASSETS.campusName).toBe('Quy Nhơn AI Campus');
+    expect(BRAND_ASSETS.productName).toBe('SmartSchedule');
+  });
 });
