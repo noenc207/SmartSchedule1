@@ -37,6 +37,7 @@ export function MobileSettingsScreen() {
 
   const [pushNotifs, setPushNotifs] = useState(true);
   const [googleSync, setGoogleSync] = useState(true);
+  const [showQr, setShowQr] = useState(false);
 
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';
@@ -66,7 +67,11 @@ export function MobileSettingsScreen() {
       <main className="mobile-view-container">
         {/* FPT University Student Card */}
         <section className="mb-5">
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-[#ea580c] via-[#f97316] to-[#c2410c] text-white shadow-md relative overflow-hidden">
+          <div
+            onClick={() => setShowQr(!showQr)}
+            className="mobile-student-card cursor-pointer"
+            title="Chạm để chuyển đổi mặt thẻ"
+          >
             <div className="flex items-start justify-between mb-3">
               <div>
                 <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-white/20 text-white backdrop-blur-xs">
@@ -76,35 +81,54 @@ export function MobileSettingsScreen() {
                   THẺ SINH VIÊN ĐIỆN TỬ
                 </h2>
               </div>
-              <img
-                src="/fpt-icon.png"
-                alt="FPT"
-                className="w-7 h-7 object-contain bg-white/90 rounded-full p-0.5"
-                onError={(e) => {
-                  (e.target as HTMLElement).style.display = 'none';
-                }}
-              />
+              <div className="mobile-student-card-chip" />
             </div>
 
-            <div className="flex items-center gap-3 pt-1">
-              <div className="w-12 h-12 rounded-xl overflow-hidden border-2 border-white/80 shrink-0 shadow-xs">
-                <img
-                  src="/avatar-nhi.png"
-                  alt={studentName}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = '/fpt-icon.png';
-                  }}
-                />
+            {!showQr ? (
+              <div>
+                <div className="flex items-center gap-3 pt-1">
+                  <div className="w-12 h-12 rounded-xl overflow-hidden border-2 border-white/80 shrink-0 shadow-xs">
+                    <img
+                      src="/avatar-nhi.png"
+                      alt={studentName}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/fpt-icon.png';
+                      }}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-bold text-white truncate">{studentName}</h3>
+                    <p className="text-xs text-white/90 font-mono">MSSV: QE160123</p>
+                    <p className="text-[11px] text-white/80 truncate">
+                      Kỹ thuật phần mềm AI · K15
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between mt-3 pt-2 border-t border-white/20 text-[11px] text-white/90">
+                  <span>Học kỳ: Fall 2026</span>
+                  <span className="font-semibold underline flex items-center gap-1">
+                    Mở mã QR qua cổng →
+                  </span>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-bold text-white truncate">{studentName}</h3>
-                <p className="text-xs text-white/90 font-mono">MSSV: QE160123</p>
-                <p className="text-[11px] text-white/80 truncate">
-                  Kỹ thuật phần mềm AI · K15
+            ) : (
+              <div className="flex flex-col items-center justify-center py-2 bg-white/10 rounded-xl">
+                {/* SVG QR Code Simulation for Campus Gate */}
+                <svg
+                  className="w-24 h-24 bg-white p-1.5 rounded-lg text-slate-900"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  <path d="M2 2h8v8H2V2zm2 2v4h4V4H4zm10-2h8v8h-8V2zm2 2v4h4V4h-4zM2 14h8v8H2v-8zm2 2v4h4v-4H4zm14 0h-4v2h2v4h2v-2h2v-2h-2v-2zm-4 4h-2v2h2v-2zm4 0h2v2h-2v-2zM5 5h2v2H5V5zm12 0h2v2h-2V5zM5 17h2v2H5v-2z" />
+                </svg>
+                <p className="text-[11px] font-bold text-white mt-1.5">
+                  Mã QR quét qua cổng Campus AI
                 </p>
+                <span className="text-[10px] text-white/80">Chạm để quay lại mặt trước</span>
               </div>
-            </div>
+            )}
           </div>
         </section>
 

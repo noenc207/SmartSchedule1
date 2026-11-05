@@ -111,6 +111,12 @@ export function MobileCalendarScreen() {
           <div className="mobile-day-strip-grid">
             {DAYS_HEADER.map((day, idx) => {
               const isSelected = idx === activeDayIndex;
+              // Calculate day of month for this weekday
+              const dayDate = new Date(activeDate);
+              const diff = idx - activeDayIndex;
+              dayDate.setDate(activeDate.getDate() + diff);
+              const dayNum = dayDate.getDate();
+
               return (
                 <button
                   key={day.key}
@@ -122,8 +128,9 @@ export function MobileCalendarScreen() {
                       : 'text-[var(--m-text-secondary)] hover:bg-[var(--m-surface-subtle)]'
                   }`}
                 >
-                  <span className="text-[11px] uppercase tracking-wider">{day.label}</span>
-                  <span className={`w-1.5 h-1.5 rounded-full mt-1 ${isSelected ? 'bg-white' : 'bg-[var(--m-brand-primary)]'}`} />
+                  <span className="text-[10px] uppercase tracking-wider">{day.label}</span>
+                  <span className="text-xs font-black my-0.5">{dayNum}</span>
+                  <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-[var(--m-brand-primary)]'}`} />
                 </button>
               );
             })}
@@ -139,6 +146,22 @@ export function MobileCalendarScreen() {
           <span className="text-xs text-[var(--m-brand-primary)] font-semibold">
             {dayEvents.length} môn học
           </span>
+        </div>
+
+        {/* Quick Filter Tags */}
+        <div className="mobile-chip-row mb-3">
+          <button type="button" className="mobile-chip active">
+            Tất cả ({dayEvents.length})
+          </button>
+          <button type="button" className="mobile-chip">
+            Chính khóa
+          </button>
+          <button type="button" className="mobile-chip">
+            Đồ án
+          </button>
+          <button type="button" className="mobile-chip">
+            Tự học
+          </button>
         </div>
 
         {/* Timeline Events List */}

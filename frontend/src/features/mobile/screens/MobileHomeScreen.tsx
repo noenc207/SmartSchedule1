@@ -86,36 +86,64 @@ export function MobileHomeScreen() {
           <div className="mobile-hero-gradient-card relative overflow-hidden">
             <div className="absolute -right-4 -bottom-6 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
 
-            <div className="flex items-center justify-between mb-2">
-              <span className="px-2.5 py-0.5 rounded-full bg-white/20 text-white text-[11px] font-bold tracking-wide backdrop-blur-sm">
+            <div className="flex items-center justify-between mb-2.5">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/25 text-white text-[11px] font-bold tracking-wide backdrop-blur-sm">
+                <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
                 TIẾT HỌC TIẾP THEO
               </span>
-              <span className="text-white/80 text-xs flex items-center gap-1 font-medium">
+              <span className="text-white/90 text-xs flex items-center gap-1 font-semibold">
                 <Clock size={13} /> Hôm nay
               </span>
             </div>
 
             {nextClass ? (
-              <div
-                onClick={() => setSelectedClass(nextClass)}
-                className="cursor-pointer active:opacity-95 transition-opacity"
-              >
-                <h2 className="text-lg font-bold tracking-tight text-white mb-1 leading-snug">
-                  {nextClass.title}
-                </h2>
-                <div className="flex items-center gap-3 text-white/90 text-xs mb-3 font-medium">
-                  <span className="flex items-center gap-1">
-                    <Clock size={13} /> {nextClass.time}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <MapPin size={13} /> {nextClass.room || 'Phòng Alpha 204'}
-                  </span>
+              <div>
+                <div
+                  onClick={() => setSelectedClass(nextClass)}
+                  className="cursor-pointer active:opacity-95 transition-opacity"
+                >
+                  <h2 className="text-lg font-bold tracking-tight text-white mb-1 leading-snug">
+                    {nextClass.title}
+                  </h2>
+                  <div className="flex items-center gap-3 text-white/90 text-xs mb-3 font-medium">
+                    <span className="flex items-center gap-1">
+                      <Clock size={13} /> {nextClass.time}
+                    </span>
+                    <span className="flex items-center gap-1 font-bold bg-white/15 px-2 py-0.5 rounded-md">
+                      <MapPin size={13} /> {nextClass.room || 'Phòng Alpha 204'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between pt-2 border-t border-white/20 text-xs text-white/95">
+                    <span className="truncate">GV: {(nextClass as any)?.instructor || 'ThS. Nguyễn Văn A'}</span>
+                    <span className="font-semibold underline flex items-center gap-1 shrink-0">
+                      Chi tiết <ArrowRight size={13} />
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between pt-2.5 border-t border-white/20 text-xs text-white/95">
-                  <span className="truncate">GV: {(nextClass as any)?.instructor || 'ThS. Nguyễn Văn A'}</span>
-                  <span className="font-semibold underline flex items-center gap-1 shrink-0">
-                    Chi tiết <ArrowRight size={13} />
-                  </span>
+
+                {/* Quick In-Hero Actions */}
+                <div className="grid grid-cols-3 gap-2 mt-3 pt-2.5 border-t border-white/15">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedClass(nextClass)}
+                    className="py-1.5 px-2 rounded-lg bg-white/20 hover:bg-white/30 text-white text-[11px] font-bold text-center active:scale-95 transition-transform"
+                  >
+                    Điểm danh
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/documents')}
+                    className="py-1.5 px-2 rounded-lg bg-white/20 hover:bg-white/30 text-white text-[11px] font-bold text-center active:scale-95 transition-transform"
+                  >
+                    Tài liệu môn
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/calendar')}
+                    className="py-1.5 px-2 rounded-lg bg-white/20 hover:bg-white/30 text-white text-[11px] font-bold text-center active:scale-95 transition-transform"
+                  >
+                    Đổi lịch
+                  </button>
                 </div>
               </div>
             ) : (
@@ -143,6 +171,9 @@ export function MobileHomeScreen() {
             <div className="text-lg font-black text-[var(--m-brand-primary)] tracking-tight my-0.5">
               {kpiSummary?.remainingHours || '4.5h'}
             </div>
+            <div className="w-full bg-[var(--m-border-faint)] h-1 rounded-full overflow-hidden my-1">
+              <div className="bg-[var(--m-brand-primary)] h-full rounded-full" style={{ width: '65%' }} />
+            </div>
             <span className="text-[10px] text-[var(--m-text-secondary)] truncate">
               {kpiSummary?.dailyAvgHours || '2 tiết hôm nay'}
             </span>
@@ -158,6 +189,9 @@ export function MobileHomeScreen() {
             <div className="text-lg font-black text-[var(--m-campus-red)] tracking-tight my-0.5">
               {kpiSummary?.urgentDeadlineCount ?? 2}
             </div>
+            <div className="w-full bg-[var(--m-border-faint)] h-1 rounded-full overflow-hidden my-1">
+              <div className="bg-[var(--m-campus-red)] h-full rounded-full" style={{ width: '80%' }} />
+            </div>
             <span className="text-[10px] text-[var(--m-text-secondary)] truncate">
               {kpiSummary?.deadlineBadgeText || 'Trong 48h'}
             </span>
@@ -172,6 +206,9 @@ export function MobileHomeScreen() {
             </span>
             <div className="text-lg font-black text-[var(--m-campus-green)] tracking-tight my-0.5">
               {kpiSummary?.weeklyGoalPct ?? 85}%
+            </div>
+            <div className="w-full bg-[var(--m-border-faint)] h-1 rounded-full overflow-hidden my-1">
+              <div className="bg-[var(--m-campus-green)] h-full rounded-full" style={{ width: `${kpiSummary?.weeklyGoalPct ?? 85}%` }} />
             </div>
             <span className="text-[10px] text-[var(--m-text-secondary)] truncate">
               Còn {kpiSummary?.remainingDays ?? 3} ngày

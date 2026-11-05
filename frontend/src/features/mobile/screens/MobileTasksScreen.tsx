@@ -126,6 +126,18 @@ export function MobileTasksScreen() {
           )}
         </AnimatePresence>
 
+        {/* Search Bar */}
+        <div className="relative mb-3">
+          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--m-text-muted)]" />
+          <input
+            type="text"
+            placeholder="Tìm kiếm bài tập, đồ án..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 rounded-xl bg-[var(--m-surface)] border border-[var(--m-border)] text-xs text-[var(--m-text-primary)] placeholder:text-[var(--m-text-muted)] focus:outline-none focus:border-[var(--m-brand-primary)]"
+          />
+        </div>
+
         {/* Filter Chips */}
         <section className="mb-4">
           <div className="mobile-chip-row">
