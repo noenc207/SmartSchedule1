@@ -122,15 +122,20 @@ export function MobileCalendarScreen() {
                   key={day.key}
                   type="button"
                   onClick={() => handleSelectDay(idx)}
-                  className={`flex-1 py-2 flex flex-col items-center justify-center rounded-xl transition-all ${
-                    isSelected
-                      ? 'bg-[var(--m-brand-primary)] text-white font-bold shadow-sm'
-                      : 'text-[var(--m-text-secondary)] hover:bg-[var(--m-surface-subtle)]'
-                  }`}
+                  className={`mobile-day-btn ${isSelected ? 'active' : ''}`}
+                  aria-label={`${day.full}, ngày ${dayNum}`}
                 >
-                  <span className="text-[10px] uppercase tracking-wider">{day.label}</span>
-                  <span className="text-xs font-black my-0.5">{dayNum}</span>
-                  <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-[var(--m-brand-primary)]'}`} />
+                  <span className="text-[10px] uppercase font-bold tracking-wider leading-none">
+                    {day.label}
+                  </span>
+                  <span className="text-sm font-black leading-none my-0.5">
+                    {dayNum}
+                  </span>
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      isSelected ? 'bg-white' : 'bg-[var(--m-brand-primary)] opacity-40'
+                    }`}
+                  />
                 </button>
               );
             })}

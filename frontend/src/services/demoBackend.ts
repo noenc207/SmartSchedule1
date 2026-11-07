@@ -885,12 +885,14 @@ export const demoAdapter: AxiosAdapter = async (config) => {
   // User Profile & Auth
   if ((route === '/users/me' || route === '/auth/me') && method === 'GET') {
     const demoTier = (typeof window !== 'undefined' && localStorage.getItem('smartschedule-demo-tier')) || 'PRO';
+    const demoAvatar = (typeof window !== 'undefined' && localStorage.getItem('smartschedule-demo-avatar')) || '/avatar-nhi.png';
+    const demoName = (typeof window !== 'undefined' && localStorage.getItem('smartschedule-demo-name')) || 'Vũ Ngọc Nhi';
     data = {
       id: DEMO_USER_ID,
-      email: 'demo@fpt.edu.vn',
-      displayName: 'Nguyen Thi Huong Nhi',
-      name: 'Nguyen Thi Huong Nhi',
-      avatarUrl: null,
+      email: 'nhi.vn@fpt.edu.vn',
+      displayName: demoName,
+      name: demoName,
+      avatarUrl: demoAvatar,
       timezone: 'Asia/Ho_Chi_Minh',
       locale: 'vi-VN',
       enabled: true,
@@ -899,12 +901,22 @@ export const demoAdapter: AxiosAdapter = async (config) => {
     };
   } else if ((route === '/users/me' || route === '/auth/me') && (method === 'PATCH' || method === 'PUT')) {
     const demoTier = (typeof window !== 'undefined' && localStorage.getItem('smartschedule-demo-tier')) || 'PRO';
+    if (typeof window !== 'undefined') {
+      if (body.avatarUrl !== undefined) {
+        localStorage.setItem('smartschedule-demo-avatar', body.avatarUrl || '/avatar-nhi.png');
+      }
+      if (body.name || body.displayName) {
+        localStorage.setItem('smartschedule-demo-name', body.name || body.displayName);
+      }
+    }
+    const currentAvatar = (typeof window !== 'undefined' && localStorage.getItem('smartschedule-demo-avatar')) || body.avatarUrl || '/avatar-nhi.png';
+    const currentName = body.name || body.displayName || (typeof window !== 'undefined' && localStorage.getItem('smartschedule-demo-name')) || 'Vũ Ngọc Nhi';
     data = {
       id: DEMO_USER_ID,
-      email: 'demo@fpt.edu.vn',
-      displayName: body.name || body.displayName || 'Nguyen Thi Huong Nhi',
-      name: body.name || body.displayName || 'Nguyen Thi Huong Nhi',
-      avatarUrl: body.avatarUrl ?? null,
+      email: 'nhi.vn@fpt.edu.vn',
+      displayName: currentName,
+      name: currentName,
+      avatarUrl: currentAvatar,
       timezone: body.timezone || 'Asia/Ho_Chi_Minh',
       locale: body.locale || 'vi-VN',
       enabled: true,

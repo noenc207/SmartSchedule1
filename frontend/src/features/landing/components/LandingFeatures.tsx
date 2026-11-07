@@ -1,158 +1,366 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ScrollWordRevealText, ShimmerSweepBadge } from '../../../components/effects/AnimateText';
+import {
+  Calendar,
+  Compass,
+  Layers,
+  ShieldAlert,
+  CheckCircle2,
+  Clock,
+  MapPin,
+  Sparkles,
+  Zap,
+} from 'lucide-react';
 
-const FEATURES = [
-  {
-    id: 'fptu-slots',
-    badge: 'CHUẨN HÓA LỊCH FPTU',
-    title: 'Khớp chính xác 6 Slot học đặc thù tại FPT University',
-    desc: 'Không hiển thị theo lịch tuần chung chung. SmartSchedule được thiết kế riêng theo khung giờ 6 slot học của FPTU (07:30 đến 18:30), hỗ trợ đầy đủ ca học lý thuyết, ca thực hành lab và các buổi bảo vệ đồ án.',
-    snippet: (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', fontWeight: 600 }}>
-          <span style={{ color: '#f8faff' }}>Slot 1: 07:30 - 09:00</span>
-          <span style={{ color: '#38bdf8' }}>Lý thuyết chuyên ngành</span>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', fontWeight: 600 }}>
-          <span style={{ color: '#f8faff' }}>Slot 2: 09:15 - 10:45</span>
-          <span style={{ color: '#ff7a32' }}>Thực hành Lab máy</span>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', fontWeight: 600 }}>
-          <span style={{ color: '#f8faff' }}>Slot 4: 13:30 - 15:00</span>
-          <span style={{ color: '#34d399' }}>Hội thảo & Workshop</span>
-        </div>
-      </div>
-    ),
-  },
-  {
-    id: 'conflict-detection',
-    badge: 'THUẬT TOÁN THÔNG MINH',
-    title: 'Tự động phát hiện và hóa giải xung đột lịch trình',
-    desc: 'Khi bạn có lịch thi đột xuất, buổi họp nhóm đồ án hoặc sự kiện CLB trùng vào giờ tự học, thuật toán Constraint Satisfaction sẽ lập tức cảnh báo và tính toán phương án dời lịch sang khung giờ trống phù hợp nhất.',
-    snippet: (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(234, 88, 12, 0.16)', padding: '10px 14px', borderRadius: '8px', border: '1px solid rgba(255, 122, 50, 0.35)' }}>
-        <div>
-          <strong style={{ fontSize: '0.85rem', color: '#ffc46b', display: 'block' }}>Phát hiện trùng giờ Slot 3</strong>
-          <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Đã tự động chuyển khối ôn tập sang Slot 5 rảnh</span>
-        </div>
-        <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '4px 8px', background: '#059669', color: '#ffffff', borderRadius: '6px' }}>
-          Đã giải quyết
-        </span>
-      </div>
-    ),
-  },
-  {
-    id: 'deadline-management',
-    badge: 'CHỐNG NƯỚC RÚT',
-    title: 'Phân bổ bài tập và đồ án lớn theo khối lượng giờ',
-    desc: 'Nhập deadline đồ án (SWP391, Capstone, Assigment môn học), SmartSchedule sẽ chia nhỏ thành các phiên tập trung 90 phút và trải đều vào các slot trống trước hạn nộp, giúp bạn không bao giờ phải thức trắng đêm.',
-    snippet: (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
-          <span style={{ color: '#f8faff' }}>Đồ án SWP391: Sprint 2</span>
-          <strong style={{ color: '#ff7a32' }}>Cần 6h (4 slot học)</strong>
-        </div>
-        <div style={{ height: '6px', width: '100%', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '3px', overflow: 'hidden' }}>
-          <div style={{ width: '75%', height: '100%', background: '#ea580c' }} />
-        </div>
-        <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Đã tự động xếp 3 slot trong tuần · Còn 1 slot trước Thứ Sáu</span>
-      </div>
-    ),
-  },
-  {
-    id: 'ai-assistant',
-    badge: 'TRỢ LÝ HỌC VỤ AI',
-    title: 'AI Companion chuyên sâu cho sinh viên AI Campus',
-    desc: 'Đặt câu hỏi bằng tiếng Việt tự nhiên: "Hôm nay mình học phòng nào?", "Sắp xếp cho mình 4 tiếng ôn thi môn PRN211 trước thứ Bảy". AI hiểu ngữ cảnh thời khóa biểu của bạn và đưa ra câu trả lời chính xác trong tích tắc.',
-    snippet: (
-      <div style={{ background: 'rgba(17, 26, 58, 0.8)', border: '1px solid rgba(157, 231, 255, 0.16)', borderRadius: '8px', padding: '10px 12px' }}>
-        <p style={{ margin: '0 0 6px', fontSize: '0.8rem', color: '#94a3b8' }}>
-          💬 <em>"Hôm nay mình có slot nào trống để họp nhóm không?"</em>
-        </p>
-        <p style={{ margin: 0, fontSize: '0.82rem', fontWeight: 600, color: '#f8faff' }}>
-          🤖 "Bạn rảnh Slot 3 (11:00 - 12:30) và Slot 5 (15:15 - 16:45) tại Tòa Beta."
-        </p>
-      </div>
-    ),
-  },
+const FPTU_SLOTS = [
+  { id: 1, name: 'Slot 1', time: '07:30 – 09:00', course: 'PRN231 · Building Cross-Platform Web APIs', room: 'P.A302 · Tòa Alpha', type: 'Lý thuyết chuyên ngành', color: '#2563eb' },
+  { id: 2, name: 'Slot 2', time: '09:15 – 10:45', course: 'AIL303m · Machine Learning Thực hành', room: 'Lab B204 · Tòa Beta', type: 'Thực hành Lab AI (Đệm 15p)', color: '#ea580c' },
+  { id: 3, name: 'Slot 3', time: '11:00 – 12:30', course: 'Deep Work · Đồ án SWP391 Sprint 2', room: 'Không gian Atrium Tầng 2', type: 'Cóc AI tự động xếp lịch', color: '#059669' },
+  { id: 4, name: 'Slot 4', time: '12:50 – 14:20', course: 'JPD123 · Tiếng Nhật Sơ cấp 2', room: 'P.A405 · Tòa Alpha', type: 'Ngoại ngữ bắt buộc', color: '#7c3aed' },
+  { id: 5, name: 'Slot 5', time: '14:30 – 16:00', course: 'Họp Mentor Đồ án Tốt nghiệp', room: 'Phòng Thảo luận G102', type: 'Lịch nhóm đồng bộ', color: '#0284c7' },
+  { id: 6, name: 'Slot 6', time: '16:10 – 17:40', course: 'Rèn luyện Vovinam / CLB F-Code', room: 'Sân tập Đa năng Campus', type: 'Hoạt động ngoại khóa', color: '#d97706' },
 ];
 
 export function LandingFeatures() {
+  const [selectedSlot, setSelectedSlot] = useState(FPTU_SLOTS[1]);
+
   return (
     <section id="features" className="landing-section landing-section-alt" aria-labelledby="features-heading">
       <div className="landing-container">
-        <motion.div
-          className="landing-section-header"
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: '-60px' }}
-          transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <ShimmerSweepBadge delay={0.05} duration={0.8} className="inline-block">
-            <span className="landing-section-pill">TÍNH NĂNG NỔI BẬT</span>
-          </ShimmerSweepBadge>
+        <div className="landing-section-header">
+          <div className="landing-pill-badge">
+            <span className="landing-pill-dot" aria-hidden="true" />
+            KIẾN TRÚC ĐẶC THÙ CHO SINH VIÊN FPTU
+          </div>
 
           <h2 id="features-heading" className="landing-section-title">
-            <ScrollWordRevealText
-              text="Được xây dựng cho nhịp sống học tập thực tế của sinh viên"
-              as="span"
-              delay={0.12}
-            />
+            Thiết kế chuẩn xác theo{' '}
+            <span className="landing-hero-headline-highlight">
+              nhịp sống 6 Slot
+            </span>{' '}
+            tại Quy Nhơn AI Campus
           </h2>
-          <motion.p
-            className="landing-section-desc"
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-60px' }}
-            transition={{ duration: 0.6, delay: 0.22, ease: [0.22, 1, 0.36, 1] }}
-          >
-            Không chỉ là một ứng dụng lịch thông thường. SmartSchedule là hệ thống điều phối học tập thông minh giúp sinh viên tối ưu hóa từng giờ trong kỳ học.
-          </motion.p>
-        </motion.div>
 
-        {/* 4 Feature Cards with Staggered Entrance and Smooth Hover Response */}
-        <div className="landing-features-grid">
-          {FEATURES.map((feature, idx) => (
-            <motion.article
-              key={feature.id}
-              className="landing-feature-card"
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: '-60px' }}
-              transition={{
-                duration: 0.6,
-                delay: 0.08 + idx * 0.12,
-                ease: [0.22, 1, 0.36, 1],
-              }}
-              whileHover={{
-                y: -6,
-                borderColor: 'rgba(234, 88, 12, 0.45)',
-                boxShadow: '0 16px 36px rgba(0, 0, 0, 0.4)',
-                transition: { type: 'spring', stiffness: 350, damping: 22 },
-              }}
-            >
-              <div>
-                <div className="landing-feature-top">
-                  <motion.span
-                    className="landing-feature-icon-badge"
-                    aria-hidden="true"
-                    whileHover={{ scale: 1.15, rotate: 5 }}
-                    transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-                  >
-                    {idx + 1}
-                  </motion.span>
-                  <span className="landing-feature-tag">{feature.badge}</span>
-                </div>
-                <h3 className="landing-feature-title">{feature.title}</h3>
-                <p className="landing-feature-desc">{feature.desc}</p>
+          <p className="landing-section-desc">
+            Không phải ứng dụng lịch đại trà. Mọi thuật toán của SmartSchedule đều được huấn luyện trên cấu trúc học kỳ, sơ đồ tòa nhà và khối lượng đồ án thực tế của sinh viên FPT University.
+          </p>
+        </div>
+
+        {/* Asymmetric Bento Grid */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(12, 1fr)',
+            gap: 22,
+          }}
+        >
+          {/* Bento Card 1 (7 cols): Interactive 6-Slot FPTU Explorer */}
+          <motion.article
+            whileHover={{ y: -4 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+            style={{
+              gridColumn: 'span 12',
+              background: '#ffffff',
+              borderRadius: 26,
+              padding: '28px 30px',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 16px 40px -14px rgba(15, 23, 42, 0.07)',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))',
+              gap: 28,
+              alignItems: 'center',
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '5px 12px',
+                  borderRadius: 999,
+                  background: 'rgba(234, 88, 12, 0.1)',
+                  color: '#ea580c',
+                  fontSize: '0.75rem',
+                  fontWeight: 800,
+                  marginBottom: 14,
+                }}
+              >
+                <Calendar size={14} />
+                TRỤ CỘT 01 · CHUẨN HÓA 6 SLOT HỌC FAP
               </div>
 
-              <div className="landing-feature-snippet">{feature.snippet}</div>
-            </motion.article>
-          ))}
+              <h3
+                style={{
+                  fontSize: '1.5rem',
+                  fontWeight: 900,
+                  color: '#0f172a',
+                  margin: '0 0 12px',
+                  letterSpacing: '-0.02em',
+                  lineHeight: 1.25,
+                }}
+              >
+                Khớp nối hoàn hảo 6 ca học từ 07:30 sáng đến 17:40 chiều
+              </h3>
+
+              <p style={{ fontSize: '0.96rem', color: '#475569', lineHeight: 1.65, margin: '0 0 20px' }}>
+                Thay vì chia theo từng giờ rời rạc, SmartSchedule nhận diện trực tiếp 6 Slot chuẩn FPTU. Bấm vào từng Slot bên cạnh để xem cách AI lồng ghép lịch học chính khóa, đệm di chuyển và phiên tự học sâu.
+              </p>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                {[
+                  'Đồng bộ mã môn PRN, SWP, AIL, MAS',
+                  'Tự động khóa cứng ca thi FE / PE',
+                  'Phân biệt ca Lý thuyết & Lab thực hành',
+                ].map((tag) => (
+                  <span
+                    key={tag}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '6px 12px',
+                      borderRadius: 10,
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      color: '#334155',
+                    }}
+                  >
+                    <CheckCircle2 size={14} color="#059669" />
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Interactive 6-Slot Selector Widget */}
+            <div
+              style={{
+                background: '#0f172a',
+                borderRadius: 20,
+                padding: '20px 22px',
+                color: '#f8fafc',
+                border: '1px solid rgba(148, 163, 184, 0.2)',
+                boxShadow: '0 20px 44px -12px rgba(15, 23, 42, 0.25)',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: 14,
+                }}
+              >
+                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#94a3b8', letterSpacing: '0.04em' }}>
+                  BẤM CHỌN SLOT ĐỂ KIỂM TRA LỊCH TRÌNH
+                </span>
+                <span
+                  style={{
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    color: '#34d399',
+                    background: 'rgba(16, 185, 129, 0.16)',
+                    padding: '3px 9px',
+                    borderRadius: 999,
+                  }}
+                >
+                  6/6 Slot Active
+                </span>
+              </div>
+
+              {/* 6 Slot Pills */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gap: 8,
+                  marginBottom: 16,
+                }}
+              >
+                {FPTU_SLOTS.map((slot) => {
+                  const active = selectedSlot.id === slot.id;
+                  return (
+                    <button
+                      key={slot.id}
+                      type="button"
+                      onClick={() => setSelectedSlot(slot)}
+                      style={{
+                        appearance: 'none',
+                        border: active ? `1.5px solid ${slot.color}` : '1px solid rgba(255,255,255,0.1)',
+                        background: active ? 'rgba(255, 255, 255, 0.12)' : 'rgba(30, 41, 59, 0.7)',
+                        color: active ? '#ffffff' : '#94a3b8',
+                        borderRadius: 12,
+                        padding: '8px 10px',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'all 0.18s ease',
+                      }}
+                    >
+                      <div style={{ fontSize: '0.82rem', fontWeight: 800 }}>{slot.name}</div>
+                      <div style={{ fontSize: '0.68rem', opacity: 0.8 }}>{slot.time.split(' – ')[0]}</div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Selected Slot Detail Card */}
+              <motion.div
+                key={selectedSlot.id}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2 }}
+                style={{
+                  padding: '16px 18px',
+                  borderRadius: 16,
+                  background: 'rgba(30, 41, 59, 0.92)',
+                  borderLeft: `4px solid ${selectedSlot.color}`,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6,
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fdba74' }}>
+                    {selectedSlot.name} · {selectedSlot.time}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '0.7rem',
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: 6,
+                      background: 'rgba(255,255,255,0.08)',
+                      color: '#e2e8f0',
+                    }}
+                  >
+                    {selectedSlot.type}
+                  </span>
+                </div>
+                <strong style={{ fontSize: '1.02rem', color: '#ffffff' }}>{selectedSlot.course}</strong>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', color: '#94a3b8' }}>
+                  <MapPin size={13} color="#38bdf8" />
+                  <span>{selectedSlot.room}</span>
+                </div>
+              </motion.div>
+            </div>
+          </motion.article>
+
+          {/* 3 Secondary Bento Cards */}
+          {[
+            {
+              badge: 'TRỤ CỘT 02 · ĐỊNH TUYẾN CAMPUS',
+              icon: Compass,
+              color: '#0284c7',
+              bg: 'rgba(2, 132, 199, 0.09)',
+              title: 'Đệm di chuyển thông minh Alpha ↔ Beta ↔ Atrium',
+              desc: 'Tự động tính khoảng cách đi bộ thực tế (280m – 4.2 phút) giữa các tòa nhà trong khuôn viên An Phú Thịnh và chèn 15 phút đệm an toàn trước mỗi ca học.',
+              footer: '✓ Cảnh báo rời lớp sớm 5 phút trên điện thoại',
+            },
+            {
+              badge: 'TRỤ CỘT 03 · CHỐNG NƯỚC RÚT CUỐI KỲ',
+              icon: Layers,
+              color: '#ea580c',
+              bg: 'rgba(234, 88, 12, 0.1)',
+              title: 'Băm nhỏ Đồ án Capstone & SWP391 theo Sprint',
+              desc: 'Chỉ cần nhập hạn nộp đồ án và tổng số giờ ước tính (ví dụ: 12 giờ), OR-Tools sẽ tự động chia thành 8 phiên học sâu 90 phút rải đều vào các slot trống trong tuần.',
+              footer: '✓ Hoàn thành bài tập sớm 24h trước hạn LMS',
+            },
+            {
+              badge: 'TRỤ CỘT 04 · LÁ CHẮN XUNG ĐỘT 24/7',
+              icon: ShieldAlert,
+              color: '#059669',
+              bg: 'rgba(5, 150, 105, 0.1)',
+              title: 'Tự động tái cấu trúc lịch khi có lịch thi đột xuất',
+              desc: 'Khi giảng viên thêm lịch học bù hoặc lịch bảo vệ đồ án trùng vào ca tự học, hệ thống tự động tìm slot trống thay thế chỉ với 1 cú nhấp chuột.',
+              footer: '✓ Bảo toàn 100% mục tiêu giờ học hàng tuần',
+            },
+          ].map((item) => {
+            const Icon = item.icon;
+            return (
+              <motion.article
+                key={item.title}
+                whileHover={{ y: -5 }}
+                transition={{ type: 'spring', stiffness: 320, damping: 24 }}
+                style={{
+                  gridColumn: 'span 4',
+                  background: '#ffffff',
+                  borderRadius: 24,
+                  padding: '26px 24px',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 12px 30px -12px rgba(15, 23, 42, 0.06)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  gap: 16,
+                }}
+                className="bento-col-card"
+              >
+                <div>
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 7,
+                      padding: '4px 11px',
+                      borderRadius: 999,
+                      background: item.bg,
+                      color: item.color,
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      marginBottom: 14,
+                    }}
+                  >
+                    <Icon size={14} />
+                    {item.badge}
+                  </div>
+
+                  <h3
+                    style={{
+                      fontSize: '1.22rem',
+                      fontWeight: 800,
+                      color: '#0f172a',
+                      margin: '0 0 10px',
+                      lineHeight: 1.3,
+                      letterSpacing: '-0.02em',
+                    }}
+                  >
+                    {item.title}
+                  </h3>
+
+                  <p style={{ fontSize: '0.92rem', color: '#475569', lineHeight: 1.6, margin: 0 }}>
+                    {item.desc}
+                  </p>
+                </div>
+
+                <div
+                  style={{
+                    padding: '10px 14px',
+                    borderRadius: 12,
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    color: item.color,
+                  }}
+                >
+                  {item.footer}
+                </div>
+              </motion.article>
+            );
+          })}
         </div>
       </div>
+
+      <style>{`
+        @media (max-width: 960px) {
+          .bento-col-card {
+            grid-column: span 12 !important;
+          }
+        }
+      `}</style>
     </section>
   );
 }

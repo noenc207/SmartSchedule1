@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, useEffect, Component, type ReactNode } from 'react';
+import React, { useRef, useMemo, useEffect, useState, Component, type ReactNode } from 'react';
 import { useGLTF } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -10,6 +10,8 @@ export interface MascotModelProps {
   rotation?: [number, number, number];
   floatIntensity?: number;
   interactive?: boolean;
+  actionPulse?: number;
+  onMascotClick?: () => void;
 }
 
 export function GeometricMascotFallback({
@@ -24,40 +26,27 @@ export function GeometricMascotFallback({
   useFrame((state) => {
     if (!groupRef.current) return;
     const t = state.clock.getElapsedTime();
-    groupRef.current.position.y = position[1] + Math.sin(t * 1.5) * 0.035;
+    groupRef.current.position.y = position[1] + Math.sin(t * 2.2) * 0.05;
+    groupRef.current.rotation.y = Math.sin(t * 1.2) * 0.15;
   });
 
   return (
     <group ref={groupRef} position={position} scale={scale}>
-      {/* Head */}
-      <mesh position={[0, 1.05, 0]} castShadow receiveShadow>
+      <mesh position={[0, 1.05, 0]}>
         <sphereGeometry args={[0.36, 32, 32]} />
         <meshStandardMaterial color="#fffbf5" roughness={0.25} metalness={0.05} />
       </mesh>
-      {/* Glossy Visor / Friendly Eyes */}
-      <mesh position={[0, 1.06, 0.28]} castShadow>
+      <mesh position={[0, 1.06, 0.28]}>
         <boxGeometry args={[0.32, 0.15, 0.1]} />
         <meshStandardMaterial color="#0f172a" roughness={0.1} metalness={0.8} />
       </mesh>
-      {/* FPT Orange Accents / Cap */}
-      <mesh position={[0, 1.28, 0.05]} castShadow>
+      <mesh position={[0, 1.28, 0.05]}>
         <cylinderGeometry args={[0.34, 0.38, 0.12, 32]} />
         <meshStandardMaterial color="#ea580c" roughness={0.3} metalness={0.1} />
       </mesh>
-      {/* Torso */}
-      <mesh position={[0, 0.5, 0]} castShadow receiveShadow>
+      <mesh position={[0, 0.5, 0]}>
         <cylinderGeometry args={[0.3, 0.36, 0.65, 32]} />
         <meshStandardMaterial color="#ea580c" roughness={0.3} metalness={0.1} />
-      </mesh>
-      {/* Raised Index Finger (Iconic Mascot Pose) */}
-      <mesh position={[0.42, 0.95, 0.1]} rotation={[0, 0, -0.2]} castShadow>
-        <cylinderGeometry args={[0.04, 0.05, 0.25, 16]} />
-        <meshStandardMaterial color="#ea580c" roughness={0.3} metalness={0.1} />
-      </mesh>
-      {/* Base shadow disc */}
-      <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <circleGeometry args={[0.55, 32]} />
-        <meshBasicMaterial color="#fed7aa" transparent opacity={0.45} />
       </mesh>
     </group>
   );
@@ -88,13 +77,27 @@ function RealMascotMesh({
   rotation = [0, 0, 0],
   floatIntensity = 1,
   interactive = true,
+  actionPulse = 0,
+  onMascotClick,
 }: MascotModelProps) {
   const groupRef = useRef<THREE.Group>(null);
   const { scene } = useGLTF(BRAND_ASSETS.mascotModelUrl);
   const clonedScene = useMemo(() => scene.clone(true), [scene]);
 
+  // Joyful physics state for hop & spin animations
+  const jumpProgress = useRef(0);
+  const spinAngle = useRef(0);
+  const [hovered, setHovered] = useState(false);
+
+  // Trigger celebratory hop when actionPulse increments
   useEffect(() => {
-    // Load emissive texture to illuminate glowing cyber accents & pedestal circuit paths
+    if (actionPulse > 0) {
+      jumpProgress.current = 1.0;
+      spinAngle.current += Math.PI * 2;
+    }
+  }, [actionPulse]);
+
+  useEffect(() => {
     const textureLoader = new THREE.TextureLoader();
     textureLoader.load(
       BRAND_ASSETS.mascotEmissiveUrl,
@@ -112,9 +115,9 @@ function RealMascotMesh({
               const mat = (mesh.material as THREE.MeshStandardMaterial).clone();
               mat.emissiveMap = emissiveTex;
               mat.emissive = new THREE.Color(0xffffff);
-              mat.emissiveIntensity = 1.2;
-              mat.roughness = 0.26;
-              mat.metalness = 0.08;
+              mat.emissiveIntensity = 1.45;
+              mat.roughness = 0.22;
+              mat.metalness = 0.12;
               mat.needsUpdate = true;
               mesh.material = mat;
             }
@@ -123,14 +126,13 @@ function RealMascotMesh({
       },
       undefined,
       () => {
-        // Fallback: enable shadows on original materials without emissive
         clonedScene.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
             child.castShadow = true;
             child.receiveShadow = true;
           }
         });
-      }
+      },
     );
   }, [clonedScene]);
 
@@ -138,27 +140,68 @@ function RealMascotMesh({
     if (!groupRef.current) return;
     const time = state.clock.getElapsedTime();
 
-    // Natural idle floating motion
-    if (floatIntensity > 0) {
-      groupRef.current.position.y = position[1] + Math.sin(time * 1.5) * 0.035 * floatIntensity;
+    // Decay jump impulse smoothly
+    if (jumpProgress.current > 0.001) {
+      jumpProgress.current = Math.max(0, jumpProgress.current - delta * 2.2);
+    } else {
+      jumpProgress.current = 0;
     }
 
-    // Responsive cursor parallax (strictly front-facing clamped angles)
+    // Joyful parabolic hop height
+    const hopOffset = Math.sin(jumpProgress.current * Math.PI) * 0.24;
+
+    // Playful idle bounce + hop
+    const idleBounce = Math.sin(time * 2.4) * 0.045 * floatIntensity;
+    groupRef.current.position.y = position[1] + idleBounce + hopOffset;
+
+    // Playful side-to-side cheerful sway
+    const cheerfulSwayZ = Math.sin(time * 1.8) * 0.03 + Math.sin(jumpProgress.current * Math.PI * 2) * 0.08;
+    groupRef.current.rotation.z = THREE.MathUtils.damp(groupRef.current.rotation.z, cheerfulSwayZ, 5, delta);
+
+    // Interactive scale pop on hover or jump
+    const targetScale = scale * (hovered ? 1.06 : 1.0) * (1 + Math.sin(jumpProgress.current * Math.PI) * 0.08);
+    const currentScale = THREE.MathUtils.damp(groupRef.current.scale.x, targetScale, 6, delta);
+    groupRef.current.scale.setScalar(currentScale);
+
+    // Responsive cursor tracking + celebratory spin
     if (interactive) {
       const isMobile = state.size.width < 768;
-      const targetRotY = isMobile
-        ? rotation[1]
-        : rotation[1] + THREE.MathUtils.clamp(state.pointer.x * 0.16, -0.20, 0.20);
-      const targetRotX = isMobile
-        ? rotation[0]
-        : rotation[0] - THREE.MathUtils.clamp(state.pointer.y * 0.08, -0.10, 0.10);
-      groupRef.current.rotation.y = THREE.MathUtils.damp(groupRef.current.rotation.y, targetRotY, 3.5, delta);
-      groupRef.current.rotation.x = THREE.MathUtils.damp(groupRef.current.rotation.x, targetRotX, 3.5, delta);
+      const pointerRotY = isMobile ? 0 : THREE.MathUtils.clamp(state.pointer.x * 0.32, -0.35, 0.35);
+      const idleTurnY = Math.sin(time * 0.9) * 0.08;
+      const targetRotY = rotation[1] + pointerRotY + idleTurnY + spinAngle.current;
+
+      const pointerRotX = isMobile ? 0 : -THREE.MathUtils.clamp(state.pointer.y * 0.14, -0.16, 0.16);
+      const targetRotX = rotation[0] + pointerRotX - Math.sin(jumpProgress.current * Math.PI) * 0.12;
+
+      groupRef.current.rotation.y = THREE.MathUtils.damp(groupRef.current.rotation.y, targetRotY, 4.2, delta);
+      groupRef.current.rotation.x = THREE.MathUtils.damp(groupRef.current.rotation.x, targetRotX, 4.2, delta);
     }
   });
 
+  const handleClick = (e: { stopPropagation: () => void }) => {
+    e.stopPropagation();
+    jumpProgress.current = 1.0;
+    spinAngle.current += Math.PI * 2;
+    if (onMascotClick) onMascotClick();
+  };
+
   return (
-    <group ref={groupRef} position={position} rotation={rotation} scale={scale} dispose={null}>
+    <group
+      ref={groupRef}
+      position={position}
+      rotation={rotation}
+      scale={scale}
+      dispose={null}
+      onClick={handleClick}
+      onPointerOver={() => {
+        setHovered(true);
+        if (typeof document !== 'undefined') document.body.style.cursor = 'pointer';
+      }}
+      onPointerOut={() => {
+        setHovered(false);
+        if (typeof document !== 'undefined') document.body.style.cursor = 'auto';
+      }}
+    >
       <primitive object={clonedScene} />
     </group>
   );
@@ -172,7 +215,6 @@ export function MascotModel(props: MascotModelProps) {
   );
 }
 
-// Preload canonical PBR mascot model
 try {
   useGLTF.preload(BRAND_ASSETS.mascotModelUrl);
 } catch (e) {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, ArrowRight } from 'lucide-react';
+import { Clock, ArrowRight, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface SelfStudyBookingCardProps {
@@ -14,8 +14,8 @@ export function SelfStudyBookingCard({ studyGap }: SelfStudyBookingCardProps) {
   const navigate = useNavigate();
 
   const gap = studyGap || {
-    minutes: 60,
-    timeRange: '08:00 - 09:00',
+    minutes: 660,
+    timeRange: '08:00 – 19:00',
   };
 
   return (
@@ -27,7 +27,7 @@ export function SelfStudyBookingCard({ studyGap }: SelfStudyBookingCardProps) {
     >
       <div className="mock-study-row">
         <div className="mock-study-icon-wrap">
-          <Clock size={16} />
+          <Clock size={18} className="text-emerald-600" />
         </div>
         <div className="mock-study-text">
           <div className="mock-study-title">Khoảng trống tự học</div>
@@ -40,9 +40,10 @@ export function SelfStudyBookingCard({ studyGap }: SelfStudyBookingCardProps) {
 
       <button
         type="button"
-        className="mock-primary-btn"
+        className="mock-primary-btn hero-btn-gradient-primary"
         onClick={() => navigate('/scheduling')}
       >
+        <Sparkles size={14} />
         <span>Đăng ký phòng tự học</span>
         <ArrowRight size={14} />
       </button>

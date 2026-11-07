@@ -21,6 +21,7 @@ import {
 } from '../../../components/mobile';
 import { useAuth } from '../../../hooks/useAuth';
 import { resetDemoData } from '../../../services/demoBackend';
+import { AvatarModal } from '../../settings/components/AvatarModal';
 import { showToast } from '../../../components/Toast';
 
 export function MobileSettingsScreen() {
@@ -38,6 +39,7 @@ export function MobileSettingsScreen() {
   const [pushNotifs, setPushNotifs] = useState(true);
   const [googleSync, setGoogleSync] = useState(true);
   const [showQr, setShowQr] = useState(false);
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
 
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';
@@ -87,9 +89,9 @@ export function MobileSettingsScreen() {
             {!showQr ? (
               <div>
                 <div className="flex items-center gap-3 pt-1">
-                  <div className="w-12 h-12 rounded-xl overflow-hidden border-2 border-white/80 shrink-0 shadow-xs">
+                  <div className="w-12 h-12 rounded-xl overflow-hidden border-2 border-white/80 shrink-0 shadow-xs cursor-pointer relative" onClick={(e) => { e.stopPropagation(); setIsAvatarModalOpen(true); }} title="Chạm để đổi Avatar">
                     <img
-                      src="/avatar-nhi.png"
+                      src={user?.avatarUrl || "/avatar-nhi.png"}
                       alt={studentName}
                       className="w-full h-full object-cover"
                       onError={(e) => {
@@ -106,9 +108,9 @@ export function MobileSettingsScreen() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between mt-3 pt-2 border-t border-white/20 text-[11px] text-white/90">
+                <div className="flex items-center justify-between gap-2 mt-3 pt-2.5 border-t border-white/20 text-[11px] text-white/90">
                   <span>Học kỳ: Fall 2026</span>
-                  <span className="font-semibold underline flex items-center gap-1">
+                  <span className="font-semibold underline flex items-center gap-1 cursor-pointer hover:text-white">
                     Mở mã QR qua cổng →
                   </span>
                 </div>
@@ -238,6 +240,7 @@ export function MobileSettingsScreen() {
           </button>
         </section>
       </main>
+      <AvatarModal isOpen={isAvatarModalOpen} onClose={() => setIsAvatarModalOpen(false)} />
     </div>
   );
 }

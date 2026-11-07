@@ -1,27 +1,39 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ScrollWordRevealText, ShimmerSweepBadge } from '../../../components/effects/AnimateText';
+import { CalendarCheck, FileSpreadsheet, Cpu, Sparkles } from 'lucide-react';
 
 const STEPS = [
   {
-    step: '1',
-    title: 'Đồng bộ thời khóa biểu',
-    desc: 'Đăng nhập tài khoản trường và nhập các lớp học theo 6 slot chuẩn FPTU từ FAP chỉ trong một phút.',
+    step: '01',
+    icon: CalendarCheck,
+    color: '#2563eb',
+    bg: 'rgba(37, 99, 235, 0.1)',
+    title: 'Đồng bộ Thời khóa biểu FAP',
+    desc: 'Đăng nhập bằng tài khoản sinh viên FPTU và nhập nhanh các ca học theo 6 slot chuẩn từ cổng FAP chỉ trong 30 giây.',
   },
   {
-    step: '2',
-    title: 'Thêm đồ án & bài tập',
-    desc: 'Nhập hạn nộp bài tập lớn, đồ án môn học và khối lượng thời gian bạn ước tính cần để hoàn thành.',
+    step: '02',
+    icon: FileSpreadsheet,
+    color: '#ea580c',
+    bg: 'rgba(234, 88, 12, 0.1)',
+    title: 'Khai báo Đồ án & Hạn chót LMS',
+    desc: 'Thêm các cột mốc đồ án SWP391, bài Lab hàng tuần và thời lượng ước tính bạn cần để hoàn thành từng học phần.',
   },
   {
-    step: '3',
-    title: 'Động cơ AI tự động xếp lịch',
-    desc: 'Thuật toán tính toán đệm di chuyển giữa các tòa nhà campus và xếp các buổi tự học vào các slot rảnh nhất.',
+    step: '03',
+    icon: Cpu,
+    color: '#059669',
+    bg: 'rgba(5, 150, 105, 0.1)',
+    title: 'OR-Tools CP-SAT Tối ưu 6 Slot',
+    desc: 'Thuật toán tự động tính đệm di chuyển 15 phút giữa Tòa Alpha – Beta và xếp các phiên học sâu 90 phút vào khung giờ vàng.',
   },
   {
-    step: '4',
-    title: 'Theo dõi & linh hoạt điều chỉnh',
-    desc: 'Nhận thông báo trước giờ học, theo dõi tiến độ tuần và 1-click dời lịch khi có kế hoạch đột xuất.',
+    step: '04',
+    icon: Sparkles,
+    color: '#7c3aed',
+    bg: 'rgba(124, 58, 237, 0.1)',
+    title: 'Bám sát Tiến độ cùng Cóc AI',
+    desc: 'Nhận thông báo nhắc chuyển tòa, theo dõi chuỗi ngày học tập (Streak) và 1-chạm dời lịch khi có sự kiện đột xuất.',
   },
 ];
 
@@ -29,90 +41,109 @@ export function LandingHowItWorks() {
   return (
     <section id="how-it-works" className="landing-section" aria-labelledby="how-it-works-heading">
       <div className="landing-container">
-        <motion.div
-          className="landing-section-header"
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.1 }}
-          transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <ShimmerSweepBadge delay={0.05} duration={0.8} className="inline-block">
-            <span className="landing-section-pill">QUY TRÌNH TINH GỌN</span>
-          </ShimmerSweepBadge>
+        <div className="landing-section-header">
+          <div className="landing-pill-badge">
+            <span className="landing-pill-dot" aria-hidden="true" />
+            QUY TRÌNH 4 BƯỚC TINH GỌN
+          </div>
 
           <h2 id="how-it-works-heading" className="landing-section-title">
-            <ScrollWordRevealText
-              text="Chỉ 4 bước để có một tuần học tập không áp lực"
-              as="span"
-              delay={0.12}
-            />
+            Chỉ 2 phút thiết lập để{' '}
+            <span className="landing-hero-headline-highlight">
+              làm chủ trọn kỳ học
+            </span>{' '}
+            10 tuần tại FPTU
           </h2>
-          <motion.p
-            className="landing-section-desc"
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.1 }}
-            transition={{ duration: 0.6, delay: 0.22, ease: [0.22, 1, 0.36, 1] }}
-          >
-            Không cần mất hàng giờ kẻ bảng Excel hay phân vân giờ nào học bài. SmartSchedule biến việc lập kế hoạch thành trải nghiệm tự động và chính xác.
-          </motion.p>
-        </motion.div>
 
-        {/* Progress Flow Container with Animated Connecting Line */}
-        <div style={{ position: 'relative' }}>
-          {/* Subtle connecting progress bar that draws across steps */}
-          <motion.div
-            aria-hidden="true"
-            initial={{ scaleX: 0 }}
-            whileInView={{ scaleX: 1 }}
-            viewport={{ once: true, amount: 0.1 }}
-            transition={{ duration: 0.85, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
-            style={{
-              position: 'absolute',
-              top: '40px',
-              left: '8%',
-              right: '8%',
-              height: '2px',
-              background: 'linear-gradient(90deg, rgba(234, 88, 12, 0.2) 0%, rgba(255, 122, 50, 0.7) 50%, rgba(157, 231, 255, 0.4) 100%)',
-              transformOrigin: 'left center',
-              zIndex: 0,
-              pointerEvents: 'none',
-            }}
-          />
+          <p className="landing-section-desc">
+            Không cần kẻ bảng thủ công trên Notion hay Excel. SmartSchedule tự động hóa toàn bộ quy trình điều phối thời gian học thuật.
+          </p>
+        </div>
 
-          <div className="landing-steps-row" style={{ position: 'relative', zIndex: 1 }}>
-            {STEPS.map((item, idx) => (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gap: 22,
+          }}
+        >
+          {STEPS.map((item) => {
+            const Icon = item.icon;
+            return (
               <motion.div
                 key={item.step}
-                className="landing-step-card"
-                initial={{ opacity: 0, y: 28 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, amount: 0.1 }}
-                transition={{
-                  duration: 0.55,
-                  delay: 0.1 + idx * 0.14,
-                  ease: [0.22, 1, 0.36, 1],
-                }}
-                whileHover={{
-                  y: -5,
-                  borderColor: 'rgba(234, 88, 12, 0.4)',
-                  boxShadow: '0 12px 28px rgba(0, 0, 0, 0.35)',
-                  transition: { type: 'spring', stiffness: 350, damping: 22 },
+                whileHover={{ y: -6 }}
+                transition={{ type: 'spring', stiffness: 320, damping: 24 }}
+                style={{
+                  background: '#ffffff',
+                  borderRadius: 24,
+                  padding: '28px 24px',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 12px 32px -12px rgba(15, 23, 42, 0.06)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 14,
+                  position: 'relative',
                 }}
               >
-                <motion.div
-                  className="landing-step-marker"
-                  aria-hidden="true"
-                  whileHover={{ scale: 1.15, rotate: [0, -5, 5, 0] }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 18 }}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
                 >
-                  {item.step}
-                </motion.div>
-                <h3 className="landing-step-title">{item.title}</h3>
-                <p className="landing-step-desc">{item.desc}</p>
+                  <div
+                    style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: 14,
+                      background: item.bg,
+                      color: item.color,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Icon size={22} />
+                  </div>
+                  <span
+                    style={{
+                      fontSize: '1.65rem',
+                      fontWeight: 900,
+                      color: '#cbd5e1',
+                      letterSpacing: '-0.04em',
+                    }}
+                  >
+                    {item.step}
+                  </span>
+                </div>
+
+                <h3
+                  style={{
+                    fontSize: '1.16rem',
+                    fontWeight: 800,
+                    color: '#0f172a',
+                    margin: 0,
+                    letterSpacing: '-0.02em',
+                  }}
+                >
+                  {item.title}
+                </h3>
+
+                <p
+                  style={{
+                    fontSize: '0.92rem',
+                    color: '#475569',
+                    lineHeight: 1.6,
+                    margin: 0,
+                  }}
+                >
+                  {item.desc}
+                </p>
               </motion.div>
-            ))}
-          </div>
+            );
+          })}
         </div>
       </div>
     </section>

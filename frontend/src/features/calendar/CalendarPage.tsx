@@ -66,6 +66,7 @@ import { MiniCalendar } from './components/MiniCalendar';
 import { YearView } from './components/YearView';
 import { QuarterView } from './components/QuarterView';
 import { TimelineView } from './components/TimelineView';
+import { FptSlotGrid } from './components/FptSlotGrid';
 import { MobileDayStrip } from './components/MobileDayStrip';
 import { COLOR_PALETTE } from './utils/colorPalette';
 import { NlpTaskInput } from '../tasks/components/NlpTaskInput';
@@ -89,6 +90,10 @@ import {
   PanelRightOpen,
   Search,
   GripVertical,
+  Sun,
+  Sunset,
+  Moon,
+  Clock,
 } from 'lucide-react';
 
 const blank: EventInput = {
@@ -395,8 +400,17 @@ export function CalendarPage() {
       const start = new Date(activeYear, activeDate.getMonth() - 1, 1).toISOString();
       const end = new Date(activeYear, activeDate.getMonth() + 4, 0, 23, 59, 59).toISOString();
       void load(start, end);
+    } else if (calendarView === 'slotGrid') {
+      const startOfWeek = new Date(activeDate);
+      const day = (startOfWeek.getDay() + 6) % 7;
+      startOfWeek.setDate(startOfWeek.getDate() - day);
+      startOfWeek.setHours(0, 0, 0, 0);
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 7);
+      endOfWeek.setHours(23, 59, 59, 999);
+      void load(startOfWeek.toISOString(), endOfWeek.toISOString());
     }
-  }, [activeScheduleId, calendarView, activeYear, activeQuarter, load]);
+  }, [activeScheduleId, calendarView, activeYear, activeQuarter, activeDate, load]);
 
   // Refresh calendar when AI Action confirms a create/update/reschedule/delete
   useEffect(() => {
@@ -904,21 +918,24 @@ export function CalendarPage() {
     );
   };
 
-  // Day period filter: 'all' (24h), 'morning' (Buổi sáng), 'afternoon' (Buổi chiều), 'evening' (Buổi tối)
-  type DayPeriod = 'all' | 'morning' | 'afternoon' | 'evening';
+  // Day period filter: 'all' (Chính khóa 07:00–21:30), 'morning' (Buổi sáng), 'afternoon' (Buổi chiều), 'evening' (Buổi tối), 'full24h' (24h)
+  type DayPeriod = 'all' | 'morning' | 'afternoon' | 'evening' | 'full24h';
   const [dayPeriod, setDayPeriod] = useState<DayPeriod>('all');
 
   const { slotMinTime, slotMaxTime, scrollTime } = useMemo(() => {
     switch (dayPeriod) {
       case 'morning':
-        return { slotMinTime: '06:00:00', slotMaxTime: '13:00:00', scrollTime: '07:00:00' };
+        return { slotMinTime: '06:30:00', slotMaxTime: '13:00:00', scrollTime: '07:00:00' };
       case 'afternoon':
         return { slotMinTime: '12:00:00', slotMaxTime: '18:30:00', scrollTime: '12:30:00' };
       case 'evening':
-        return { slotMinTime: '18:00:00', slotMaxTime: '24:00:00', scrollTime: '18:30:00' };
+        return { slotMinTime: '18:00:00', slotMaxTime: '23:30:00', scrollTime: '18:30:00' };
+      case 'full24h':
+        return { slotMinTime: '00:00:00', slotMaxTime: '24:00:00', scrollTime: '07:30:00' };
       case 'all':
       default:
-        return { slotMinTime: '00:00:00', slotMaxTime: '24:00:00', scrollTime: '07:30:00' };
+        // ACADEMIC HOURS: 07:00 to 21:30 by default! Eliminates midnight void completely!
+        return { slotMinTime: '07:00:00', slotMaxTime: '21:30:00', scrollTime: '07:30:00' };
     }
   }, [dayPeriod]);
 
@@ -1666,7 +1683,7 @@ export function CalendarPage() {
       setActiveDate((prev) => new Date(prev.getFullYear() - 1, prev.getMonth(), prev.getDate()));
     } else if (calendarView === 'quarter') {
       setActiveDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 3, prev.getDate()));
-    } else if (calendarView === 'timeline') {
+    } else if (calendarView === 'slotGrid' || calendarView === 'timeline') {
       setActiveDate((prev) => new Date(prev.getTime() - 7 * 86400000));
     } else {
       const api = calendarRef.current?.getApi();
@@ -1682,7 +1699,7 @@ export function CalendarPage() {
       setActiveDate((prev) => new Date(prev.getFullYear() + 1, prev.getMonth(), prev.getDate()));
     } else if (calendarView === 'quarter') {
       setActiveDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 3, prev.getDate()));
-    } else if (calendarView === 'timeline') {
+    } else if (calendarView === 'slotGrid' || calendarView === 'timeline') {
       setActiveDate((prev) => new Date(prev.getTime() + 7 * 86400000));
     } else {
       const api = calendarRef.current?.getApi();
@@ -1933,24 +1950,42 @@ export function CalendarPage() {
   }, [selected, selectedTask, navigate]);
 
   return (
-    <section className="workspace-page">
-      <div className="section-heading calendar-main-header">
-        <div>
-          <div className="calendar-breadcrumb-row">
-            <div className="school-brand-pill">
-              <img
-                src="/fpt-logo.png"
-                alt="FPT University"
-                className="school-logo-img"
-                onError={(e) => {
-                  (e.target as HTMLElement).style.display = 'none';
-                }}
-              />
-              <span className="school-brand-text">FPT UNIVERSITY · QUY NHƠN AI CAMPUS</span>
-            </div>
+    <section
+      className="workspace-page calendar-single-screen"
+      style={
+        isMobile
+          ? undefined
+          : {
+              height: 'calc(100vh - 76px)',
+              maxHeight: 'calc(100vh - 76px)',
+              padding: '8px 20px 10px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 6,
+              overflow: 'hidden',
+              boxSizing: 'border-box',
+            }
+      }
+    >
+      <div
+        className="section-heading calendar-main-header"
+        style={{ marginBottom: 0, paddingBottom: 0, flexShrink: 0 }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div className="school-brand-pill">
+            <img
+              src="/fpt-logo.png"
+              alt="FPT University"
+              className="school-logo-img"
+              onError={(e) => {
+                (e.target as HTMLElement).style.display = 'none';
+              }}
+            />
+            <span className="school-brand-text">FPT UNIVERSITY · QUY NHƠN AI CAMPUS</span>
           </div>
-          <h1 className="calendar-heading-title">Thời khóa biểu &amp; Kế hoạch học tập</h1>
-          <p className="muted calendar-subtitle">Quản lý lịch học trên lớp cố định, các phiên tập trung thông minh và theo dõi quỹ thời gian.</p>
+          <h1 className="calendar-heading-title" style={{ fontSize: 20, margin: 0 }}>
+            Thời khóa biểu &amp; Kế hoạch học tập
+          </h1>
         </div>
         <div className="topbar-actions">
           <SchedulePicker />
@@ -2173,11 +2208,35 @@ export function CalendarPage() {
             </div>
           )}
 
-          <div className={`calendar-layout ${(!taskPanelVisible && !editing) || (isMobile && mobileCalendarTab === 'calendar') ? 'full-width' : ''}`}>
+          <div
+            className={`calendar-layout ${(!taskPanelVisible && !editing) || (isMobile && mobileCalendarTab === 'calendar') ? 'full-width' : ''}`}
+            style={
+              isMobile
+                ? undefined
+                : {
+                    flex: 1,
+                    minHeight: 0,
+                    overflow: 'hidden',
+                    alignItems: 'stretch',
+                  }
+            }
+          >
           {(!isMobile || mobileCalendarTab === 'calendar') && (
           <div
             ref={calendarPanelRef}
             className="panel calendar-panel"
+            style={
+              isMobile
+                ? undefined
+                : {
+                    display: 'flex',
+                    flexDirection: 'column',
+                    height: '100%',
+                    minHeight: 0,
+                    overflow: 'hidden',
+                    padding: '10px 14px',
+                  }
+            }
             onContextMenu={(e) => {
               // Custom right click on empty calendar background
               if ((e.target as HTMLElement).closest('.fc-event')) return;
@@ -2265,161 +2324,170 @@ export function CalendarPage() {
                 onNavigateDate={handleNavigateTimeline}
               />
             ) : (
-              <div className={isMobile && calendarView === 'timeGridWeek' ? 'calendar-mobile-week-wrapper' : 'calendar-fc-wrapper'}>
+              <div
+                className={isMobile && calendarView === 'timeGridWeek' ? 'calendar-mobile-week-wrapper' : 'calendar-fc-wrapper'}
+                style={
+                  isMobile
+                    ? undefined
+                    : {
+                        flex: 1,
+                        minHeight: 0,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden',
+                      }
+                }
+              >
                 {['timeGridDay', 'timeGridWeek'].includes(calendarView) && (
-                  <div className="calendar-day-period-bar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 14px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '13px', flexWrap: 'wrap', gap: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 600, color: '#475569', fontSize: '12px' }}>Khung giờ:</span>
-                      <div className="period-btn-group" style={{ display: 'inline-flex', background: '#e2e8f0', padding: '2px', borderRadius: '6px' }}>
+                  <div className="calendar-day-period-bar" style={{ marginBottom: 6, padding: '5px 10px', flexShrink: 0 }}>
+                    <div className="period-bar-left">
+                      <span className="period-bar-title">Khung giờ:</span>
+                      <div className="period-segmented-control" role="group" aria-label="Bộ lọc khung giờ">
                         <button
                           type="button"
+                          className={`period-pill-btn ${dayPeriod === 'all' ? 'active' : ''}`}
                           onClick={() => setDayPeriod('all')}
-                          style={{
-                            border: 'none',
-                            background: dayPeriod === 'all' ? '#ffffff' : 'transparent',
-                            color: dayPeriod === 'all' ? '#0f172a' : '#64748b',
-                            fontWeight: dayPeriod === 'all' ? 600 : 500,
-                            padding: '3px 10px',
-                            borderRadius: '4px',
-                            fontSize: '12px',
-                            cursor: 'pointer',
-                            boxShadow: dayPeriod === 'all' ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
-                          }}
+                          title="Hiển thị khung giờ học tập chuẩn (07:00 – 21:30)"
                         >
-                          24 Giờ
+                          <Clock size={13} className="period-pill-icon text-orange-500" />
+                          <span>Học tập <small>(07:00 – 21:30)</small></span>
                         </button>
                         <button
                           type="button"
+                          className={`period-pill-btn ${dayPeriod === 'morning' ? 'active' : ''}`}
                           onClick={() => setDayPeriod('morning')}
-                          style={{
-                            border: 'none',
-                            background: dayPeriod === 'morning' ? '#ffffff' : 'transparent',
-                            color: dayPeriod === 'morning' ? '#0f172a' : '#64748b',
-                            fontWeight: dayPeriod === 'morning' ? 600 : 500,
-                            padding: '3px 10px',
-                            borderRadius: '4px',
-                            fontSize: '12px',
-                            cursor: 'pointer',
-                            boxShadow: dayPeriod === 'morning' ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
-                          }}
                         >
-                          Buổi sáng (06:00 - 13:00)
+                          <Sun size={13} className="period-pill-icon text-amber-500" />
+                          <span>Buổi sáng <small>(06:30 – 13:00)</small></span>
                         </button>
                         <button
                           type="button"
+                          className={`period-pill-btn ${dayPeriod === 'afternoon' ? 'active' : ''}`}
                           onClick={() => setDayPeriod('afternoon')}
-                          style={{
-                            border: 'none',
-                            background: dayPeriod === 'afternoon' ? '#ffffff' : 'transparent',
-                            color: dayPeriod === 'afternoon' ? '#0f172a' : '#64748b',
-                            fontWeight: dayPeriod === 'afternoon' ? 600 : 500,
-                            padding: '3px 10px',
-                            borderRadius: '4px',
-                            fontSize: '12px',
-                            cursor: 'pointer',
-                            boxShadow: dayPeriod === 'afternoon' ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
-                          }}
                         >
-                          Buổi chiều (12:00 - 18:30)
+                          <Sunset size={13} className="period-pill-icon text-orange-500" />
+                          <span>Buổi chiều <small>(12:00 – 18:30)</small></span>
                         </button>
                         <button
                           type="button"
+                          className={`period-pill-btn ${dayPeriod === 'evening' ? 'active' : ''}`}
                           onClick={() => setDayPeriod('evening')}
-                          style={{
-                            border: 'none',
-                            background: dayPeriod === 'evening' ? '#ffffff' : 'transparent',
-                            color: dayPeriod === 'evening' ? '#0f172a' : '#64748b',
-                            fontWeight: dayPeriod === 'evening' ? 600 : 500,
-                            padding: '3px 10px',
-                            borderRadius: '4px',
-                            fontSize: '12px',
-                            cursor: 'pointer',
-                            boxShadow: dayPeriod === 'evening' ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
-                          }}
                         >
-                          Buổi tối (18:00 - 24:00)
+                          <Moon size={13} className="period-pill-icon text-indigo-400" />
+                          <span>Buổi tối <small>(18:00 – 23:30)</small></span>
+                        </button>
+                        <button
+                          type="button"
+                          className={`period-pill-btn ${dayPeriod === 'full24h' ? 'active' : ''}`}
+                          onClick={() => setDayPeriod('full24h')}
+                          title="Hiển thị đủ 24 giờ trong ngày (00:00 – 24:00)"
+                        >
+                          <span>24h</span>
                         </button>
                       </div>
                     </div>
-                    <span style={{ fontSize: '11px', color: '#64748b' }}>
-                      {dayPeriod === 'all' ? 'Hiển thị đầy đủ 24 giờ trong ngày' : dayPeriod === 'morning' ? 'Tập trung các tiết học buổi sáng' : dayPeriod === 'afternoon' ? 'Tập trung các tiết học buổi chiều' : 'Tập trung ca tự học buổi tối'}
+                    <span className="period-bar-hint">
+                      {dayPeriod === 'all'
+                        ? 'Tập trung khung giờ học tập chuẩn tại Campus (07:00 – 21:30)'
+                        : dayPeriod === 'morning'
+                        ? 'Tập trung các tiết học buổi sáng'
+                        : dayPeriod === 'afternoon'
+                        ? 'Tập trung các tiết học buổi chiều'
+                        : dayPeriod === 'evening'
+                        ? 'Tập trung ca tự học buổi tối'
+                        : 'Hiển thị đầy đủ 24 giờ trong ngày'}
                     </span>
                   </div>
                 )}
-                <FullCalendar
-                  ref={calendarRef}
-                  plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
-                  timeZone="local"
-                  firstDay={1}
-                  initialView={calendarView}
-                  selectable={canEdit && !whatIfActive}
-                  selectAllow={(selectInfo) => selectInfo.start.getTime() >= Date.now() - 60000}
-                  editable={canEdit}
-                  droppable={canEdit && !whatIfActive}
-                  slotEventOverlap={false}
-                  nowIndicator
-                  stickyHeaderDates="auto"
-                  slotMinTime={slotMinTime}
-                  slotMaxTime={slotMaxTime}
-                  scrollTime={scrollTime}
-                  slotDuration={slotDuration}
-                  slotLabelInterval="01:00"
-                  slotLabelContent={renderSlotLabel}
-                  expandRows
-                  dayMaxEvents={3}
-                  moreLinkClick="popover"
-                  headerToolbar={false}
-                  events={calendarEvents}
-                  datesSet={datesSet}
-                  select={handleSelectSlot}
-                  dateClick={handleDateClick}
-                  eventContent={renderCalendarEventContent}
-                  dayHeaderContent={renderDayHeader}
-                  dayHeaderDidMount={(arg) => {
-                    const cushion = arg.el.querySelector('.fc-col-header-cell-cushion');
-                    if (cushion) {
-                      Array.from(cushion.childNodes).forEach((node) => {
-                        if (node.nodeType === Node.TEXT_NODE) node.remove();
-                      });
-                    }
-                  }}
-                  eventClick={(arg: EventClickArg) => {
-                    const item = events.find((event) => event.occurrenceId === arg.event.id || event.id === arg.event.id);
-                    if (item) openDetails(item);
-                  }}
-                  eventDidMount={(arg) => {
-                    // Attach double click to open edit drawer immediately
-                    arg.el.addEventListener('dblclick', (e) => {
-                      e.stopPropagation();
-                      const item = events.find((ev) => ev.occurrenceId === arg.event.id || ev.id === arg.event.id);
-                      if (item && canEdit) openEdit(item);
-                    });
+                {calendarView === 'slotGrid' ? (
+                  <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+                    <FptSlotGrid
+                      activeDate={activeDate}
+                      events={events}
+                      onSelectEvent={(item) => openDetails(item)}
+                      onEditEvent={(item) => canEdit && openEdit(item)}
+                      onOpenCreate={(start, end) => canEdit && openCreate(start, end)}
+                      canEdit={canEdit}
+                      timeZone={schedule?.timezone ?? DEFAULT_TIMEZONE}
+                    />
+                  </div>
+                ) : (
+                  <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }} className="calendar-fc-wrapper">
+                    <FullCalendar
+                      ref={calendarRef}
+                      plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
+                      timeZone="local"
+                      firstDay={1}
+                      initialView={calendarView}
+                      selectable={canEdit && !whatIfActive}
+                      selectAllow={(selectInfo) => selectInfo.start.getTime() >= Date.now() - 60000}
+                      editable={canEdit}
+                      droppable={canEdit && !whatIfActive}
+                      allDaySlot={false}
+                      slotEventOverlap={false}
+                      nowIndicator
+                      stickyHeaderDates="auto"
+                      slotMinTime={slotMinTime}
+                      slotMaxTime={slotMaxTime}
+                      scrollTime={scrollTime}
+                      slotDuration={slotDuration}
+                      slotLabelInterval="01:00"
+                      slotLabelContent={renderSlotLabel}
+                      expandRows
+                      dayMaxEvents={3}
+                      moreLinkClick="popover"
+                      headerToolbar={false}
+                      events={calendarEvents}
+                      datesSet={datesSet}
+                      select={handleSelectSlot}
+                      dateClick={handleDateClick}
+                      eventContent={renderCalendarEventContent}
+                      dayHeaderContent={renderDayHeader}
+                      dayHeaderDidMount={(arg) => {
+                        const cushion = arg.el.querySelector('.fc-col-header-cell-cushion');
+                        if (cushion) {
+                          Array.from(cushion.childNodes).forEach((node) => {
+                            if (node.nodeType === Node.TEXT_NODE) node.remove();
+                          });
+                        }
+                      }}
+                      eventClick={(arg: EventClickArg) => {
+                        const item = events.find((event) => event.occurrenceId === arg.event.id || event.id === arg.event.id);
+                        if (item) openDetails(item);
+                      }}
+                      eventDidMount={(arg) => {
+                        arg.el.addEventListener('dblclick', (e) => {
+                          e.stopPropagation();
+                          const item = events.find((ev) => ev.occurrenceId === arg.event.id || ev.id === arg.event.id);
+                          if (item && canEdit) openEdit(item);
+                        });
 
-                    // Attach right-click context menu to event
-                    arg.el.addEventListener('contextmenu', (e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const item = events.find((ev) => ev.occurrenceId === arg.event.id || ev.id === arg.event.id);
-                      if (item) {
-                        setContextMenu({ x: e.clientX, y: e.clientY, event: item });
+                        arg.el.addEventListener('contextmenu', (e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const item = events.find((ev) => ev.occurrenceId === arg.event.id || ev.id === arg.event.id);
+                          if (item) {
+                            setContextMenu({ x: e.clientX, y: e.clientY, event: item });
+                          }
+                        });
+                      }}
+                      eventDrop={(arg) => void persistCalendarMove(arg)}
+                      eventResize={(arg) => void persistCalendarMove(arg)}
+                      eventReceive={(arg) => void receiveTask(arg)}
+                      eventAllow={(dropInfo, draggedEvent) =>
+                        canEdit &&
+                        dropInfo.start.getTime() >= Date.now() - 60000 &&
+                        (whatIfActive || !draggedEvent || !draggedEvent.extendedProps.event?.locked)
                       }
-                    });
-                  }}
-                  eventDrop={(arg) => void persistCalendarMove(arg)}
-                  eventResize={(arg) => void persistCalendarMove(arg)}
-                  eventReceive={(arg) => void receiveTask(arg)}
-                  eventAllow={(dropInfo, draggedEvent) =>
-                    canEdit &&
-                    dropInfo.start.getTime() >= Date.now() - 60000 &&
-                    (whatIfActive || !draggedEvent || !draggedEvent.extendedProps.event?.locked)
-                  }
-                  height="min(720px, calc(100vh - 250px))"
-                />
+                      height="100%"
+                    />
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Proactive AI Planner Bottom Bar */}
-            {!aiPlannerDismissed && aiRecommendation && (
+            {/* Proactive AI Planner Bottom Bar (Always visible on Screen 1 without scrolling!) */}
+            {!aiPlannerDismissed && (
               <CalendarAiPlannerBar
                 recommendation={aiRecommendation}
                 loading={aiLoading}
@@ -2432,20 +2500,20 @@ export function CalendarPage() {
           )}
 
           {((!isMobile && taskPanelVisible) || (isMobile && mobileCalendarTab === 'assistant')) && (
-            <aside className="calendar-side-column">
-            {/* Mini Calendar Navigator */}
-            {isMiniCalendarVisible && !whatIfActive && (
-              <div className="panel mini-calendar-sidebar-panel" style={{ marginBottom: '1rem' }}>
-                <MiniCalendar
-                  activeDate={activeDate}
-                  selectedDate={activeDate}
-                  events={events}
-                  tasks={tasks}
-                  timeZone={schedule?.timezone ?? DEFAULT_TIMEZONE}
-                  onSelectDate={handleSelectDate}
-                />
-              </div>
-            )}
+            <aside
+              className="calendar-side-column"
+              style={
+                isMobile
+                  ? undefined
+                  : {
+                      height: '100%',
+                      minHeight: 0,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      overflow: 'hidden',
+                    }
+              }
+            >
             {/* What-If Impact Summary Card if active */}
             {whatIfActive && whatIfImpact && (
               <div className="panel what-if-impact-card">
@@ -2515,6 +2583,7 @@ export function CalendarPage() {
                 onViewAllToday={() => {
                   handleChangeView('timeGridDay');
                 }}
+                onSelectDate={handleSelectDate}
               />
             )}
           </aside>

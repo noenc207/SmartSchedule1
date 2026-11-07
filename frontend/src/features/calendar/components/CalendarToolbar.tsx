@@ -41,8 +41,9 @@ export interface CalendarToolbarProps {
 }
 
 const VIEW_OPTIONS: { id: CalendarViewType; label: string; iconLabel: string }[] = [
+  { id: 'slotGrid', label: 'Lưới Slot FPT', iconLabel: '🎓' },
+  { id: 'timeGridWeek', label: 'Tuần (Chi tiết)', iconLabel: '🗓️' },
   { id: 'timeGridDay', label: 'Ngày', iconLabel: '📅' },
-  { id: 'timeGridWeek', label: 'Tuần', iconLabel: '🗓️' },
   { id: 'dayGridMonth', label: 'Tháng', iconLabel: '📆' },
   { id: 'quarter', label: 'Quý', iconLabel: '📊' },
   { id: 'year', label: 'Năm', iconLabel: '📈' },
@@ -104,6 +105,7 @@ export function CalendarToolbar({
         const m = String(month + 1).padStart(2, '0');
         return `${dayName}, ${d}/${m}/${year}`;
       }
+      case 'slotGrid':
       case 'timeGridWeek':
       case 'listWeek': {
         const startOfWeek = new Date(currentDate);
@@ -116,7 +118,9 @@ export function CalendarToolbar({
         const d2 = String(endOfWeek.getDate()).padStart(2, '0');
         const m2 = String(endOfWeek.getMonth() + 1).padStart(2, '0');
         const y2 = endOfWeek.getFullYear();
-        return `Tuần ${d1}/${m1} – ${d2}/${m2}/${y2}`;
+        return currentView === 'slotGrid'
+          ? `Lịch Slot Tuần ${d1}/${m1} – ${d2}/${m2}/${y2}`
+          : `Tuần ${d1}/${m1} – ${d2}/${m2}/${y2}`;
       }
       case 'dayGridMonth':
         return `Tháng ${month + 1}, ${year}`;
@@ -134,7 +138,7 @@ export function CalendarToolbar({
   };
 
   const isTimeGrid = currentView === 'timeGridWeek' || currentView === 'timeGridDay';
-  const activeViewOption = VIEW_OPTIONS.find((v) => v.id === currentView) || VIEW_OPTIONS[1];
+  const activeViewOption = VIEW_OPTIONS.find((v) => v.id === currentView) || VIEW_OPTIONS[0];
 
   return (
     <div className="unified-calendar-toolbar">
@@ -143,7 +147,9 @@ export function CalendarToolbar({
         <div className="toolbar-main-heading">
           <Calendar size={18} className="toolbar-calendar-icon" />
           <h2 className="toolbar-title-text">
-            {currentView === 'timeGridWeek'
+            {currentView === 'slotGrid'
+              ? 'Thời khóa biểu Slot Chuẩn FPT'
+              : currentView === 'timeGridWeek'
               ? 'Thời khóa biểu tuần'
               : currentView === 'dayGridMonth'
               ? 'Thời khóa biểu tháng'
@@ -239,8 +245,26 @@ export function CalendarToolbar({
           </div>
         )}
 
-        {/* Segmented View Pills: Ngày | Tuần | Tháng | Timeline | ... */}
+        {/* Segmented View Pills: Lưới Slot FPT | Tuần | Ngày | Tháng | Timeline | ... */}
         <div className="toolbar-segmented-views" role="group" aria-label="Chế độ xem lịch">
+          <button
+            type="button"
+            data-view="slotGrid"
+            className={`seg-view-btn ${currentView === 'slotGrid' ? 'active' : ''}`}
+            onClick={() => onChangeView('slotGrid')}
+            title="Lưới Slot Chuẩn FPT (Slot 1–6 + Ca Tối)"
+          >
+            <span style={{ marginRight: '4px' }}>🎓</span> Lưới Slot FPT
+          </button>
+          <button
+            type="button"
+            data-view="timeGridWeek"
+            className={`seg-view-btn ${currentView === 'timeGridWeek' ? 'active' : ''}`}
+            onClick={() => onChangeView('timeGridWeek')}
+            title="Xem theo Tuần (07:00 – 21:00)"
+          >
+            Tuần
+          </button>
           <button
             type="button"
             data-view="timeGridDay"
@@ -249,15 +273,6 @@ export function CalendarToolbar({
             title="Xem theo Ngày"
           >
             Ngày
-          </button>
-          <button
-            type="button"
-            data-view="timeGridWeek"
-            className={`seg-view-btn ${currentView === 'timeGridWeek' ? 'active' : ''}`}
-            onClick={() => onChangeView('timeGridWeek')}
-            title="Xem theo Tuần"
-          >
-            Tuần
           </button>
           <button
             type="button"
@@ -282,12 +297,12 @@ export function CalendarToolbar({
           <div className="toolbar-dropdown-wrap" ref={viewDropdownRef}>
             <button
               type="button"
-              className={`seg-view-btn more-btn ${!['timeGridDay', 'timeGridWeek', 'dayGridMonth', 'timeline'].includes(currentView) ? 'active' : ''}`}
+              className={`seg-view-btn more-btn ${!['slotGrid', 'timeGridDay', 'timeGridWeek', 'dayGridMonth', 'timeline'].includes(currentView) ? 'active' : ''}`}
               onClick={() => setViewDropdownOpen(!viewDropdownOpen)}
               title="Chế độ xem khác (Quý, Năm, Danh sách)"
               aria-expanded={viewDropdownOpen}
             >
-              {!['timeGridDay', 'timeGridWeek', 'dayGridMonth', 'timeline'].includes(currentView) ? activeViewOption.label : '•••'}
+              {!['slotGrid', 'timeGridDay', 'timeGridWeek', 'dayGridMonth', 'timeline'].includes(currentView) ? activeViewOption.label : '•••'}
             </button>
 
             {viewDropdownOpen && (
@@ -334,10 +349,10 @@ export function CalendarToolbar({
             className="toolbar-google-quick-btn toolbar-sheet-quick-btn"
             onClick={() => onOpenGoogleImport('sheets')}
             title="Dán liên kết Google Sheets để nhập lịch nhanh"
-            aria-label="Dán link Google Sheet"
+            aria-label="Nhập dữ liệu Google Sheet"
           >
             <FileSpreadsheet size={15} color="#059669" />
-            <span className="create-event-btn-text">Dán link Sheet</span>
+            <span className="create-event-btn-text">Nhập Sheet</span>
           </button>
         )}
 
@@ -351,7 +366,7 @@ export function CalendarToolbar({
             aria-label="Đồng bộ Google Calendar"
           >
             <CalendarSync size={15} color="#2563eb" />
-            <span className="create-event-btn-text">Đồng bộ Google</span>
+            <span className="create-event-btn-text">Đồng bộ</span>
           </button>
         )}
 

@@ -18,6 +18,25 @@ import {
 import { useDashboardData } from '../../dashboard/hooks/useDashboardData';
 import type { Task } from '../../../types/domain';
 
+const DEFAULT_TASKS: Task[] = [
+  {
+    id: 'task-swp391',
+    title: 'Hoàn thiện tài liệu Sprint Review SWP391',
+    status: 'PENDING',
+    priority: 'HIGH',
+    estimatedDurationMinutes: 120,
+    deadline: new Date(Date.now() + 86400000 * 2).toISOString(),
+  } as any,
+  {
+    id: 'task-prn211',
+    title: 'Ôn tập trắc nghiệm PRN211 Lab 3 & 4',
+    status: 'PENDING',
+    priority: 'MEDIUM',
+    estimatedDurationMinutes: 60,
+    deadline: new Date(Date.now() + 86400000 * 3).toISOString(),
+  } as any,
+];
+
 export function MobileTasksScreen() {
   const { tasks, toggleTaskComplete } = useDashboardData();
   const [filter, setFilter] = useState<'all' | 'today' | 'urgent' | 'completed'>('all');
@@ -25,11 +44,15 @@ export function MobileTasksScreen() {
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [isAdding, setIsAdding] = useState(false);
 
-  // Local task list state for instantaneous UI feedback
-  const [localTasks, setLocalTasks] = useState<Task[]>(tasks);
+  // Local task list state with fallback demo tasks for instant feedback
+  const [localTasks, setLocalTasks] = useState<Task[]>(() =>
+    tasks.length > 0 ? tasks : DEFAULT_TASKS
+  );
 
   React.useEffect(() => {
-    setLocalTasks(tasks);
+    if (tasks.length > 0) {
+      setLocalTasks(tasks);
+    }
   }, [tasks]);
 
   const handleToggle = (task: Task) => {
@@ -128,14 +151,23 @@ export function MobileTasksScreen() {
 
         {/* Search Bar */}
         <div className="relative mb-3">
-          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--m-text-muted)]" />
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--m-text-muted)] pointer-events-none" />
           <input
             type="text"
             placeholder="Tìm kiếm bài tập, đồ án..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 rounded-xl bg-[var(--m-surface)] border border-[var(--m-border)] text-xs text-[var(--m-text-primary)] placeholder:text-[var(--m-text-muted)] focus:outline-none focus:border-[var(--m-brand-primary)]"
+            className="w-full pl-10 pr-8 py-2.5 rounded-xl bg-[var(--m-surface)] border border-[var(--m-border)] text-xs text-[var(--m-text-primary)] placeholder:text-[var(--m-text-muted)] focus:outline-none focus:border-[var(--m-brand-primary)] focus:ring-2 focus:ring-[var(--m-brand-soft)] shadow-xs transition-all"
           />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-[var(--m-text-muted)] hover:text-[var(--m-text-primary)]"
+            >
+              ✕
+            </button>
+          )}
         </div>
 
         {/* Filter Chips */}
@@ -209,7 +241,7 @@ export function MobileTasksScreen() {
 
                     <div className="flex items-center gap-2 text-xs text-[var(--m-text-muted)] mt-1.5">
                       {task.deadline && (
-                        <span className="flex items-center gap-1 font-medium">
+                        <span className="flex items-center gap-1 font-medium text-[var(--m-text-secondary)]">
                           <Calendar size={12} className="text-[var(--m-brand-primary)]" />
                           {new Date(task.deadline).toLocaleDateString('vi-VN', {
                             day: 'numeric',
@@ -219,10 +251,12 @@ export function MobileTasksScreen() {
                       )}
 
                       <span
-                        className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
                           task.priority === 'HIGH'
-                            ? 'bg-[var(--m-campus-red-soft)] text-[var(--m-campus-red)]'
-                            : 'bg-[var(--m-surface-subtle)] text-[var(--m-text-secondary)]'
+                            ? 'bg-rose-50 text-rose-600 border border-rose-200'
+                            : task.priority === 'MEDIUM'
+                            ? 'bg-amber-50 text-amber-600 border border-amber-200'
+                            : 'bg-slate-100 text-slate-600 border border-slate-200'
                         }`}
                       >
                         {task.priority || 'MEDIUM'}

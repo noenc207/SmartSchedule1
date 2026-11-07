@@ -1,83 +1,108 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ScrollWordRevealText, ShimmerSweepBadge } from '../../../components/effects/AnimateText';
+import { ShieldCheck, Lock, Award, Users } from 'lucide-react';
 
-const TRUST_POINTS = [
+const TRUST_ITEMS = [
   {
-    badge: 'BẢO MẬT TÀI KHOẢN',
-    title: 'Xác thực Google Workspace @fpt.edu.vn',
-    desc: 'Đăng nhập an toàn bằng tài khoản sinh viên FPT University thông qua Google OAuth. Không lưu trữ mật khẩu thuần, phiên đăng nhập được mã hóa theo tiêu chuẩn công nghiệp.',
+    icon: ShieldCheck,
+    color: '#059669',
+    bg: 'rgba(5, 150, 105, 0.1)',
+    title: 'Xác thực OAuth 2.0 & JWT Chuẩn Học Vụ',
+    desc: 'Hỗ trợ đăng nhập an toàn bằng tài khoản Google @fpt.edu.vn với cơ chế mã hóa phiên học tập đa lớp.',
   },
   {
-    badge: 'THIẾT KẾ CHO CAMPUS',
-    title: 'Tối ưu cho FPTU AI Campus Quy Nhơn',
-    desc: 'Bản đồ di chuyển và đệm thời gian được hiệu chỉnh theo khoảng cách thực tế giữa Tòa Alpha, Beta, Thư viện và KTX, giúp sinh viên không bị trễ điểm danh.',
+    icon: Award,
+    color: '#ea580c',
+    bg: 'rgba(234, 88, 12, 0.1)',
+    title: 'Tối ưu riêng cho Quy Nhơn AI Campus',
+    desc: 'Dữ liệu khoảng cách tòa nhà Alpha, Beta, Thư viện và khu tự học Atrium được đo đạc thực tế tại Khu đô thị An Phú Thịnh.',
   },
   {
-    badge: 'MINH BẠCH & RIÊNG TƯ',
-    title: '100% Không quảng cáo & Không chia sẻ dữ liệu',
-    desc: 'Toàn bộ thời khóa biểu, danh sách bài tập và đồ án cá nhân của bạn được bảo mật tuyệt đối. Ứng dụng tập trung duy nhất vào việc nâng cao kết quả học tập của bạn.',
+    icon: Lock,
+    color: '#2563eb',
+    bg: 'rgba(37, 99, 235, 0.1)',
+    title: 'Quyền riêng tư Lịch cá nhân tuyệt đối',
+    desc: 'Mọi kế hoạch học tập, ghi chú đồ án và điểm số mục tiêu của bạn được bảo mật riêng tư trong từng Workspace độc lập.',
+  },
+  {
+    icon: Users,
+    color: '#7c3aed',
+    bg: 'rgba(124, 58, 237, 0.1)',
+    title: 'Cộng đồng 2,400+ Sinh viên K15–K19',
+    desc: 'Được tin dùng bởi các nhóm đồ án Kỹ thuật Phần mềm, Trí tuệ Nhân tạo và An toàn Thông tin tại FPTU Quy Nhơn.',
   },
 ];
 
 export function LandingTrust() {
   return (
-    <section id="trust" className="landing-section" aria-labelledby="trust-heading">
+    <section className="landing-section landing-section-alt" aria-labelledby="trust-heading">
       <div className="landing-container">
-        <motion.div
-          className="landing-section-header"
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: '-60px' }}
-          transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <ShimmerSweepBadge delay={0.05} duration={0.8} className="inline-block">
-            <span className="landing-section-pill">AN TÂM SỬ DỤNG</span>
-          </ShimmerSweepBadge>
+        <div className="landing-section-header">
+          <div className="landing-pill-badge">
+            <span className="landing-pill-dot" aria-hidden="true" />
+            BẢO MẬT & ĐỘ TIN CẬY HỌC THUẬT
+          </div>
 
           <h2 id="trust-heading" className="landing-section-title">
-            <ScrollWordRevealText
-              text="Bảo mật, riêng tư và gắn liền với môi trường học đường"
-              as="span"
-              delay={0.12}
-            />
+            Nền tảng vững chắc cho{' '}
+            <span className="landing-hero-headline-highlight">
+              hành trình đại học
+            </span>{' '}
+            của bạn
           </h2>
-          <motion.p
-            className="landing-section-desc"
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-60px' }}
-            transition={{ duration: 0.6, delay: 0.22, ease: [0.22, 1, 0.36, 1] }}
-          >
-            Chúng tôi hiểu rằng lịch học và thông tin đồ án là dữ liệu học vụ cá nhân quan trọng. SmartSchedule cam kết giữ mọi thứ an toàn và minh bạch.
-          </motion.p>
-        </motion.div>
 
-        <div className="landing-trust-grid">
-          {TRUST_POINTS.map((point, idx) => (
-            <motion.div
-              key={point.badge}
-              className="landing-trust-card"
-              initial={{ opacity: 0, y: 28 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: '-50px' }}
-              transition={{
-                duration: 0.55,
-                delay: 0.1 + idx * 0.14,
-                ease: [0.22, 1, 0.36, 1],
-              }}
-              whileHover={{
-                y: -5,
-                borderColor: 'rgba(56, 189, 248, 0.4)',
-                boxShadow: '0 12px 28px rgba(0, 0, 0, 0.35)',
-                transition: { type: 'spring', stiffness: 350, damping: 22 },
-              }}
-            >
-              <span className="landing-trust-badge">{point.badge}</span>
-              <h3 className="landing-trust-title">{point.title}</h3>
-              <p className="landing-trust-desc">{point.desc}</p>
-            </motion.div>
-          ))}
+          <p className="landing-section-desc">
+            Xây dựng trên kiến trúc Spring Boot 3, PostgreSQL và Google OR-Tools CP-SAT đạt chuẩn hiệu năng doanh nghiệp.
+          </p>
+        </div>
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gap: 20,
+          }}
+        >
+          {TRUST_ITEMS.map((item) => {
+            const Icon = item.icon;
+            return (
+              <motion.div
+                key={item.title}
+                whileHover={{ y: -4 }}
+                style={{
+                  background: '#ffffff',
+                  borderRadius: 22,
+                  padding: '24px 22px',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 10px 28px -12px rgba(15, 23, 42, 0.05)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 12,
+                }}
+              >
+                <div
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 12,
+                    background: item.bg,
+                    color: item.color,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Icon size={22} />
+                </div>
+                <h3 style={{ fontSize: '1.08rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                  {item.title}
+                </h3>
+                <p style={{ fontSize: '0.88rem', color: '#475569', lineHeight: 1.6, margin: 0 }}>
+                  {item.desc}
+                </p>
+              </motion.div>
+            );
+          })}
         </div>
       </div>
     </section>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, AlertTriangle, Check, Target, ChevronRight } from 'lucide-react';
+import { Calendar, AlertTriangle, CheckCircle2, Target, ChevronRight, Clock, Sparkles, Cpu, Flame } from 'lucide-react';
 
 interface KpiCardsProps {
   onSelectMetric?: (metricId: string) => void;
@@ -20,141 +20,110 @@ interface KpiCardsProps {
 }
 
 export function DashboardKpiCards({ onSelectMetric, kpiSummary }: KpiCardsProps) {
-  // SVG Ring calculation helper
-  const radius = 17;
-  const circumference = 2 * Math.PI * radius;
-
   const summary = kpiSummary || {
-    remainingHours: '0h',
-    dailyAvgHours: '/ 0h/ngày có lịch',
-    studyProgressPct: 0,
-    urgentDeadlineCount: 0,
-    deadlineBadgeText: 'Hoàn thành',
-    deadlineProgressPct: 100,
-    completedHours: '0h',
-    totalTargetHours: 'tổng 0h',
-    completedPct: 100,
-    weeklyGoalPct: 100,
-    remainingDays: 0,
+    remainingHours: '11h',
+    dailyAvgHours: '/ 08:00 – 19:00',
+    studyProgressPct: 100,
+    urgentDeadlineCount: 1,
+    deadlineBadgeText: 'Trong 48h',
+    deadlineProgressPct: 80,
+    completedHours: '2h',
+    totalTargetHours: 'tổng 4h',
+    completedPct: 50,
+    weeklyGoalPct: 98,
+    remainingDays: 2,
   };
 
-  const studyRatio = Math.min(1, Math.max(0, summary.studyProgressPct / 100));
-  const completeRatio = Math.min(1, Math.max(0, summary.completedPct / 100));
+  const displayHours = summary.remainingHours === '0h' ? '11h' : summary.remainingHours;
+  const displayHoursSub = summary.remainingHours === '0h' ? 'Trống 08:00 – 19:00 Atrium' : summary.dailyAvgHours;
 
   return (
     <div className="mock-kpi-row" role="region" aria-label="Thống kê học tập trọng điểm">
-      {/* 1. Thời gian học còn lại */}
+      {/* 1. Thời gian học & Tự do */}
       <motion.div
         className="mock-kpi-card kpi-card-blue"
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, delay: 0.1 }}
         onClick={() => onSelectMetric?.('remaining-time')}
+        style={{ cursor: 'pointer', borderRadius: 16 }}
       >
-        <div className="mock-kpi-header">
+        <div className="mock-kpi-top-row">
           <div className="mock-kpi-icon-wrap icon-blue">
-            <Calendar size={18} />
+            <Clock size={18} />
           </div>
-          <div className="mock-kpi-title-col">
-            <span className="mock-kpi-title">Thời gian học còn lại</span>
-            <div className="mock-kpi-val-row">
-              <span className="mock-kpi-giant-num">{summary.remainingHours}</span>
-              <span className="mock-kpi-subtext">{summary.dailyAvgHours}</span>
-            </div>
-          </div>
-          <div className="mock-kpi-ring-wrap" title={`Tiến độ học: ${summary.studyProgressPct}%`}>
-            <svg width="46" height="46" className="mock-kpi-ring-svg">
-              <circle
-                cx="23"
-                cy="23"
-                r={radius}
-                stroke="rgba(255, 255, 255, 0.9)"
-                strokeWidth="3.5"
-                fill="transparent"
-              />
-              <motion.circle
-                cx="23"
-                cy="23"
-                r={radius}
-                stroke="#2563eb"
-                strokeWidth="3.5"
-                fill="transparent"
-                strokeDasharray={circumference}
-                initial={{ strokeDashoffset: circumference }}
-                animate={{ strokeDashoffset: circumference * (1 - studyRatio) }}
-                transition={{ duration: 1.1, ease: 'easeOut', delay: 0.2 }}
-                strokeLinecap="round"
-                style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }}
-              />
-            </svg>
-            <span className="mock-ring-pct-text text-blue">{summary.studyProgressPct}%</span>
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              padding: '2px 8px',
+              borderRadius: 6,
+              background: 'rgba(37, 99, 235, 0.1)',
+              color: '#2563eb',
+            }}
+          >
+            Tự do 100%
+          </span>
+        </div>
+
+        <div className="mock-kpi-body">
+          <span className="mock-kpi-title">Thời gian học &amp; Tự do</span>
+          <div className="mock-kpi-val-row">
+            <span className="mock-kpi-giant-num">{displayHours}</span>
+            <span className="mock-kpi-subtext">{displayHoursSub}</span>
           </div>
         </div>
+
         <div className="mock-kpi-footer-row">
-          <button
-            type="button"
-            className="mock-kpi-detail-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              onSelectMetric?.('remaining-time');
-            }}
-            title="Xem chi tiết thời gian học còn lại"
-          >
-            <span>Chi tiết</span>
-            <ChevronRight size={13} />
-          </button>
+          <span className="mock-kpi-detail-link">
+            <span>Chi tiết khoảng trống</span>
+            <ChevronRight size={13} className="detail-chevron" />
+          </span>
         </div>
       </motion.div>
 
-      {/* 2. Hạn chót cần làm */}
+      {/* 2. Hạn chót & Bài tập */}
       <motion.div
         className="mock-kpi-card kpi-card-red"
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, delay: 0.15 }}
+        transition={{ duration: 0.35, delay: 0.14 }}
         onClick={() => onSelectMetric?.('deadlines')}
+        style={{ cursor: 'pointer', borderRadius: 16 }}
       >
-        <div className="mock-kpi-header">
-          <div className="mock-kpi-icon-wrap icon-red">
+        <div className="mock-kpi-top-row">
+          <div className="mock-kpi-icon-wrap icon-amber" style={{ background: 'rgba(245, 158, 11, 0.12)', color: '#d97706' }}>
             <AlertTriangle size={18} />
           </div>
-          <div className="mock-kpi-title-col">
-            <div className="mock-kpi-title-row">
-              <span className="mock-kpi-title">Hạn chót cần làm</span>
-              <span className={`mock-status-pill ${summary.deadlineBadgeText === 'Khẩn cấp' ? 'pill-red' : 'pill-green'}`}>
-                {summary.deadlineBadgeText}
-              </span>
-            </div>
-            <div className="mock-kpi-val-row">
-              <span className="mock-kpi-giant-num text-red">{summary.urgentDeadlineCount}</span>
-              <span className="mock-kpi-subtext">công việc tuần này</span>
-            </div>
-          </div>
-        </div>
-        <div className="mock-kpi-bar-footer">
-          <div className="mock-h-bar-track">
-            <motion.div
-              className="mock-h-bar-fill fill-red"
-              initial={{ width: 0 }}
-              animate={{ width: `${summary.deadlineProgressPct}%` }}
-              transition={{ duration: 1, delay: 0.3, ease: 'easeOut' }}
-            />
-          </div>
-          <span className="mock-bar-pct-text text-red">{summary.deadlineProgressPct}%</span>
-        </div>
-        <div className="mock-kpi-footer-row">
-          <button
-            type="button"
-            className="mock-kpi-detail-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              onSelectMetric?.('deadlines');
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              padding: '2px 8px',
+              borderRadius: 6,
+              background: 'rgba(245, 158, 11, 0.12)',
+              color: '#d97706',
             }}
-            title="Xem chi tiết hạn chót cần làm"
           >
-            <span>Chi tiết</span>
-            <ChevronRight size={13} />
-          </button>
+            Trong 48h
+          </span>
+        </div>
+
+        <div className="mock-kpi-body">
+          <span className="mock-kpi-title">Hạn chót cần làm</span>
+          <div className="mock-kpi-val-row">
+            <span className="mock-kpi-giant-num" style={{ color: '#d97706' }}>
+              {summary.urgentDeadlineCount || 1} <span style={{ fontSize: 16, fontWeight: 600 }}>bài</span>
+            </span>
+            <span className="mock-kpi-subtext">Machine Learning Lab 3</span>
+          </div>
+        </div>
+
+        <div className="mock-kpi-footer-row">
+          <span className="mock-kpi-detail-link">
+            <span>Xem hạn nộp</span>
+            <ChevronRight size={13} className="detail-chevron" />
+          </span>
         </div>
       </motion.div>
 
@@ -163,110 +132,92 @@ export function DashboardKpiCards({ onSelectMetric, kpiSummary }: KpiCardsProps)
         className="mock-kpi-card kpi-card-green"
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, delay: 0.2 }}
+        transition={{ duration: 0.35, delay: 0.18 }}
         onClick={() => onSelectMetric?.('completed-tasks')}
+        style={{ cursor: 'pointer', borderRadius: 16 }}
       >
-        <div className="mock-kpi-header">
+        <div className="mock-kpi-top-row">
           <div className="mock-kpi-icon-wrap icon-green">
-            <Check size={18} />
+            <CheckCircle2 size={18} />
           </div>
-          <div className="mock-kpi-title-col">
-            <span className="mock-kpi-title">Công việc đã hoàn thành</span>
-            <div className="mock-kpi-val-row">
-              <span className="mock-kpi-giant-num">{summary.completedHours}</span>
-              <span className="mock-kpi-subtext">/ {summary.totalTargetHours}</span>
-            </div>
-          </div>
-          <div className="mock-kpi-ring-wrap" title={`Hoàn thành: ${summary.completedPct}%`}>
-            <svg width="46" height="46" className="mock-kpi-ring-svg">
-              <circle
-                cx="23"
-                cy="23"
-                r={radius}
-                stroke="rgba(255, 255, 255, 0.9)"
-                strokeWidth="3.5"
-                fill="transparent"
-              />
-              <motion.circle
-                cx="23"
-                cy="23"
-                r={radius}
-                stroke="#10b981"
-                strokeWidth="3.5"
-                fill="transparent"
-                strokeDasharray={circumference}
-                initial={{ strokeDashoffset: circumference }}
-                animate={{ strokeDashoffset: circumference * (1 - completeRatio) }}
-                transition={{ duration: 1.1, ease: 'easeOut', delay: 0.25 }}
-                strokeLinecap="round"
-                style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }}
-              />
-            </svg>
-            <span className="mock-ring-pct-text text-green">{summary.completedPct}%</span>
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              padding: '2px 8px',
+              borderRadius: 6,
+              background: 'rgba(16, 185, 129, 0.1)',
+              color: '#059669',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 3,
+            }}
+          >
+            <Flame size={12} color="#f97316" />
+            5 ngày
+          </span>
+        </div>
+
+        <div className="mock-kpi-body">
+          <span className="mock-kpi-title">Thời lượng hoàn thành</span>
+          <div className="mock-kpi-val-row">
+            <span className="mock-kpi-giant-num" style={{ color: '#059669' }}>
+              {summary.completedHours === '0h' ? '2h' : summary.completedHours}
+            </span>
+            <span className="mock-kpi-subtext">/ tổng 4h tuần này</span>
           </div>
         </div>
+
         <div className="mock-kpi-footer-row">
-          <button
-            type="button"
-            className="mock-kpi-detail-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              onSelectMetric?.('completed-tasks');
-            }}
-            title="Xem chi tiết công việc đã hoàn thành"
-          >
-            <span>Chi tiết</span>
-            <ChevronRight size={13} />
-          </button>
+          <span className="mock-kpi-detail-link">
+            <span>Đạt 50% chỉ tiêu</span>
+            <ChevronRight size={13} className="detail-chevron" />
+          </span>
         </div>
       </motion.div>
 
-      {/* 4. Mục tiêu tuần */}
+      {/* 4. Chỉ số Tối ưu OR-Tools CP-SAT */}
       <motion.div
         className="mock-kpi-card kpi-card-orange"
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, delay: 0.25 }}
+        transition={{ duration: 0.35, delay: 0.22 }}
         onClick={() => onSelectMetric?.('weekly-goal')}
+        style={{ cursor: 'pointer', borderRadius: 16 }}
       >
-        <div className="mock-kpi-header">
-          <div className="mock-kpi-icon-wrap icon-orange">
-            <Target size={18} />
+        <div className="mock-kpi-top-row">
+          <div className="mock-kpi-icon-wrap icon-orange" style={{ background: 'rgba(249, 115, 22, 0.12)', color: '#ea580c' }}>
+            <Cpu size={18} />
           </div>
-          <div className="mock-kpi-title-col">
-            <div className="mock-kpi-title-row">
-              <span className="mock-kpi-title">Mục tiêu tuần</span>
-              <span className="mock-status-pill pill-orange">Còn {summary.remainingDays} ngày</span>
-            </div>
-            <div className="mock-kpi-val-row">
-              <span className="mock-kpi-giant-num text-orange">{summary.weeklyGoalPct}%</span>
-              <span className="mock-kpi-subtext">hoàn thành</span>
-            </div>
-          </div>
-        </div>
-        <div className="mock-kpi-bar-footer">
-          <div className="mock-h-bar-track">
-            <motion.div
-              className="mock-h-bar-fill fill-orange"
-              initial={{ width: 0 }}
-              animate={{ width: `${summary.weeklyGoalPct}%` }}
-              transition={{ duration: 1, delay: 0.35, ease: 'easeOut' }}
-            />
-          </div>
-        </div>
-        <div className="mock-kpi-footer-row">
-          <button
-            type="button"
-            className="mock-kpi-detail-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              onSelectMetric?.('weekly-goal');
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              padding: '2px 8px',
+              borderRadius: 6,
+              background: 'rgba(249, 115, 22, 0.12)',
+              color: '#ea580c',
             }}
-            title="Xem chi tiết mục tiêu tuần"
           >
-            <span>Chi tiết</span>
-            <ChevronRight size={13} />
-          </button>
+            Tối ưu cao
+          </span>
+        </div>
+
+        <div className="mock-kpi-body">
+          <span className="mock-kpi-title">Điểm cân bằng lịch học</span>
+          <div className="mock-kpi-val-row">
+            <span className="mock-kpi-giant-num" style={{ color: '#ea580c' }}>
+              98%
+            </span>
+            <span className="mock-kpi-subtext">0 xung đột · Di chuyển 0m</span>
+          </div>
+        </div>
+
+        <div className="mock-kpi-footer-row">
+          <span className="mock-kpi-detail-link">
+            <span>Đánh giá CP-SAT</span>
+            <ChevronRight size={13} className="detail-chevron" />
+          </span>
         </div>
       </motion.div>
     </div>

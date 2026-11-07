@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutGrid, Calendar, Plus, Sparkles, BarChart2 } from 'lucide-react';
+import { LayoutGrid, Calendar, Plus, Sparkles, BarChart2, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export function QuickActionsCard() {
@@ -10,28 +10,32 @@ export function QuickActionsCard() {
     {
       id: 'a1',
       title: 'Tạo lịch học',
-      icon: <Calendar size={16} className="text-orange" />,
+      desc: 'Xếp lịch thông minh',
+      icon: <Calendar size={17} className="text-orange-500" />,
       colorClass: 'action-orange',
       route: '/scheduling',
     },
     {
       id: 'a2',
-      title: 'Thêm công việc',
-      icon: <Plus size={16} className="text-blue" />,
+      title: 'Thêm bài tập',
+      desc: 'Quản lý hạn nộp',
+      icon: <Plus size={17} className="text-blue-500" />,
       colorClass: 'action-blue',
       route: '/tasks',
     },
     {
       id: 'a3',
-      title: 'Lên kế hoạch',
-      icon: <Sparkles size={16} className="text-purple" />,
+      title: 'Tối ưu AI',
+      desc: 'Giải quyết xung đột',
+      icon: <Sparkles size={17} className="text-purple-500" />,
       colorClass: 'action-purple',
       route: '/rescheduling',
     },
     {
       id: 'a4',
       title: 'Xem báo cáo',
-      icon: <BarChart2 size={16} className="text-green" />,
+      desc: 'Phân tích hiệu suất',
+      icon: <BarChart2 size={17} className="text-emerald-500" />,
       colorClass: 'action-green',
       route: '/analytics',
     },
@@ -46,7 +50,7 @@ export function QuickActionsCard() {
     >
       <div className="mock-card-header">
         <div className="mock-card-title-group">
-          <LayoutGrid size={16} className="mock-header-icon" />
+          <LayoutGrid size={16} className="mock-header-icon text-indigo-500" />
           <h2 className="mock-card-title">Hành động nhanh</h2>
         </div>
       </div>
@@ -60,13 +64,17 @@ export function QuickActionsCard() {
             onClick={() => navigate(act.route)}
           >
             <div className="mock-tile-left">
-              <span className="mock-tile-icon">{act.icon}</span>
-              <span className="mock-tile-label">{act.title}</span>
+              <span className="mock-tile-icon-box">{act.icon}</span>
+              <div className="mock-tile-text-col">
+                <span className="mock-tile-label">{act.title}</span>
+                <span className="mock-tile-desc">{act.desc}</span>
+              </div>
             </div>
-            <span className="mock-tile-check-box" />
+            <ChevronRight size={14} className="mock-tile-chevron" />
           </button>
         ))}
       </div>
     </motion.div>
   );
 }
+

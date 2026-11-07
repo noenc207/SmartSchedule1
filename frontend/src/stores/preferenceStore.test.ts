@@ -8,7 +8,7 @@ describe('preferenceStore', () => {
 
   it('initializes with default preferences', () => {
     const state = usePreferenceStore.getState();
-    expect(state.calendarView).toBe('timeGridWeek');
+    expect(state.calendarView).toBe('slotGrid');
     expect(state.taskFilterStatus).toBe('ALL');
     expect(state.taskFilterPriority).toBe('ALL');
     expect(state.taskSortBy).toBe('DEADLINE');

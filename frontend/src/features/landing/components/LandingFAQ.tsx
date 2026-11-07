@@ -1,107 +1,124 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ScrollWordRevealText, ShimmerSweepBadge } from '../../../components/effects/AnimateText';
+import { ChevronDown, HelpCircle } from 'lucide-react';
 
 const FAQS = [
   {
-    q: 'SmartSchedule có hoàn toàn miễn phí cho sinh viên không?',
-    a: 'Có. Tất cả sinh viên FPT University đều có thể đăng ký và sử dụng toàn bộ tính năng quản lý lịch học, xếp slot tự học, phát hiện xung đột và trợ lý học vụ AI hoàn toàn miễn phí.',
+    q: 'SmartSchedule có miễn phí cho sinh viên FPT University không?',
+    a: 'Hoàn toàn miễn phí! Sinh viên FPT University Quy Nhơn (từ K15 đến K19) được sử dụng đầy đủ tính năng xếp lịch tự động OR-Tools CP-SAT, trợ lý Cóc AI và quản lý đồ án mà không giới hạn.',
   },
   {
-    q: 'Làm thế nào để tôi nhập thời khóa biểu kỳ mới vào ứng dụng?',
-    a: 'Bạn có thể nhập danh sách các môn và mã lớp theo kỳ từ cổng FAP. Hệ thống được lập trình sẵn chuẩn 6 slot của trường nên các môn học sẽ lập tức vào đúng phòng và giờ tương ứng.',
+    q: 'Khi giảng viên đổi lịch học hoặc thêm ca học bù trên FAP thì sao?',
+    a: 'Bạn chỉ cần cập nhật ca học mới, hệ thống Lá chắn Xung đột của SmartSchedule sẽ tự động phát hiện các phiên tự học bị đè giờ và chuyển chúng sang slot trống gần nhất trong tuần chỉ với 1 cú nhấp chuột.',
   },
   {
-    q: 'Đệm di chuyển (Transit Buffer) giữa các tòa nhà hoạt động ra sao?',
-    a: 'Nếu bạn có Slot 1 tại Tòa Alpha và Slot 2 tại Tòa Beta, SmartSchedule sẽ tính toán khoảng đệm 15 phút nghỉ ngơi và di chuyển, đồng thời ngăn việc xếp lịch tự học xen ngang vào quãng thời gian này.',
+    q: 'Hệ thống tính đệm di chuyển giữa Tòa Alpha và Beta như thế nào?',
+    a: 'Thuật toán định tuyến nội khu tính sẵn khoảng cách đi bộ thực tế (280m ~ 4.2 phút đi bộ giữa Alpha và Beta) và tự động giữ trống 15 phút chuyển tiếp giữa hai ca học liên tiếp để bạn không bao giờ bị trễ điểm danh.',
   },
   {
-    q: 'Nếu có lịch thi hoặc buổi họp đồ án đột xuất thì giải quyết thế nào?',
-    a: 'Chỉ cần thêm sự kiện mới hoặc bật tính năng "Giải quyết xung đột", hệ thống sẽ tự động quét các khung giờ trống còn lại trong tuần và dời các khối tự học sang vị trí mới tối ưu nhất.',
-  },
-  {
-    q: 'Ứng dụng có hỗ trợ giao diện điện thoại di động không?',
-    a: 'Có! Toàn bộ giao diện SmartSchedule được thiết kế theo chuẩn responsive mobile-first, hiển thị sắc nét trên cả điện thoại, máy tính bảng và màn hình máy tính để bàn.',
+    q: 'Mình có thể dùng chung lịch để tìm giờ họp nhóm Đồ án SWP391 / Capstone không?',
+    a: 'Có! Cóc AI hỗ trợ đối chiếu các slot trống giữa các thành viên trong nhóm để gợi ý khung giờ họp nhóm tối ưu nhất tại khu tự học Atrium hoặc phòng thảo luận thư viện.',
   },
 ];
 
 export function LandingFAQ() {
-  const [openIndex, setOpenIndex] = useState<number | null>(0);
-
-  const toggle = (idx: number) => {
-    setOpenIndex((curr) => (curr === idx ? null : idx));
-  };
+  const [openIdx, setOpenIdx] = useState<number | null>(0);
 
   return (
-    <section id="faq" className="landing-section landing-section-alt" aria-labelledby="faq-heading">
-      <div className="landing-container">
-        <motion.div
-          className="landing-section-header"
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: '-60px' }}
-          transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <ShimmerSweepBadge delay={0.05} duration={0.8} className="inline-block">
-            <span className="landing-section-pill">GIẢI ĐÁP THẮC MẮC</span>
-          </ShimmerSweepBadge>
+    <section id="faq" className="landing-section" aria-labelledby="faq-heading">
+      <div className="landing-container" style={{ maxWidth: 880 }}>
+        <div className="landing-section-header">
+          <div className="landing-pill-badge">
+            <span className="landing-pill-dot" aria-hidden="true" />
+            GIẢI ĐÁP THẮC MẮC NHANH
+          </div>
 
           <h2 id="faq-heading" className="landing-section-title">
-            <ScrollWordRevealText
-              text="Câu hỏi thường gặp của sinh viên"
-              as="span"
-              delay={0.12}
-            />
+            Câu hỏi thường gặp từ{' '}
+            <span className="landing-hero-headline-highlight">
+              sinh viên FPTU
+            </span>
           </h2>
-          <motion.p
-            className="landing-section-desc"
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-60px' }}
-            transition={{ duration: 0.6, delay: 0.22, ease: [0.22, 1, 0.36, 1] }}
-          >
-            Những thông tin cần biết để bạn bắt đầu tối ưu hóa thời gian học tập hiệu quả nhất.
-          </motion.p>
-        </motion.div>
 
-        <div className="landing-faq-container">
-          {FAQS.map((faq, idx) => {
-            const isOpen = openIndex === idx;
+          <p className="landing-section-desc">
+            Mọi điều bạn cần biết trước khi bắt đầu tối ưu hóa kỳ học của mình cùng SmartSchedule.
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {FAQS.map((item, idx) => {
+            const isOpen = openIdx === idx;
             return (
-              <motion.div
-                key={faq.q}
-                className="landing-faq-item"
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: '-40px' }}
-                transition={{ duration: 0.45, delay: 0.08 + idx * 0.08, ease: [0.22, 1, 0.36, 1] }}
+              <div
+                key={item.q}
+                style={{
+                  background: '#ffffff',
+                  borderRadius: 20,
+                  border: isOpen ? '1.5px solid #ea580c' : '1px solid #e2e8f0',
+                  boxShadow: isOpen
+                    ? '0 14px 32px -12px rgba(234, 88, 12, 0.14)'
+                    : '0 4px 14px rgba(15, 23, 42, 0.03)',
+                  overflow: 'hidden',
+                  transition: 'all 0.2s ease',
+                }}
               >
                 <button
                   type="button"
-                  className="landing-faq-question"
-                  onClick={() => toggle(idx)}
+                  onClick={() => setOpenIdx(isOpen ? null : idx)}
                   aria-expanded={isOpen}
+                  style={{
+                    width: '100%',
+                    appearance: 'none',
+                    border: 'none',
+                    background: 'transparent',
+                    padding: '20px 24px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 16,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
                 >
-                  <span>{faq.q}</span>
-                  <span className={`landing-faq-icon ${isOpen ? 'expanded' : ''}`} aria-hidden="true">
-                    +
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <HelpCircle size={18} color={isOpen ? '#ea580c' : '#64748b'} style={{ flexShrink: 0 }} />
+                    <span style={{ fontSize: '1.02rem', fontWeight: 800, color: '#0f172a' }}>
+                      {item.q}
+                    </span>
+                  </div>
+                  <ChevronDown
+                    size={18}
+                    color={isOpen ? '#ea580c' : '#64748b'}
+                    style={{
+                      transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                      transition: 'transform 0.2s ease',
+                      flexShrink: 0,
+                    }}
+                  />
                 </button>
-                <AnimatePresence>
+
+                <AnimatePresence initial={false}>
                   {isOpen && (
                     <motion.div
-                      className="landing-faq-answer"
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-                      style={{ overflow: 'hidden' }}
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.22 }}
                     >
-                      {faq.a}
+                      <div
+                        style={{
+                          padding: '0 24px 20px 54px',
+                          fontSize: '0.94rem',
+                          color: '#475569',
+                          lineHeight: 1.65,
+                        }}
+                      >
+                        {item.a}
+                      </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
-              </motion.div>
+              </div>
             );
           })}
         </div>

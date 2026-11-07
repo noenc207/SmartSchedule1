@@ -1,198 +1,275 @@
-import React, { Suspense } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Canvas } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
-import * as THREE from 'three';
-import { MascotModel, GeometricMascotFallback } from './MascotModel';
-import { SoftBlurInText, ShimmerSweepBadge } from '../../../components/effects/AnimateText';
+import { Sparkles, CheckCircle2, ArrowRight } from 'lucide-react';
+import { BorderBeam } from '../../../components/ui/border-beam';
+import { HeroScene } from './HeroScene';
 
 export function ClosingScene() {
   const navigate = useNavigate();
+  const [celebratePulse, setCelebratePulse] = useState(0);
 
   return (
     <section className="landing-closing-section" aria-labelledby="closing-heading">
       <div className="landing-container">
-        <motion.div
-          className="landing-closing-card"
-          initial={{ opacity: 0, y: 36 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: '-60px' }}
-          transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
+        <div
+          style={{
+            position: 'relative',
+            borderRadius: 32,
+            background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 55%, #0f172a 100%)',
+            border: '1px solid rgba(148, 163, 184, 0.25)',
+            boxShadow: '0 32px 72px -18px rgba(15, 23, 42, 0.35)',
+            padding: '48px 44px',
+            overflow: 'hidden',
+            color: '#f8fafc',
+          }}
         >
-          <div className="landing-closing-grid">
-            {/* Left: Text & Actions */}
-            <div className="landing-closing-content">
-              <ShimmerSweepBadge delay={0.08} duration={0.8} className="inline-block">
-                <span className="landing-pill-badge" style={{ background: 'rgba(234, 88, 12, 0.08)' }}>
-                  <span className="landing-pill-dot" aria-hidden="true" />
-                  SẴN SÀNG CHO KỲ HỌC TIẾP THEO
-                </span>
-              </ShimmerSweepBadge>
+          <BorderBeam size={320} duration={12} colorFrom="#f97316" colorTo="#38bdf8" />
 
-              <h2 id="closing-heading" className="landing-closing-title">
-                <SoftBlurInText
-                  text="Bắt đầu một ngày học rõ ràng, chủ động cùng "
-                  delay={0.15}
-                  duration={0.85}
-                  stagger={0.02}
-                  trigger="inView"
-                />
-                <span className="landing-hero-headline-highlight">
-                  <SoftBlurInText
-                    text="SmartSchedule"
-                    delay={0.4}
-                    duration={0.85}
-                    stagger={0.02}
-                    highlight={true}
-                    trigger="inView"
-                  />
+          {/* Ambient Campus Photography Backdrop Overlay */}
+          <div
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: 'url(/banner/hero_bg_landscape.png)',
+              backgroundSize: 'cover',
+              backgroundPosition: 'center right',
+              opacity: 0.16,
+              pointerEvents: 'none',
+            }}
+          />
+
+          <div
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background:
+                'linear-gradient(90deg, rgba(15, 23, 42, 0.96) 0%, rgba(15, 23, 42, 0.88) 55%, rgba(15, 23, 42, 0.72) 100%)',
+              pointerEvents: 'none',
+            }}
+          />
+
+          <div
+            style={{
+              position: 'relative',
+              zIndex: 2,
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+              gap: 36,
+              alignItems: 'center',
+            }}
+          >
+            {/* Left Column: Headline & CTAs */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  alignSelf: 'flex-start',
+                  padding: '6px 14px',
+                  borderRadius: 999,
+                  background: 'rgba(249, 115, 22, 0.18)',
+                  border: '1px solid rgba(249, 115, 22, 0.45)',
+                  color: '#fdba74',
+                  fontSize: '0.76rem',
+                  fontWeight: 800,
+                  letterSpacing: '0.05em',
+                }}
+              >
+                <Sparkles size={13} />
+                SẴN SÀNG CHO KỲ HỌC BỨT PHÁ TẠI FPTU
+              </div>
+
+              <h2
+                id="closing-heading"
+                style={{
+                  fontSize: 'clamp(1.95rem, 3.4vw, 2.75rem)',
+                  fontWeight: 900,
+                  lineHeight: 1.15,
+                  letterSpacing: '-0.03em',
+                  color: '#ffffff',
+                  margin: 0,
+                }}
+              >
+                Bắt đầu một kỳ học rõ ràng, chủ động cùng{' '}
+                <span
+                  style={{
+                    background: 'linear-gradient(135deg, #fb923c 0%, #f97316 50%, #38bdf8 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                  }}
+                >
+                  SmartSchedule
                 </span>
               </h2>
 
-              <motion.p
-                className="landing-closing-desc"
-                initial={{ opacity: 0, y: 16 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.65, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
+              <p
+                style={{
+                  fontSize: '1.02rem',
+                  color: '#cbd5e1',
+                  lineHeight: 1.65,
+                  margin: 0,
+                  maxWidth: 560,
+                }}
               >
-                Trải nghiệm trọn vẹn sức mạnh xếp lịch thông minh: từ nhận diện xung đột 6 slot học, tự động tính toán đệm di chuyển giữa các tòa nhà campus đến nhắc nhở deadline đồ án Capstone theo nhịp sinh học.
-              </motion.p>
+                Trải nghiệm trọn vẹn sức mạnh xếp lịch thông minh: từ nhận diện xung đột 6 slot học, tự động tính toán đệm di chuyển giữa Tòa Alpha – Beta đến chia nhỏ tiến độ đồ án Capstone theo nhịp sinh học.
+              </p>
 
-              <motion.div
-                className="landing-hero-cta-group"
-                initial={{ opacity: 0, y: 16 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.38, ease: [0.22, 1, 0.36, 1] }}
-              >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginTop: 4 }}>
                 <motion.button
                   type="button"
-                  className="landing-btn-hero-primary"
                   onClick={() => navigate('/register')}
-                  whileHover={{ scale: 1.025, boxShadow: '0 0 28px rgba(234, 88, 12, 0.55)' }}
+                  whileHover={{ scale: 1.025 }}
                   whileTap={{ scale: 0.975 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                  style={{
+                    appearance: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '15px 28px',
+                    borderRadius: 14,
+                    fontSize: '0.98rem',
+                    fontWeight: 800,
+                    color: '#ffffff',
+                    background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                    boxShadow: '0 12px 28px -4px rgba(234, 88, 12, 0.5)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                  }}
                 >
-                  Tạo tài khoản sinh viên FPTU →
+                  <span>Tạo tài khoản sinh viên FPTU</span>
+                  <ArrowRight size={16} />
                 </motion.button>
+
                 <motion.button
                   type="button"
-                  className="landing-btn-hero-secondary"
                   onClick={() => navigate('/login')}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                  style={{
+                    appearance: 'none',
+                    cursor: 'pointer',
+                    padding: '15px 24px',
+                    borderRadius: 14,
+                    fontSize: '0.98rem',
+                    fontWeight: 700,
+                    color: '#ffffff',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    border: '1px solid rgba(255, 255, 255, 0.24)',
+                    backdropFilter: 'blur(10px)',
+                  }}
                 >
-                  Đăng nhập với Google
+                  Đăng nhập vào Workspace
                 </motion.button>
-              </motion.div>
+              </div>
 
-              <div className="landing-closing-badges-row">
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18, marginTop: 6 }}>
                 {[
-                  '100% Miễn phí trọn đời cho sinh viên',
-                  'Đăng nhập an toàn @fpt.edu.vn',
-                  'Tương thích mọi thiết bị di động',
-                ].map((text, idx) => (
-                  <motion.div
+                  '100% Miễn phí cho sinh viên FPTU',
+                  'Xác thực an toàn @fpt.edu.vn',
+                  'Đồng bộ tức thì Mobile & Desktop',
+                ].map((text) => (
+                  <div
                     key={text}
-                    className="landing-closing-badge-item"
-                    initial={{ opacity: 0, y: 12 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.5, delay: 0.45 + idx * 0.1 }}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 7,
+                      fontSize: '0.84rem',
+                      color: '#e2e8f0',
+                      fontWeight: 600,
+                    }}
                   >
-                    <span className="landing-closing-check">✓</span>
+                    <CheckCircle2 size={15} color="#34d399" />
                     <span>{text}</span>
-                  </motion.div>
+                  </div>
                 ))}
               </div>
             </div>
 
-            {/* Right: 3D Mascot Showcase Stage */}
-            <motion.div
-              className="landing-closing-stage-wrapper"
-              initial={{ opacity: 0, scale: 0.92 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.75, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            {/* Right Column: Official 3D Cóc AI Mascot & Campus Showcase Card */}
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position: 'relative',
+              }}
             >
               <div
-                className="landing-closing-3d-stage"
-                role="img"
-                aria-label="Tượng Mascot 3D Cóc AI SmartSchedule vẫy chào và khích lệ sinh viên"
-                style={{ width: '100%', height: '420px', position: 'relative' }}
+                style={{
+                  position: 'relative',
+                  width: '100%',
+                  maxWidth: 380,
+                  borderRadius: 24,
+                  padding: '24px 22px',
+                  background: 'rgba(30, 41, 59, 0.85)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  boxShadow: '0 20px 44px rgba(0, 0, 0, 0.35)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  textAlign: 'center',
+                  gap: 12,
+                }}
               >
-                <Canvas
-                  camera={{ position: [0, 0.65, 3.15], fov: 42 }}
-                  shadows
-                  gl={{
-                    antialias: true,
-                    alpha: true,
-                    powerPreference: 'high-performance',
-                    toneMapping: THREE.ACESFilmicToneMapping,
-                    toneMappingExposure: 1.25,
-                  }}
-                  onCreated={({ gl }) => {
-                    gl.domElement.addEventListener('webglcontextlost', (event) => {
-                      event.preventDefault();
-                      console.warn('ClosingScene WebGL context lost handled');
-                    });
+                <span
+                  style={{
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    padding: '4px 12px',
+                    borderRadius: 999,
+                    background: 'rgba(16, 185, 129, 0.18)',
+                    color: '#6ee7b7',
+                    border: '1px solid rgba(16, 185, 129, 0.35)',
                   }}
                 >
-                  {/* Midnight Cosmic Lighting */}
-                  <ambientLight intensity={0.9} color="#111a3a" />
-                  <directionalLight
-                    position={[3, 5, 4]}
-                    intensity={2.4}
-                    color="#f8faff"
-                    castShadow
-                    shadow-mapSize={[1024, 1024]}
-                    shadow-bias={-0.0001}
+                  ● Thư viện & Atrium AI Campus: Đang mở cửa
+                </span>
+
+                <div style={{ width: '100%', height: 240, position: 'relative' }}>
+                  <HeroScene
+                    interactive={true}
+                    activeMode={2}
+                    actionPulse={celebratePulse}
+                    onMascotClick={() => setCelebratePulse((prev) => prev + 1)}
                   />
-                  <directionalLight position={[2.5, 3.5, -3]} intensity={3.0} color="#ff7a32" />
-                  <directionalLight position={[-3, 2.5, -2]} intensity={2.2} color="#9de7ff" />
-                  <pointLight position={[0, -0.2, 0]} intensity={1.5} color="#ea580c" distance={4} />
+                </div>
 
-                  <Suspense fallback={<GeometricMascotFallback scale={0.85} position={[0, -0.15, 0]} />}>
-                    <group position={[0, 0, 0]}>
-                      {/* Dark Cosmic Platform Disc */}
-                      <mesh position={[0, -0.17, 0]} receiveShadow>
-                        <cylinderGeometry args={[1.2, 1.3, 0.04, 64]} />
-                        <meshStandardMaterial color="#0c1226" roughness={0.3} metalness={0.6} />
-                      </mesh>
-                      <mesh position={[0, -0.168, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                        <ringGeometry args={[1.22, 1.28, 64]} />
-                        <meshBasicMaterial color="#ea580c" transparent opacity={0.8} side={THREE.DoubleSide} />
-                      </mesh>
+                <button
+                  type="button"
+                  onClick={() => setCelebratePulse((prev) => prev + 1)}
+                  style={{
+                    appearance: 'none',
+                    border: '1px solid rgba(255, 122, 50, 0.5)',
+                    background: 'rgba(234, 88, 12, 0.22)',
+                    color: '#fed7aa',
+                    fontSize: '0.76rem',
+                    fontWeight: 800,
+                    padding: '5px 14px',
+                    borderRadius: 999,
+                    cursor: 'pointer',
+                  }}
+                >
+                  🎉 Chạm để Cóc 3D nhảy ăn mừng!
+                </button>
 
-                      {/* Mascot facing front with welcoming float */}
-                      <MascotModel
-                        scale={0.92}
-                        position={[0, -0.15, 0]}
-                        rotation={[0, 0, 0]}
-                        floatIntensity={0.85}
-                        interactive={true}
-                      />
-                    </group>
-                  </Suspense>
-
-                  {/* Clamped controls so mascot never turns its back */}
-                  <OrbitControls
-                    enableZoom={false}
-                    enablePan={false}
-                    minAzimuthAngle={-Math.PI / 5}
-                    maxAzimuthAngle={Math.PI / 5}
-                    minPolarAngle={Math.PI / 2.6}
-                    maxPolarAngle={Math.PI / 2.05}
-                    dampingFactor={0.06}
-                  />
-                </Canvas>
+                <div>
+                  <strong style={{ fontSize: '1.08rem', color: '#ffffff', display: 'block' }}>
+                    Cóc 3D đang chờ bạn trong Workspace!
+                  </strong>
+                  <span style={{ fontSize: '0.82rem', color: '#94a3b8' }}>
+                    FPT University Quy Nhơn · Khu đô thị An Phú Thịnh
+                  </span>
+                </div>
               </div>
-            </motion.div>
+            </div>
           </div>
-        </motion.div>
+        </div>
       </div>
     </section>
   );

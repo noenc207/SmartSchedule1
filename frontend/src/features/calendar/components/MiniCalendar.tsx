@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { EventItem, Task } from '../../../types/domain';
 import { DEFAULT_TIMEZONE, formatDate, isSameDay } from '../../../utils/dateTime';
 import { getDailyMetrics } from '../utils/longRangeMetrics';
@@ -46,10 +47,7 @@ export function MiniCalendar({
   };
 
   // Header month title
-  const monthTitle = new Intl.DateTimeFormat('vi-VN', {
-    month: 'long',
-    year: 'numeric',
-  }).format(navDate);
+  const monthTitle = `Tháng ${month + 1}, ${year}`;
 
   // Compute month days grid starting from Monday
   const firstDayOfMonth = new Date(year, month, 1);
@@ -101,7 +99,7 @@ export function MiniCalendar({
           onClick={prevMonth}
           aria-label="Tháng trước"
         >
-          Trước
+          <ChevronLeft size={15} />
         </button>
         <button
           type="button"
@@ -117,7 +115,7 @@ export function MiniCalendar({
           onClick={nextMonth}
           aria-label="Tháng sau"
         >
-          Sau
+          <ChevronRight size={15} />
         </button>
       </div>
 

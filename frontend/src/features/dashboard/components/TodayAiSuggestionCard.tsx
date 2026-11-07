@@ -11,11 +11,35 @@ interface TodayAiSuggestionCardProps {
 export function TodayAiSuggestionCard({ insight }: TodayAiSuggestionCardProps) {
   const navigate = useNavigate();
 
-  const title = insight?.title || 'Gợi ý hôm nay';
-  const desc =
+  const rawTitle = insight?.title || 'Gợi ý học tập hôm nay';
+  const title = rawTitle.includes('You have')
+    ? rawTitle
+        .replace('You have ', 'Bạn có ')
+        .replace('m available this morning', ' phút trống vào buổi sáng')
+        .replace('m available this afternoon', ' phút trống vào buổi chiều')
+        .replace('m available this evening', ' phút trống vào buổi tối')
+    : rawTitle.includes('is due')
+    ? rawTitle.replace(' is due today', ' đến hạn hôm nay').replace(' is due tomorrow', ' đến hạn ngày mai')
+    : rawTitle;
+
+  const rawDesc =
     insight?.description ||
-    'Bạn có 2 giờ trống vào buổi tối. Bạn có muốn dùng để học thêm hoặc làm dự án không?';
-  const actionLabel = insight?.actionLabel || 'Xem gợi ý';
+    'Bạn có khoảng trống lý tưởng trong ngày để tập trung hoàn thành bài tập lớn và đồ án.';
+  const desc = rawDesc.includes('Open window between')
+    ? 'Khoảng trống từ 08:00 – 19:00 hôm nay rất lý tưởng cho phiên tự học sâu hoàn thành đồ án.'
+    : rawDesc;
+
+  const rawAction = insight?.actionLabel || 'Xem gợi ý';
+  const actionLabel =
+    rawAction === 'Schedule Session'
+      ? 'Xếp lịch tự học'
+      : rawAction === 'Balance Schedule'
+      ? 'Cân bằng lịch học'
+      : rawAction === 'View Full Calendar'
+      ? 'Xem toàn bộ lịch'
+      : rawAction === 'Generate Smart Plan'
+      ? 'Tạo kế hoạch thông minh'
+      : rawAction;
   const actionRoute = insight?.actionRoute || '/scheduling';
 
   return (

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, Plus, ArrowRight, BookOpen, Code, Cpu, Languages } from 'lucide-react';
+import { Calendar, Plus, ArrowRight, BookOpen, Code, Cpu, Languages, Sparkles, Clock, Check, Coffee } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { showToast } from '../../../components/Toast';
 
 interface TimetableEventItem {
   id: string;
@@ -11,8 +12,6 @@ interface TimetableEventItem {
   color: 'blue' | 'purple' | 'green' | 'orange';
   iconType: 'book' | 'code' | 'cpu' | 'lang';
 }
-
-
 
 const DAYS_ORDER = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 const DAY_LABELS: Record<string, string> = {
@@ -25,16 +24,12 @@ const DAY_LABELS: Record<string, string> = {
   CN: 'Chủ nhật',
 };
 
-/**
- * Calculates accurate top% and height% relative to 07:00 – 19:00 (12 hours = 720 minutes).
- */
 function computeTimelineCoord(timeStr: string): { topPct: number; heightPct: number } {
   const parts = timeStr.split(' - ');
   if (parts.length !== 2) return { topPct: 0, heightPct: 15 };
   const [startH, startM] = parts[0].trim().split(':').map(Number);
   const [endH, endM] = parts[1].trim().split(':').map(Number);
 
-  // Baseline 07:00 (0m), Max 19:00 (720m)
   const startMin = Math.max(0, (startH - 7) * 60 + (startM || 0));
   const endMin = Math.min(720, (endH - 7) * 60 + (endM || 0));
   const duration = Math.max(endMin - startMin, 40);
@@ -61,11 +56,10 @@ export function WeeklyTimetableCard({
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'week' | 'day' | 'month'>('week');
 
-  // Determine current day key (defaults to today's day of week, e.g. T4 for Wednesday)
   const [internalSelectedDay, setInternalSelectedDay] = useState(() => {
     const todayIndex = new Date().getDay();
     const map = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
-    return map[todayIndex] || 'T4';
+    return map[todayIndex] || 'T6';
   });
 
   const activeDay = propSelectedDay ?? internalSelectedDay;
@@ -78,17 +72,15 @@ export function WeeklyTimetableCard({
     }
   };
 
-  // Dynamic Week Date Range Label (e.g. "Mon, 21/9 – Sun, 27/9")
   const weekRangeLabel = React.useMemo(() => {
     if (weekDates && weekDates.length >= 7) {
       const mon = weekDates[0];
       const sun = weekDates[6];
       return `Mon, ${mon.getDate()}/${mon.getMonth() + 1} – Sun, ${sun.getDate()}/${sun.getMonth() + 1}`;
     }
-    return 'Lịch tuần';
+    return 'Tuần 7 · Fall 2026';
   }, [weekDates]);
 
-  // Dynamic 7-day configuration with actual dates
   const days = DAYS_ORDER.map((key, idx) => {
     let dateStr = '';
     let isToday = false;
@@ -97,11 +89,13 @@ export function WeeklyTimetableCard({
       dateStr = `${dt.getDate()}/${dt.getMonth() + 1}`;
       isToday = dt.toDateString() === new Date().toDateString();
     }
+    const dayEvs = eventsByDay?.[key] || [];
     return {
       key,
       label: key,
       date: dateStr,
       isToday,
+      count: dayEvs.length,
     };
   });
 
@@ -115,13 +109,11 @@ export function WeeklyTimetableCard({
     { time: '19:00' },
   ];
 
-  // Current day events (synced with activeDay)
   const currentEvents: TimetableEventItem[] =
     eventsByDay && eventsByDay[activeDay] !== undefined
       ? eventsByDay[activeDay]
       : [];
 
-  // Dynamic Subbar Title: "Hôm nay · Thứ 4, 23/9" or "Thứ 2, 21/9"
   const currentDayTitle = React.useMemo(() => {
     const dayIdx = DAYS_ORDER.indexOf(activeDay);
     const dateObj = weekDates?.[dayIdx];
@@ -136,38 +128,10 @@ export function WeeklyTimetableCard({
 
   const eventsCount = currentEvents.length;
 
-  const totalMinutes = currentEvents.reduce((sum, ev) => {
-    const parts = ev.time.split(' - ');
-    if (parts.length !== 2) return sum;
-    const [sh, sm] = parts[0].trim().split(':').map(Number);
-    const [eh, em] = parts[1].trim().split(':').map(Number);
-    return sum + ((eh - sh) * 60 + ((em || 0) - (sm || 0)));
-  }, 0);
-
-  const totalHours = Math.floor(totalMinutes / 60);
-  const remainingMins = totalMinutes % 60;
-  const durationText = totalMinutes > 0
-    ? `${totalHours}h${remainingMins > 0 ? ` ${remainingMins}p` : ''}`
-    : '0h';
-
-  const metaString = eventsCount > 0
-    ? `${eventsCount} sự kiện · ${durationText}`
-    : 'Nghỉ ngơi · Không có lịch học';
-
-  function renderEventIcon(iconType: string, color: string) {
-    switch (iconType) {
-      case 'book':
-        return <BookOpen size={14} className={`text-${color} flex-shrink-0`} />;
-      case 'code':
-        return <Code size={14} className={`text-${color} flex-shrink-0`} />;
-      case 'cpu':
-        return <Cpu size={14} className={`text-${color} flex-shrink-0`} />;
-      case 'lang':
-        return <Languages size={14} className={`text-${color} flex-shrink-0`} />;
-      default:
-        return <BookOpen size={14} className={`text-${color} flex-shrink-0`} />;
-    }
-  }
+  const handleBookSlot = (slotName: string) => {
+    showToast(`Đã ghi nhận khung giờ: "${slotName}". Đang chuyển tới Studio Xếp lịch...`, 'success');
+    navigate('/scheduling');
+  };
 
   return (
     <motion.div
@@ -175,12 +139,13 @@ export function WeeklyTimetableCard({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: 0.18 }}
+      style={{ borderRadius: 16, overflow: 'hidden' }}
     >
       {/* Top Header */}
       <div className="mock-timetable-header">
         <div className="mock-card-title-group">
           <Calendar size={16} className="mock-header-icon" />
-          <h2 className="mock-card-title">Lịch học & lịch tuần</h2>
+          <h2 className="mock-card-title">Lịch học &amp; Lịch tuần</h2>
           <span className="mock-date-range-sub">{weekRangeLabel}</span>
         </div>
 
@@ -203,26 +168,24 @@ export function WeeklyTimetableCard({
           <button
             type="button"
             className={`mock-switch-tab ${activeTab === 'month' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveTab('month');
-              navigate('/calendar');
-            }}
+            onClick={() => navigate('/calendar')}
           >
             Tháng
           </button>
         </div>
       </div>
 
-      {/* Subheader: Hôm nay · Thứ 4, 23/9 | 1 sự kiện · 2h */}
+      {/* Subheader */}
       <div className="mock-timetable-subbar">
         <div className="mock-subbar-left">
           <div className="mock-subbar-title-row">
-            <span className="mock-subbar-square">▢</span>
+            <Calendar size={14} className="text-orange-500 shrink-0" />
             <strong className="mock-current-day-text">{currentDayTitle}</strong>
           </div>
           <div className="mock-subbar-meta-row">
-            <span className="mock-subbar-arrow">‹</span>
-            <span className="mock-current-day-stat">{metaString}</span>
+            <span className="mock-current-day-stat">
+              {eventsCount > 0 ? `${eventsCount} tiết học chính khóa` : 'Ngày tự học & Nghiên cứu tự do'}
+            </span>
           </div>
         </div>
         <button
@@ -235,141 +198,276 @@ export function WeeklyTimetableCard({
         </button>
       </div>
 
-      {/* Weekday Selector Row */}
-      <div className="mock-day-pills-row" role="tablist">
+      {/* Weekday Selector Row with Event Indicators */}
+      <div className="mock-day-pills-row" role="tablist" style={{ gap: 6 }}>
         {days.map((d) => (
           <button
             type="button"
             key={d.key}
             className={`mock-day-pill-btn ${activeDay === d.key ? 'active' : ''}`}
             onClick={() => handleDayClick(d.key)}
+            style={{ position: 'relative' }}
           >
             <span className="mock-day-label">{d.label}</span>
             <span className="mock-day-date">{d.date}</span>
+            {d.count > 0 && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: 4,
+                  right: 4,
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  background: '#3b82f6',
+                }}
+              />
+            )}
           </button>
         ))}
       </div>
 
-      {/* Interactive Timetable Schedule Grid */}
-      <div className="mock-time-grid-container">
-        <div className="mock-time-axis">
-          {timeSlots.map((slot, index) => (
-            <div
-              key={slot.time}
-              className="mock-time-tick"
-              style={{ top: `${(index / (timeSlots.length - 1)) * 100}%` }}
-            >
-              <span className="mock-time-label">{slot.time}</span>
-              <div className="mock-grid-line" />
-            </div>
-          ))}
-        </div>
-
-        {/* Timetable Events Container */}
-        <div className="mock-events-canvas">
-          <AnimatePresence mode="wait">
-            {eventsCount === 0 ? (
-              <motion.div
-                key="empty-day"
-                className="mock-empty-day-schedule"
-                initial={{ opacity: 0, scale: 0.96 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.25 }}
-              >
-                <div className="mock-empty-day-icon">🌴</div>
-                <strong className="mock-empty-day-title">Không có lịch học hôm nay</strong>
-                <p className="mock-empty-day-desc">
-                  Dành thời gian nghỉ ngơi, nạp lại năng lượng hoặc ôn tập cho tuần học mới nhé!
-                </p>
-                <button
-                  type="button"
-                  className="mock-text-link"
-                  onClick={() => navigate('/calendar')}
-                >
-                  <span>Mở Lịch học & Lịch trình</span>
-                  <ArrowRight size={13} />
-                </button>
-              </motion.div>
-            ) : (
-              <motion.div
-                key={activeDay}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                style={{ position: 'absolute', inset: 0 }}
-              >
-                {currentEvents.map((ev) => {
-                  const { topPct, heightPct } = computeTimelineCoord(ev.time);
-                  // Calculate if event end time has elapsed
-                  let isPast = false;
-                  const dayIdx = DAYS_ORDER.indexOf(activeDay);
-                  const dateObj = weekDates?.[dayIdx];
-                  if (dateObj) {
-                    const parts = ev.time.split(' - ');
-                    if (parts.length === 2) {
-                      const [endH, endM] = parts[1].trim().split(':').map(Number);
-                      const eventEnd = new Date(dateObj);
-                      eventEnd.setHours(endH, endM, 0, 0);
-                      isPast = eventEnd.getTime() < Date.now();
-                    }
-                  }
-                  return (
-                    <motion.div
-                      key={ev.id}
-                      className={`mock-event-block block-${ev.color} ${isPast ? 'is-past-block' : ''}`}
-                      style={{
-                        top: `${topPct}%`,
-                        height: `${heightPct}%`,
-                        opacity: isPast ? 0.65 : 1,
-                      }}
-                      whileHover={{ scale: 1.008, zIndex: 10 }}
-                      onClick={() => navigate('/calendar')}
-                      title={`${ev.time}: ${ev.title} (${ev.room})${isPast ? ' · [Đã kết thúc]' : ''}`}
-                    >
-                      <div className="mock-event-inner">
-                        <span className="mock-ev-time">{ev.time}{isPast && ' · ✓ Đã qua'}</span>
-                        <div className="mock-ev-title-row">
-                          {renderEventIcon(ev.iconType, ev.color)}
-                          <strong
-                            className="mock-ev-title"
-                            style={{ textDecoration: isPast ? 'line-through' : 'none' }}
-                          >
-                            {isPast ? `✓ ${ev.title}` : ev.title}
-                          </strong>
-                        </div>
-                        <span className="mock-ev-room">{ev.room}</span>
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Add Event Floating Button */}
-        <div className="mock-add-event-wrap">
-          <button
-            type="button"
-            className="mock-add-event-btn"
-            onClick={() => navigate('/calendar')}
-            title="Thêm sự kiện hoặc tiết học mới"
+      {/* Main Content Area */}
+      {eventsCount === 0 ? (
+        /* DAY FOCUS BLUEPRINT: ELIMINATES THE EMPTY WHITE VOID! */
+        <div style={{ padding: '16px', background: 'var(--bg-subtle, #f8fafc)' }}>
+          <div
+            style={{
+              padding: '12px 16px',
+              borderRadius: 12,
+              background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.08) 0%, rgba(59, 130, 246, 0.06) 100%)',
+              border: '1px solid var(--border-color, #e2e8f0)',
+              marginBottom: 14,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
           >
-            <Plus size={14} />
-            <span>Thêm sự kiện</span>
-          </button>
-        </div>
-      </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                  color: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Sparkles size={16} />
+              </div>
+              <div>
+                <strong style={{ fontSize: 14, color: 'var(--text-primary, #0f172a)' }}>
+                  Lộ trình Khung giờ Vàng Tự học
+                </strong>
+                <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted, #64748b)' }}>
+                  Không có lớp chính khóa · Trống trọn vẹn 11h tại Campus AI
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => navigate('/scheduling')}
+              style={{
+                fontSize: 12,
+                padding: '6px 14px',
+                borderRadius: 8,
+                background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                border: 'none',
+              }}
+            >
+              Xếp lịch OR-Tools
+            </button>
+          </div>
 
-      {/* Cheer Ribbon at Bottom */}
-      <div className="mock-cheer-ribbon">
-        <span className="mock-cheer-star">🌟</span>
-        <span className="mock-cheer-text">
-          Hôm nay bạn đã làm rất tốt! Tiếp tục phát huy nhé!
-        </span>
-      </div>
+          {/* 3 Structured Recommended Sessions */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {/* Session 1: Morning */}
+            <div
+              style={{
+                padding: '12px 14px',
+                borderRadius: 12,
+                background: 'var(--card-bg, #ffffff)',
+                border: '1px solid var(--border-color, #e2e8f0)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    padding: '4px 8px',
+                    borderRadius: 6,
+                    background: 'rgba(37, 99, 235, 0.1)',
+                    color: '#2563eb',
+                  }}
+                >
+                  08:30 – 11:30
+                </span>
+                <div>
+                  <strong style={{ fontSize: 13, color: 'var(--text-primary, #0f172a)', display: 'block' }}>
+                    Phiên học sâu: Ôn tập Thuật toán &amp; AI Lab
+                  </strong>
+                  <span style={{ fontSize: 11, color: '#64748b' }}>
+                    Thư viện AI Campus · Khu vực nghiên cứu yên tĩnh
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => handleBookSlot('Phiên sáng: Thuật toán & AI Lab')}
+                style={{ fontSize: 12, padding: '5px 12px', borderRadius: 6 }}
+              >
+                + Xếp lịch
+              </button>
+            </div>
+
+            {/* Session 2: Afternoon */}
+            <div
+              style={{
+                padding: '12px 14px',
+                borderRadius: 12,
+                background: 'var(--card-bg, #ffffff)',
+                border: '1px solid var(--border-color, #e2e8f0)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    padding: '4px 8px',
+                    borderRadius: 6,
+                    background: 'rgba(124, 58, 237, 0.1)',
+                    color: '#7c3aed',
+                  }}
+                >
+                  14:00 – 16:30
+                </span>
+                <div>
+                  <strong style={{ fontSize: 13, color: 'var(--text-primary, #0f172a)', display: 'block' }}>
+                    Lập trình Đồ án Capstone &amp; Bài tập Lab
+                  </strong>
+                  <span style={{ fontSize: 11, color: '#64748b' }}>
+                    Phòng Lab Beta 204 · Máy trạm GPU &amp; Wifi 6E
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => handleBookSlot('Phiên chiều: Đồ án Capstone')}
+                style={{ fontSize: 12, padding: '5px 12px', borderRadius: 6 }}
+              >
+                + Xếp lịch
+              </button>
+            </div>
+
+            {/* Session 3: Evening */}
+            <div
+              style={{
+                padding: '12px 14px',
+                borderRadius: 12,
+                background: 'var(--card-bg, #ffffff)',
+                border: '1px solid var(--border-color, #e2e8f0)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    padding: '4px 8px',
+                    borderRadius: 6,
+                    background: 'rgba(16, 185, 129, 0.1)',
+                    color: '#059669',
+                  }}
+                >
+                  17:00 – 18:30
+                </span>
+                <div>
+                  <strong style={{ fontSize: 13, color: 'var(--text-primary, #0f172a)', display: 'block' }}>
+                    Sinh hoạt Thể thao &amp; Nghỉ ngơi Campus
+                  </strong>
+                  <span style={{ fontSize: 11, color: '#64748b' }}>
+                    Sân bóng đá &amp; Khu thể thao sinh viên FPT
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => handleBookSlot('Phiên tối: Thể thao Campus')}
+                style={{ fontSize: 12, padding: '5px 12px', borderRadius: 6 }}
+              >
+                + Xếp lịch
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* TIMETABLE WITH ACTIVE EVENTS */
+        <div className="mock-time-grid-container" style={{ minHeight: 380 }}>
+          <div className="mock-time-axis">
+            {timeSlots.map((slot, index) => (
+              <div
+                key={slot.time}
+                className="mock-time-tick"
+                style={{ top: `${(index / (timeSlots.length - 1)) * 100}%` }}
+              >
+                <span className="mock-time-label">{slot.time}</span>
+                <div className="mock-grid-line" />
+              </div>
+            ))}
+          </div>
+
+          <div className="mock-events-canvas" style={{ position: 'relative', height: 380 }}>
+            {currentEvents.map((ev) => {
+              const { topPct, heightPct } = computeTimelineCoord(ev.time);
+              return (
+                <div
+                  key={ev.id}
+                  className={`mock-event-chip event-chip-${ev.color}`}
+                  style={{
+                    position: 'absolute',
+                    top: `${topPct}%`,
+                    height: `${heightPct}%`,
+                    left: 8,
+                    right: 8,
+                    borderRadius: 10,
+                    padding: '8px 12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                  }}
+                >
+                  <strong style={{ fontSize: 13, color: '#0f172a' }}>{ev.title}</strong>
+                  <span style={{ fontSize: 11, color: '#475569' }}>
+                    {ev.time} · {ev.room}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }

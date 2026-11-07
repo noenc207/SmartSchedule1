@@ -21,13 +21,26 @@ export function MobileEmptyState({
 }: MobileEmptyStateProps) {
   return (
     <div
-      className={`flex flex-col items-center justify-center text-center p-8 bg-[var(--m-surface)] rounded-2xl border border-[var(--m-border)] shadow-sm my-4 ${className}`}
+      className={`mobile-card flex flex-col items-center justify-center text-center p-6 my-3 ${className}`}
+      style={{
+        background: 'var(--m-surface)',
+        borderRadius: 'var(--m-radius-lg)',
+        border: '1px solid var(--m-border)',
+        boxShadow: 'var(--m-shadow-card)',
+      }}
     >
-      <div className="w-14 h-14 rounded-2xl bg-[var(--m-brand-soft)] border border-[var(--m-brand-subtle)] flex items-center justify-center text-[var(--m-brand-primary)] mb-3.5 shadow-sm">
-        {icon || <Sparkles size={26} />}
+      <div
+        className="w-13 h-13 rounded-2xl flex items-center justify-center text-[var(--m-brand-primary)] mb-3 shadow-xs"
+        style={{
+          background: 'var(--m-brand-soft)',
+          border: '1px solid var(--m-brand-subtle)',
+          color: 'var(--m-brand-primary)',
+        }}
+      >
+        {icon || <Sparkles size={24} />}
       </div>
 
-      <h3 className="text-base font-bold text-[var(--m-text-primary)] tracking-tight mb-1">
+      <h3 className="text-sm font-bold text-[var(--m-text-primary)] tracking-tight mb-1">
         {title}
       </h3>
 
@@ -40,7 +53,11 @@ export function MobileEmptyState({
           type="button"
           whileTap={{ scale: 0.95 }}
           onClick={onAction}
-          className="mobile-touch-target px-5 py-2.5 rounded-xl bg-[var(--m-brand-primary)] hover:bg-[var(--m-brand-bright)] text-white font-semibold text-xs shadow-md transition-colors"
+          className="mobile-touch-target px-5 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all"
+          style={{
+            background: 'var(--m-brand-primary)',
+            color: '#ffffff',
+          }}
         >
           {actionLabel}
         </motion.button>

@@ -1,5 +1,30 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Sparkles,
+  Zap,
+  Calendar,
+  Clock,
+  CheckCircle2,
+  AlertTriangle,
+  ShieldCheck,
+  MapPin,
+  ArrowRight,
+  Check,
+  X,
+  RefreshCw,
+  Sliders,
+  ChevronDown,
+  ChevronUp,
+  Search,
+  Plus,
+  Layers,
+  BookOpen,
+  BrainCircuit,
+  CheckSquare,
+  Square,
+} from 'lucide-react';
 import { SchedulePicker } from '../../components/SchedulePicker';
 import { useWorkspaceStore } from '../../stores/workspaceStore';
 import { taskApi } from '../../services/taskApi';
@@ -21,7 +46,6 @@ import {
 } from './utils/taskCalculations';
 import { TaskWorkspaceHeader } from './components/TaskWorkspaceHeader';
 import { QuickAddComposer } from './components/QuickAddComposer';
-import { TaskCard } from './components/TaskCard';
 import { CompactTaskAccordionList } from './components/CompactTaskAccordionList';
 import { usePreferenceStore } from '../../stores/preferenceStore';
 import { useHistoryStore } from '../../stores/historyStore';
@@ -42,7 +66,6 @@ import {
   formatHourMinute,
 } from './utils/schedulingPersonas';
 
-
 const defaults: SchedulingPreferences = {
   maxDailyMinutes: 360,
   minBreakMinutes: 30,
@@ -58,13 +81,14 @@ const defaults: SchedulingPreferences = {
 
 const startOfToday = () => {
   const date = new Date();
-  date.setHours(0, 0, 0, 0);
+  date.setHours(8, 0, 0, 0);
   return date.toISOString().slice(0, 16);
 };
 
 const plusDays = (days: number) => {
   const date = new Date();
   date.setDate(date.getDate() + days);
+  date.setHours(22, 0, 0, 0);
   return date.toISOString().slice(0, 16);
 };
 
@@ -81,7 +105,8 @@ export function SchedulingPage() {
   const [selected, setSelected] = useState<string[]>([]);
   const [splitTasks, setSplitTasks] = useState<Record<string, boolean>>({});
 
-  // Planning controls
+  // Planning controls & Presets
+  const [timePreset, setTimePreset] = useState<'next7' | 'thisWeek' | 'custom'>('next7');
   const [from, setFrom] = useState(() => (isDemoMode() ? getDemoInputDate(0, 8, 0) : startOfToday()));
   const [to, setTo] = useState(() => (isDemoMode() ? getDemoInputDate(6, 22, 0) : plusDays(7)));
   const [preferences, setPreferences] = useState(defaults);
@@ -112,7 +137,7 @@ export function SchedulingPage() {
 
   // Pro optimization states
   const user = useAuthStore((state) => state.user);
-  const [isProOptimization, setIsProOptimization] = useState(false);
+  const [isProOptimization, setIsProOptimization] = useState(true);
 
   // Progressive Constraints State
   const [schedulingRules, setSchedulingRules] = useState<SchedulingRule[]>(() => DEFAULT_SCHEDULING_RULES);
@@ -154,6 +179,31 @@ export function SchedulingPage() {
     updatePreference('preferredEnd', formatHourMinute(endHM.hour, newMinute));
   };
 
+  const handleTimePresetChange = (preset: 'next7' | 'thisWeek' | 'custom') => {
+    setTimePreset(preset);
+    const now = new Date();
+    if (preset === 'next7') {
+      const start = new Date(now);
+      start.setHours(8, 0, 0, 0);
+      const end = new Date(now);
+      end.setDate(end.getDate() + 7);
+      end.setHours(22, 0, 0, 0);
+      setFrom(start.toISOString().slice(0, 16));
+      setTo(end.toISOString().slice(0, 16));
+    } else if (preset === 'thisWeek') {
+      const day = now.getDay();
+      const diffToMon = day === 0 ? -6 : 1 - day;
+      const mon = new Date(now);
+      mon.setDate(mon.getDate() + diffToMon);
+      mon.setHours(8, 0, 0, 0);
+      const sun = new Date(mon);
+      sun.setDate(sun.getDate() + 6);
+      sun.setHours(22, 0, 0, 0);
+      setFrom(mon.toISOString().slice(0, 16));
+      setTo(sun.toISOString().slice(0, 16));
+    }
+  };
+
   // Load tasks, events, categories, and preferences for current schedule
   useEffect(() => {
     if (!activeScheduleId) {
@@ -188,7 +238,7 @@ export function SchedulingPage() {
           )
         );
       })
-      .catch(() => setError('Could not load scheduling workspace inputs.'));
+      .catch(() => setError('Không thể tải dữ liệu không gian lập lịch.'));
   }, [activeScheduleId]);
 
   // Filter and sort tasks based on search, status tab, priority, deadline, and sort order
@@ -204,7 +254,6 @@ export function SchedulingPage() {
       categories,
     });
   }, [tasks, searchQuery, taskFilterStatus, taskFilterPriority, taskFilterDeadline, taskSortBy, selected, events, categories]);
-
 
   const eligibleIds = useMemo(() => tasks.map((task) => task.id), [tasks]);
   const selectedTasks = tasks.filter((task) => selected.includes(task.id));
@@ -316,9 +365,9 @@ export function SchedulingPage() {
         [created.id]: created.estimatedDurationMinutes > 120,
       }));
       setIsComposerOpen(false);
-      showToast(`Task "${created.title}" added to planning workspace`, 'success');
+      showToast(`Đã thêm bài tập "${created.title}"`, 'success');
     } catch {
-      setError('Could not add task.');
+      setError('Không thể thêm bài tập.');
     }
   };
 
@@ -344,7 +393,7 @@ export function SchedulingPage() {
       });
       setTasks((curr) => curr.map((t) => (t.id === taskId ? updated : t)));
     } catch {
-      setError('Could not update task.');
+      setError('Không thể cập nhật bài tập.');
     }
   };
 
@@ -352,7 +401,7 @@ export function SchedulingPage() {
     if (!activeScheduleId) return;
     try {
       const duplicated = await taskApi.create(activeScheduleId, {
-        title: `${task.title} (Copy)`,
+        title: `${task.title} (Bản sao)`,
         description: task.description ?? undefined,
         estimatedDurationMinutes: task.estimatedDurationMinutes,
         remainingDurationMinutes: task.estimatedDurationMinutes,
@@ -370,9 +419,9 @@ export function SchedulingPage() {
         ...curr,
         [duplicated.id]: splitTasks[task.id] ?? false,
       }));
-      showToast(`Duplicated "${task.title}"`, 'success');
+      showToast(`Đã nhân bản "${task.title}"`, 'success');
     } catch {
-      setError('Could not duplicate task.');
+      setError('Không thể nhân bản bài tập.');
     }
   };
 
@@ -381,9 +430,9 @@ export function SchedulingPage() {
       await taskApi.remove(taskId);
       setTasks((curr) => curr.filter((t) => t.id !== taskId));
       setSelected((curr) => curr.filter((id) => id !== taskId));
-      showToast('Task removed from workspace', 'info');
+      showToast('Đã xóa bài tập khỏi không gian lập lịch', 'info');
     } catch {
-      setError('Could not delete task.');
+      setError('Không thể xóa bài tập.');
     }
   };
 
@@ -408,10 +457,9 @@ export function SchedulingPage() {
         status: 'SCHEDULED',
         fixed: false,
         locked: false,
-        notes: `Scheduled session from task · ${task.id}`,
+        notes: `Ca học xếp nhanh từ tác vụ · ${task.id}`,
       });
 
-      // Update events immediately
       setEvents((curr) => [...curr, createdEvent]);
 
       const prevScheduled = getTaskScheduledMinutes(task.id, events);
@@ -419,7 +467,6 @@ export function SchedulingPage() {
       const newRemaining = Math.max(0, task.estimatedDurationMinutes - newScheduled);
       const newStatus = newRemaining === 0 ? 'SCHEDULED' : 'IN_PROGRESS';
 
-      // Update task backend
       await taskApi.update(task.id, {
         title: task.title,
         estimatedDurationMinutes: task.estimatedDurationMinutes,
@@ -432,15 +479,13 @@ export function SchedulingPage() {
         maximumSessionMinutes: task.maximumSessionMinutes,
       });
 
-      // Update task state
       setTasks((curr) =>
         curr.map((t) => (t.id === task.id ? { ...t, remainingDurationMinutes: newRemaining, status: newStatus } : t))
       );
 
-      // Toast with Undo action
-      showToast(`Scheduled ${formatMinutes(sessionMinutes)} for "${task.title}"`, 'success', {
+      showToast(`Đã xếp ${formatMinutes(sessionMinutes)} cho "${task.title}"`, 'success', {
         action: {
-          label: 'Undo',
+          label: 'Hoàn tác',
           onClick: async () => {
             await eventApi.remove(createdEvent.id);
             setEvents((curr) => curr.filter((e) => e.id !== createdEvent.id));
@@ -459,20 +504,20 @@ export function SchedulingPage() {
             setTasks((curr) =>
               curr.map((t) => (t.id === task.id ? { ...t, remainingDurationMinutes: restoredRemaining } : t))
             );
-            showToast(`Undone session for "${task.title}"`, 'info');
+            showToast(`Đã hoàn tác ca học cho "${task.title}"`, 'info');
           },
         },
       });
     } catch {
-      setError("Couldn't schedule this task. No changes were made.");
+      setError("Không thể xếp ca học này. Chưa có thay đổi nào được áp dụng.");
     }
   };
 
   // Generate & Apply proposal handlers
-  const generate = async (isProMode: boolean = false) => {
+  const generate = async (isProMode: boolean = true) => {
     if (!activeScheduleId) return;
     if (new Date(from) >= new Date(to)) {
-      setError('Planning range must have a valid end after its start.');
+      setError('Khoảng thời gian lập lịch phải có thời điểm kết thúc sau thời điểm bắt đầu.');
       return;
     }
     setLoading(true);
@@ -482,14 +527,14 @@ export function SchedulingPage() {
     setResult(null);
 
     try {
-      await sleep(250);
+      await sleep(220);
       setGenerationStep(2);
       await schedulingApi.updatePreferences(activeScheduleId, preferences);
-      await sleep(250);
+      await sleep(220);
       setGenerationStep(3);
-      await sleep(250);
+      await sleep(220);
       setGenerationStep(4);
-      await sleep(250);
+      await sleep(220);
       setGenerationStep(5);
 
       let generatedPlan: SchedulingResult;
@@ -501,22 +546,19 @@ export function SchedulingPage() {
         generatedPlan = await schedulingApi.generate(activeScheduleId, request());
       }
 
-      await sleep(250);
-      setGenerationStep(6);
-      await sleep(250);
-      setGenerationStep(7);
       await sleep(200);
+      setGenerationStep(6);
+      await sleep(200);
+      setGenerationStep(7);
+      await sleep(150);
       setResult(generatedPlan);
+      showToast('Đã tính toán xong kế hoạch lịch tối ưu!', 'success');
     } catch (err) {
       const errMsg = getApiErrorMessage(err);
-      setError(errMsg || 'We could not generate the schedule right now. Review inputs and try again.');
+      setError(errMsg || 'Không thể tạo lịch lúc này. Vui lòng kiểm tra lại dữ liệu và thử lại.');
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleOptimizeProClick = () => {
-    void generate(true);
   };
 
   const apply = async () => {
@@ -551,12 +593,12 @@ export function SchedulingPage() {
       // 2. Authoritative Apply Step
       await schedulingApi.apply(activeScheduleId, result);
       setConfirmApply(false);
-      setApplyMessage('Schedule applied! All planned sessions are now populated on your calendar.');
-      showToast('Schedule applied! All planned sessions are on your calendar.', 'success');
+      setApplyMessage('Kế hoạch đã được áp dụng thành công! Tất cả ca học đã được đưa vào thời khóa biểu.');
+      showToast('Đã áp dụng lịch! Các ca học đã hiển thị trên thời khóa biểu.', 'success');
 
       // Record batch undo in history store
       useHistoryStore.getState().recordAction({
-        description: `Applied schedule (${appliedResult.slots.length} sessions)`,
+        description: `Áp dụng lịch trình (${appliedResult.slots.length} ca học)`,
         undo: async () => {
           try {
             const currentEvents = await eventApi.list(activeScheduleId, from, to);
@@ -569,18 +611,18 @@ export function SchedulingPage() {
             const refreshed = await taskApi.list(activeScheduleId);
             setTasks(refreshed.content);
             setEvents(previousEvents);
-            showToast('Applied schedule reverted', 'info');
+            showToast('Đã hoàn tác lịch trình vừa áp dụng', 'info');
           } catch {
-            showToast('Could not revert applied schedule', 'error');
+            showToast('Không thể hoàn tác lịch trình', 'error');
           }
         },
         redo: async () => {
           await schedulingApi.apply(activeScheduleId, appliedResult);
-          showToast('Schedule re-applied', 'info');
+          showToast('Đã khôi phục áp dụng lịch trình', 'info');
         },
       });
 
-      setTimeout(() => navigate('/calendar'), 1200);
+      setTimeout(() => navigate('/calendar'), 1000);
     } catch (reason: unknown) {
       const err = reason as any;
       const status = err?.response?.status || err?.status;
@@ -589,7 +631,7 @@ export function SchedulingPage() {
         setError(staleMsg);
         showToast(staleMsg, 'error');
       } else {
-        const errorMsg = getApiErrorMessage(reason) || 'Could not apply this plan.';
+        const errorMsg = getApiErrorMessage(reason) || 'Không thể áp dụng kế hoạch này.';
         setError(errorMsg);
         showToast(errorMsg, 'error');
       }
@@ -598,550 +640,512 @@ export function SchedulingPage() {
     }
   };
 
+  const formattedRangeText = useMemo(() => {
+    try {
+      const d1 = new Date(from);
+      const d2 = new Date(to);
+      const str1 = `${d1.getDate()}/${d1.getMonth() + 1}/${d1.getFullYear()}`;
+      const str2 = `${d2.getDate()}/${d2.getMonth() + 1}/${d2.getFullYear()}`;
+      return `${str1} ➔ ${str2} (${planningDays} ngày)`;
+    } catch {
+      return '7 ngày tới';
+    }
+  }, [from, to, planningDays]);
 
   return (
-    <section className="workspace-page">
-      <div className="section-heading">
-        <div>
-          <p className="eyebrow">Planning engine</p>
-          <h2>Generate schedule</h2>
-          <p className="muted">
-            Turn commitments, available capacity, and deadlines into a plan you can review before it touches your calendar.
+    <section className="scheduling-studio-page" aria-label="SmartSchedule Studio 2.0 AI Orchestrator">
+      {/* 1. Studio Header Banner */}
+      <div className="studio-hero-banner">
+        <div className="studio-hero-left">
+          <div className="studio-badge-row">
+            <span className="studio-campus-tag">
+              <MapPin size={11} />
+              <span>FPT University · Quy Nhơn AI Campus</span>
+            </span>
+            <span className="studio-engine-tag">
+              <Zap size={11} />
+              <span>Google OR-Tools CP-SAT Solver v2.4</span>
+            </span>
+          </div>
+
+          <h1 className="studio-hero-title">
+            <BrainCircuit size={26} className="text-indigo-600" />
+            <span>Lập Lịch Thông Minh AI</span>
+          </h1>
+
+          <p className="studio-hero-subtitle">
+            Hệ thống phân tích tự động khoảng trống giảng đường, môn học chính khóa và hạn chót bài tập để xây dựng kế hoạch học tập tối ưu toàn cục.
           </p>
         </div>
-        <SchedulePicker />
+
+        <div className="studio-hero-right">
+          <div className="studio-status-pill">
+            <span className="studio-dot-pulse" />
+            <span>AI Engine Sẵn sàng</span>
+          </div>
+          <SchedulePicker />
+        </div>
       </div>
 
       {error && <div className="form-error" role="alert">{error}</div>}
       {applyMessage && <div className="form-success" role="status">{applyMessage}</div>}
 
+      {/* 2. Interactive Workflow Stepper Bar */}
+      <div className="studio-stepper-bar">
+        <div className="studio-step-pill active">
+          <span className="studio-step-num">1</span>
+          <span>Khoảng thời gian</span>
+        </div>
+        <span className="studio-step-sep">➔</span>
+        <div className={`studio-step-pill ${selected.length > 0 ? 'active' : ''}`}>
+          <span className="studio-step-num">2</span>
+          <span>Tác vụ cần xếp ({selected.length})</span>
+        </div>
+        <span className="studio-step-sep">➔</span>
+        <div className="studio-step-pill active">
+          <span className="studio-step-num">3</span>
+          <span>Hồ sơ FPT ({activePersona.name})</span>
+        </div>
+        <span className="studio-step-sep">➔</span>
+        <div className={`studio-step-pill ${result ? 'active' : ''}`}>
+          <span className="studio-step-num">4</span>
+          <span>Kế hoạch đề xuất {result ? '(Đã xong)' : ''}</span>
+        </div>
+      </div>
+
       {!activeScheduleId ? (
         <div className="panel empty-state">
-          <strong>Create a schedule first</strong>
-          <span>Tasks, availability, and events are used to build a plan.</span>
+          <strong>Vui lòng chọn hoặc tạo lịch trình trước</strong>
+          <span>Hệ thống cần một không gian lịch trình học kỳ để lưu trữ các ca học.</span>
         </div>
       ) : (
-        <div className="scheduling-layout">
-          <div className="scheduling-setup">
-            <div className="workflow-steps" aria-label="Schedule generation steps">
-              <span className="active">01 Inputs</span>
-              <span>02 Constraints</span>
-              <span>03 Generate</span>
-              <span>04 Review</span>
+        /* 3. Main 2-Column Studio Grid */
+        <div className="studio-main-grid">
+          {/* =========================================================
+              LEFT COLUMN: Studio Controller Hub
+             ========================================================= */}
+          <div className="studio-controls-col">
+            {/* Step 1: Time Horizon Card */}
+            <div className="studio-card">
+              <div className="studio-card-header">
+                <div className="studio-card-title-wrap">
+                  <div className="studio-card-icon-box icon-box-orange">
+                    <Calendar size={16} />
+                  </div>
+                  <div>
+                    <h3 className="studio-card-title">1. Khoảng thời gian lập lịch</h3>
+                    <span className="studio-card-sub">Thời đoạn áp dụng thuật toán CP-SAT</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Presets */}
+              <div className="studio-preset-group">
+                <button
+                  type="button"
+                  className={`studio-preset-btn ${timePreset === 'next7' ? 'active' : ''}`}
+                  onClick={() => handleTimePresetChange('next7')}
+                >
+                  7 Ngày tới
+                </button>
+                <button
+                  type="button"
+                  className={`studio-preset-btn ${timePreset === 'thisWeek' ? 'active' : ''}`}
+                  onClick={() => handleTimePresetChange('thisWeek')}
+                >
+                  Tuần này
+                </button>
+                <button
+                  type="button"
+                  className={`studio-preset-btn ${timePreset === 'custom' ? 'active' : ''}`}
+                  onClick={() => setTimePreset('custom')}
+                >
+                  Tùy chỉnh
+                </button>
+              </div>
+
+              {/* Formatted Date Pill */}
+              <div className="studio-date-display-badge">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Clock size={14} className="text-orange-500" />
+                  <span>{formattedRangeText}</span>
+                </div>
+                <span style={{ fontSize: 11, color: '#64748b' }}>FPT Timezone</span>
+              </div>
+
+              {timePreset === 'custom' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
+                  <label className="field">
+                    <span>Bắt đầu</span>
+                    <input type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)} />
+                  </label>
+                  <label className="field">
+                    <span>Kết thúc</span>
+                    <input type="datetime-local" value={to} onChange={(e) => setTo(e.target.value)} />
+                  </label>
+                </div>
+              )}
             </div>
 
-            {/* Step 1: Planning Range */}
-            <section className="panel form-panel">
-              <div className="panel-heading">
-                <div>
-                  <p className="eyebrow">Bước 01</p>
-                  <h3>Khoảng thời gian lập lịch</h3>
-                </div>
-              </div>
-              <label className="field">
-                <span>Bắt đầu</span>
-                <input type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)} />
-              </label>
-              <label className="field">
-                <span>End</span>
-                <input type="datetime-local" value={to} onChange={(e) => setTo(e.target.value)} />
-              </label>
-            </section>
-
-            {/* Step 1: Tasks to schedule (Interactive Workspace) */}
-            <section className="panel task-workspace-panel">
-              <TaskWorkspaceHeader
-                tasks={tasks}
-                filteredCount={filteredTasks.length}
-                events={events}
-                selectedIds={selected}
-                currentFilter={taskFilterStatus}
-                currentPriority={taskFilterPriority}
-                currentDeadline={taskFilterDeadline}
-                currentSort={taskSortBy}
-                searchQuery={searchQuery}
-                isComposerOpen={isComposerOpen}
-                onToggleComposer={() => setIsComposerOpen((v) => !v)}
-                onFilterChange={setTaskFilterStatus}
-                onPriorityChange={setTaskFilterPriority}
-                onDeadlineChange={setTaskFilterDeadline}
-                onSortChange={setTaskSortBy}
-                onSearchChange={setSearchQuery}
-                onClearFilters={() => {
-                  setSearchQuery('');
-                  setTaskFilterStatus('ALL');
-                  setTaskFilterPriority('ALL');
-                  setTaskFilterDeadline('ALL');
-                }}
-                onToggleSelectAll={handleToggleSelectAll}
-              />
-
-              {/* Inline Quick Add Composer */}
-              {isComposerOpen && (
-                <QuickAddComposer
-                  categories={categories}
-                  onAddTask={handleAddTask}
-                  onCancel={() => setIsComposerOpen(false)}
-                />
-              )}
-
-              {/* Tasks List */}
-              {tasks.length === 0 ? (
-                <div className="empty-state compact workspace-empty-state">
-                  <strong>No tasks yet</strong>
-                  <span>Add tasks to build a schedule around your deadlines and availability.</span>
-                  <button
-                    type="button"
-                    className="primary-button compact-btn fpt-add-task-btn"
-                    onClick={() => setIsComposerOpen(true)}
-                  >
-                    + Add task
-                  </button>
-                </div>
-              ) : filteredTasks.length === 0 ? (
-                <div className="empty-state compact workspace-empty-state">
-                  <span>No tasks matching current filters.</span>
-                  <button
-                    type="button"
-                    className="text-button compact-btn"
-                    onClick={() => {
-                      setSearchQuery('');
-                      setTaskFilterStatus('ALL');
-                      setTaskFilterPriority('ALL');
-                      setTaskFilterDeadline('ALL');
-                    }}
-                  >
-                    Reset filters
-                  </button>
-                </div>
-              ) : (
-                <CompactTaskAccordionList
-                  tasks={filteredTasks}
-                  categories={categories}
-                  events={events}
-                  selected={selected}
-                  splitTasks={splitTasks}
-                  onToggleSelect={handleToggleSelect}
-                  onToggleSplit={handleToggleSplit}
-                  onUpdateTask={handleUpdateTask}
-                  onDuplicateTask={handleDuplicateTask}
-                  onDeleteTask={handleDeleteTask}
-                  onScheduleSlot={handleScheduleSlot}
-                />
-              )}
-            </section>
-
-            {/* Step 2: Persona & Study Preferences */}
-            <section className="panel constraint-panel">
-              <div className="panel-heading">
-                <div>
-                  <p className="eyebrow">Bước 02</p>
-                  <h3>Hồ sơ & Thiết lập học tập</h3>
-                  <span className="muted" style={{ fontSize: 11 }}>FPT University Quy Nhơn · AI Campus</span>
-                </div>
-                <div className="step2-heading-actions">
-                  <button
-                    type="button"
-                    className="secondary-button compact-btn"
-                    onClick={() => setIsConstraintsModalOpen(true)}
-                    aria-label="Cấu hình quy tắc nâng cao"
-                  >
-                    <span>Quy tắc nâng cao ({schedulingRules.filter((r) => r.enabled).length})</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* 4-Pill Persona Quick Selector Bar */}
-              <div className="persona-selector-container">
-                <span className="persona-selector-label">Hồ sơ mục tiêu 1 chạm:</span>
-                <div className="persona-pill-group">
-                  {(Object.keys(SCHEDULING_PERSONAS) as PersonaId[]).map((pid) => {
-                    const p = SCHEDULING_PERSONAS[pid];
-                    const isActive = activePersonaId === pid;
-                    return (
-                      <button
-                        key={pid}
-                        type="button"
-                        className={`persona-pill-btn ${isActive ? 'active' : ''}`}
-                        onClick={() => handleSelectPersona(pid)}
-                        style={{
-                          borderColor: isActive ? p.color : undefined,
-                        }}
-                      >
-                        <span className="persona-pill-badge" style={{ color: p.color }}>[{p.badge}]</span>
-                        <strong className="persona-pill-name">{p.name}</strong>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Active Persona Insight Card */}
-              <div className="persona-insight-card" style={{ borderLeftColor: activePersona.color }}>
-                <div className="persona-insight-top">
-                  <span className="persona-insight-tagline">{activePersona.tagline}</span>
-                  <span className="persona-insight-hours">
-                    {preferences.preferredStart} – {preferences.preferredEnd} ({Math.round(preferences.maxDailyMinutes / 60)}h/ngày)
-                  </span>
-                </div>
-                <p className="persona-insight-desc">{activePersona.description}</p>
-              </div>
-
-              {/* Deep Customization Section (Accordion) */}
-              <div className="deep-customization-card">
-                <div
-                  className="deep-customization-header"
-                  onClick={() => setIsDeepCustomizationOpen((v) => !v)}
-                  role="button"
-                  tabIndex={0}
-                >
+            {/* Step 2: Task Workspace Card */}
+            <div className="studio-card">
+              <div className="studio-card-header">
+                <div className="studio-card-title-wrap">
+                  <div className="studio-card-icon-box icon-box-indigo">
+                    <CheckSquare size={16} />
+                  </div>
                   <div>
-                    <strong>Tùy chỉnh sâu từng giờ, phút & ca học</strong>
-                    <span className="muted" style={{ fontSize: 12, display: 'block' }}>
-                      Điều chỉnh chính xác khung giờ vàng, thời lượng ca, nghỉ đệm và di chuyển campus
-                    </span>
+                    <h3 className="studio-card-title">2. Tác vụ cần xếp lịch</h3>
+                    <span className="studio-card-sub">{tasks.length} bài tập & đồ án trong học kỳ</span>
                   </div>
-                  <span className="accordion-indicator">
-                    {isDeepCustomizationOpen ? '[Thu gọn ▲]' : '[Tùy chỉnh sâu ▼]'}
-                  </span>
                 </div>
 
-                {isDeepCustomizationOpen && (
-                  <div className="deep-customization-body">
-                    {/* Time Window (Start & End with Hour & Minute dual selects) */}
-                    <div className="deep-control-row">
-                      <div className="deep-control-col">
-                        <label className="deep-field-label">Khung giờ bắt đầu học:</label>
-                        <div className="deep-time-dual-select">
-                          <select
-                            className="deep-select"
-                            value={startHM.hour}
-                            onChange={(e) => handleStartHourChange(Number(e.target.value))}
-                            aria-label="Giờ bắt đầu"
-                          >
-                            {Array.from({ length: 24 }, (_, i) => (
-                              <option key={i} value={i}>
-                                {String(i).padStart(2, '0')} giờ
-                              </option>
-                            ))}
-                          </select>
-                          <span className="deep-time-sep">:</span>
-                          <select
-                            className="deep-select"
-                            value={startHM.minute}
-                            onChange={(e) => handleStartMinuteChange(Number(e.target.value))}
-                            aria-label="Phút bắt đầu"
-                          >
-                            {[0, 15, 30, 45].map((m) => (
-                              <option key={m} value={m}>
-                                {String(m).padStart(2, '0')} phút
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="deep-control-col">
-                        <label className="deep-field-label">Khung giờ kết thúc tối đa:</label>
-                        <div className="deep-time-dual-select">
-                          <select
-                            className="deep-select"
-                            value={endHM.hour}
-                            onChange={(e) => handleEndHourChange(Number(e.target.value))}
-                            aria-label="Giờ kết thúc"
-                          >
-                            {Array.from({ length: 24 }, (_, i) => (
-                              <option key={i} value={i}>
-                                {String(i).padStart(2, '0')} giờ
-                              </option>
-                            ))}
-                          </select>
-                          <span className="deep-time-sep">:</span>
-                          <select
-                            className="deep-select"
-                            value={endHM.minute}
-                            onChange={(e) => handleEndMinuteChange(Number(e.target.value))}
-                            aria-label="Phút kết thúc"
-                          >
-                            {[0, 15, 30, 45].map((m) => (
-                              <option key={m} value={m}>
-                                {String(m).padStart(2, '0')} phút
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Session Min & Max Duration */}
-                    <div className="deep-control-row">
-                      <div className="deep-control-col">
-                        <label className="deep-field-label">Ca học ngắn nhất:</label>
-                        <select
-                          className="deep-select"
-                          value={preferences.minimumSessionMinutes}
-                          onChange={(e) => updatePreference('minimumSessionMinutes', Number(e.target.value))}
-                        >
-                          {SESSION_DURATION_OPTIONS.slice(0, 5).map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="deep-control-col">
-                        <label className="deep-field-label">Ca học dài nhất:</label>
-                        <select
-                          className="deep-select"
-                          value={preferences.maximumSessionMinutes}
-                          onChange={(e) => updatePreference('maximumSessionMinutes', Number(e.target.value))}
-                        >
-                          {SESSION_DURATION_OPTIONS.slice(1).map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Break Duration & Daily Cap */}
-                    <div className="deep-control-row">
-                      <div className="deep-control-col">
-                        <label className="deep-field-label">Khoảng nghỉ giữa các ca:</label>
-                        <select
-                          className="deep-select"
-                          value={preferences.minBreakMinutes}
-                          onChange={(e) => updatePreference('minBreakMinutes', Number(e.target.value))}
-                        >
-                          {BREAK_DURATION_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="deep-control-col">
-                        <label className="deep-field-label">Giới hạn tự học mỗi ngày:</label>
-                        <select
-                          className="deep-select"
-                          value={preferences.maxDailyMinutes}
-                          onChange={(e) => updatePreference('maxDailyMinutes', Number(e.target.value))}
-                        >
-                          {DAILY_CAPACITY_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Toggles: Campus Mobility & Lunch Protection */}
-                    <div className="deep-toggles-row">
-                      <button
-                        type="button"
-                        className={`deep-toggle-btn ${campusMobilityEnabled ? 'active' : ''}`}
-                        onClick={() => {
-                          setCampusMobilityEnabled((v) => !v);
-                          showToast(
-                            campusMobilityEnabled
-                              ? 'Đã tắt đệm di chuyển Campus FPT'
-                              : 'Đã bật đệm di chuyển Campus FPT Quy Nhơn',
-                            'info'
-                          );
-                        }}
-                      >
-                        <span>Đệm di chuyển Campus FPT:</span>
-                        <strong>{campusMobilityEnabled ? '[BẬT]' : '[TẮT]'}</strong>
-                      </button>
-
-                      <button
-                        type="button"
-                        className={`deep-toggle-btn ${protectLunchEnabled ? 'active' : ''}`}
-                        onClick={() => {
-                          setProtectLunchEnabled((v) => !v);
-                          showToast(
-                            protectLunchEnabled
-                              ? 'Đã mở khung giờ trưa'
-                              : 'Đã bảo vệ khung nghỉ trưa (12:00–13:00)',
-                            'info'
-                          );
-                        }}
-                      >
-                        <span>Bảo vệ giờ nghỉ trưa (12h-13h):</span>
-                        <strong>{protectLunchEnabled ? '[BẬT]' : '[TẮT]'}</strong>
-                      </button>
-                    </div>
-                  </div>
-                )}
+                <button
+                  type="button"
+                  className="hero-dock-primary"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    padding: '5px 12px',
+                    borderRadius: 8,
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => setIsComposerOpen((v) => !v)}
+                >
+                  <Plus size={12} />
+                  <span>Thêm tác vụ</span>
+                </button>
               </div>
 
-              {/* Constraint Summary Banner */}
-              <div className="constraint-summary-banner">
+              {/* Workload Indicator */}
+              <div className="studio-workload-bar">
                 <span>
-                  Đang kích hoạt <b>{schedulingRules.filter((r) => r.enabled).length}</b> quy tắc xếp lịch (
-                  <b>{schedulingRules.filter((r) => r.enabled && r.type === 'HARD').length}</b> ràng buộc cứng,{' '}
-                  <b>{schedulingRules.filter((r) => r.enabled && r.type === 'SOFT').length}</b> ưu tiên mềm)
+                  Đã chọn: <strong>{selected.length}/{tasks.length}</strong> bài
+                </span>
+                <span>
+                  Khối lượng: <strong className="text-indigo-600">{formatMinutes(estimatedRemainingMinutes)}</strong>
                 </span>
                 <button
                   type="button"
-                  className="text-button"
-                  onClick={() => setIsConstraintsModalOpen(true)}
+                  style={{ background: 'none', border: 'none', color: '#ea580c', fontSize: 11.5, fontWeight: 700, cursor: 'pointer' }}
+                  onClick={handleToggleSelectAll}
                 >
-                  Xem chi tiết
+                  {selected.length === tasks.length ? 'Bỏ chọn hết' : 'Chọn tất cả'}
                 </button>
               </div>
 
-              <ConstraintRow label="Bảo vệ lịch cố định" detail="Các tiết học trên lớp & lịch cố định không bị xê dịch" enabled />
-              <ConstraintRow
-                label="Khung giờ tự học ưu tiên"
-                detail={`${preferences.preferredStart ?? '18:00'} – ${preferences.preferredEnd ?? '22:00'}`}
-                enabled
-                onClick={() => setIsDeepCustomizationOpen(true)}
-              />
-              <ConstraintRow
-                label="Trần dung lượng mỗi ngày"
-                detail={`${Math.round(preferences.maxDailyMinutes / 60)} tiếng/ngày`}
-                enabled
-                onClick={() => setIsDeepCustomizationOpen(true)}
-              />
-              <ConstraintRow
-                label="Thời gian nghỉ giữa 2 ca"
-                detail={`${preferences.minBreakMinutes} phút`}
-                enabled
-                onClick={() => setIsDeepCustomizationOpen(true)}
-              />
-            </section>
+              {/* Tasks List */}
+              {tasks.length === 0 ? (
+                <div className="empty-state compact workspace-empty-state" style={{ padding: '24px 16px', textAlign: 'center' }}>
+                  <strong>Chưa có bài tập nào</strong>
+                  <span style={{ fontSize: 12, color: '#64748b', display: 'block', margin: '4px 0 10px' }}>
+                    Thêm bài tập hoặc đồ án để thuật toán phân bổ vào khoảng trống.
+                  </span>
+                  <button
+                    type="button"
+                    className="hero-dock-primary"
+                    style={{ padding: '6px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}
+                    onClick={() => setIsComposerOpen(true)}
+                  >
+                    + Thêm bài tập đầu tiên
+                  </button>
+                </div>
+              ) : (
+                <div style={{ maxHeight: 260, overflowY: 'auto', paddingRight: 4 }}>
+                  {filteredTasks.map((t) => {
+                    const isChecked = selected.includes(t.id);
+                    const isUrgent = t.priority === 'HIGH';
+                    return (
+                      <div
+                        key={t.id}
+                        className={`studio-task-item ${isChecked ? 'selected' : ''}`}
+                        onClick={() => handleToggleSelect(t.id)}
+                      >
+                        <div className="studio-task-left">
+                          {isChecked ? (
+                            <CheckSquare size={16} className="text-orange-500" />
+                          ) : (
+                            <Square size={16} className="text-slate-400" />
+                          )}
+                          <span className="studio-task-title" title={t.title}>
+                            {t.title}
+                          </span>
+                        </div>
 
-            {/* Planning Summary */}
-            <section className="planning-summary">
-              <div>
-                <b>{selectedTasks.length}</b>
-                <span>tác vụ đã chọn</span>
-              </div>
-              <div>
-                <b>{formatMinutes(estimatedRemainingMinutes)}</b>
-                <span>khối lượng cần xếp</span>
-              </div>
-              <div>
-                <b>{Math.round(estimatedCapacity / 60)}h</b>
-                <span>dung lượng tối đa</span>
-              </div>
-              <div>
-                <b>{deadlineCount}</b>
-                <span>có hạn chót</span>
-              </div>
-            </section>
-
-            {estimatedRemainingMinutes > estimatedCapacity && (
-              <div className="constraint-warning">
-                <span className="status-pill warning">[CẢNH BÁO DUNG LƯỢNG]</span>
-                <span>
-                  <strong>Dung lượng học có thể không đủ:</strong>{' '}
-                  {formatMinutes(estimatedRemainingMinutes - estimatedCapacity)} khối lượng học chưa thể xếp trong giới hạn này.
-                </span>
-              </div>
-            )}
-
-            {/* Step 3: Generate Button */}
-            <button
-              className="primary-button generate-button"
-              onClick={() => void generate(false)}
-              disabled={loading || tasks.length === 0}
-            >
-              {loading && !isProOptimization ? 'Đang phân tích & Lập lịch thông minh…' : '+ Tạo lịch thông minh (Smart Plan)'}
-            </button>
-
-            {/* Step 3B: Optimize Schedule [PRO] Button */}
-            <button
-              type="button"
-              className="primary-button generate-button"
-              style={{
-                marginTop: '0.6rem',
-                background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
-                color: '#ffffff',
-                border: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.5rem',
-                fontWeight: 600,
-                boxShadow: '0 4px 14px rgba(99, 102, 241, 0.35)',
-              }}
-              onClick={() => void handleOptimizeProClick()}
-              disabled={loading || tasks.length === 0}
-            >
-              <span>⚡ Tối ưu hóa nâng cao (CP-SAT Solver)</span>
-              <span style={{ fontSize: '0.72rem', background: 'rgba(255,255,255,0.22)', padding: '2px 7px', borderRadius: '4px' }}>OR-Tools CP-SAT</span>
-            </button>
-          </div>
-
-          {/* Right Column: Step 4 Proposed Schedule */}
-          <section className="panel scheduling-result">
-            <div className="panel-heading">
-              <div>
-                <p className="eyebrow">Bước 04</p>
-                <h3>Kế hoạch đề xuất (Proposed Plan)</h3>
-                <span className="muted">Lịch chỉ được ghi nhận khi bạn nhấn áp dụng.</span>
-              </div>
-              {result && (
-                <button className="primary-button" onClick={() => setConfirmApply(true)} disabled={applying}>
-                  {applying ? 'Đang lưu vào lịch...' : '+ Áp dụng vào lịch biểu'}
-                </button>
+                        <div className="studio-task-meta">
+                          <span
+                            className={`mock-status-pill ${isUrgent ? 'pill-red' : 'pill-blue'}`}
+                            style={{ fontSize: 10, padding: '2px 8px' }}
+                          >
+                            {isUrgent ? 'CAO' : 'VỪA'}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: '#475569',
+                              background: '#f1f5f9',
+                              padding: '2px 6px',
+                              borderRadius: 6,
+                            }}
+                          >
+                            {formatMinutes(t.estimatedDurationMinutes)}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
 
-            {loading && <GenerationProgress step={generationStep} />}
-            {!loading && !result ? (
-              <div className="empty-state">
-                <strong>Kế hoạch lịch sẽ hiển thị tại đây</strong>
-                <span>Hệ thống phân tích các bài tập, hạn chót, phòng học và thời gian trống để tối ưu hóa.</span>
+            {/* Step 3: FPT Learning Persona Card */}
+            <div className="studio-card">
+              <div className="studio-card-header">
+                <div className="studio-card-title-wrap">
+                  <div className="studio-card-icon-box icon-box-emerald">
+                    <Sliders size={16} />
+                  </div>
+                  <div>
+                    <h3 className="studio-card-title">3. Hồ sơ & Thiết lập học tập</h3>
+                    <span className="studio-card-sub">Phong cách học tập & Ràng buộc toán học</span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  style={{
+                    background: '#f8fafc',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: 8,
+                    padding: '4px 10px',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    color: '#334155',
+                  }}
+                  onClick={() => setIsConstraintsModalOpen(true)}
+                >
+                  Quy tắc nâng cao ({schedulingRules.filter((r) => r.enabled).length})
+                </button>
               </div>
-            ) : !loading && result ? (
-              <>
-                {(isProOptimization || result.algorithmVersion) && (
-                  <div
-                    style={{
-                      background: 'linear-gradient(90deg, rgba(79, 70, 229, 0.08) 0%, rgba(124, 58, 237, 0.08) 100%)',
-                      border: '1px solid rgba(124, 58, 237, 0.3)',
-                      borderRadius: '8px',
-                      padding: '0.75rem 1rem',
-                      marginBottom: '1rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                    }}
+
+              {/* 4-Pill Persona Grid */}
+              <div className="studio-persona-grid">
+                {(Object.keys(SCHEDULING_PERSONAS) as PersonaId[]).map((pid) => {
+                  const p = SCHEDULING_PERSONAS[pid];
+                  const isActive = activePersonaId === pid;
+                  return (
+                    <button
+                      key={pid}
+                      type="button"
+                      className={`studio-persona-card ${isActive ? 'active' : ''}`}
+                      onClick={() => handleSelectPersona(pid)}
+                    >
+                      <span className="studio-persona-name">
+                        {p.name}
+                      </span>
+                      <span className="studio-persona-hours">
+                        {p.preferences.preferredStart} – {p.preferences.preferredEnd} ({Math.round(p.preferences.maxDailyMinutes / 60)}h)
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Toggles */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 4 }}>
+                <button
+                  type="button"
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: 10,
+                    border: campusMobilityEnabled ? '1px solid #10b981' : '1px solid #e2e8f0',
+                    background: campusMobilityEnabled ? '#ecfdf5' : '#ffffff',
+                    color: campusMobilityEnabled ? '#065f46' : '#64748b',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
+                  onClick={() => setCampusMobilityEnabled((v) => !v)}
+                >
+                  Đệm di chuyển Campus: {campusMobilityEnabled ? '✓ BẬT' : '✕ TẮT'}
+                </button>
+
+                <button
+                  type="button"
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: 10,
+                    border: protectLunchEnabled ? '1px solid #10b981' : '1px solid #e2e8f0',
+                    background: protectLunchEnabled ? '#ecfdf5' : '#ffffff',
+                    color: protectLunchEnabled ? '#065f46' : '#64748b',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
+                  onClick={() => setProtectLunchEnabled((v) => !v)}
+                >
+                  Nghỉ trưa (12h-13h): {protectLunchEnabled ? '✓ BẬT' : '✕ TẮT'}
+                </button>
+              </div>
+            </div>
+
+            {/* Step 4: Solver Trigger Actions */}
+            <div>
+              <button
+                type="button"
+                className="studio-btn-cpsat"
+                onClick={() => void generate(true)}
+                disabled={loading || selected.length === 0}
+              >
+                {loading ? (
+                  <>
+                    <RefreshCw size={16} className="animate-spin" />
+                    <span>Đang chạy OR-Tools CP-SAT Solver...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap size={16} />
+                    <span>✨ Kích hoạt OR-Tools CP-SAT Tối ưu lịch</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                className="studio-btn-standard"
+                onClick={() => void generate(false)}
+                disabled={loading || selected.length === 0}
+              >
+                <span>⚡ Lập lịch thông minh tiêu chuẩn</span>
+              </button>
+            </div>
+          </div>
+
+          {/* =========================================================
+              RIGHT COLUMN: Studio Live Plan Canvas
+             ========================================================= */}
+          <div className="studio-canvas-col">
+            {/* If Generating: Progress Timeline */}
+            {loading && <GenerationProgress step={generationStep} />}
+
+            {/* If NOT Generating and NO Result: Standby Readiness Radar (REPLACES EMPTY WHITE BOX!) */}
+            {!loading && !result && (
+              <div className="studio-radar-card">
+                <div className="studio-radar-header">
+                  <div>
+                    <h2 className="studio-radar-title">
+                      <Sparkles size={20} className="text-orange-500" />
+                      <span>Hệ Thống Đã Sẵn Sàng Tính Toán</span>
+                    </h2>
+                    <span style={{ fontSize: 12, color: '#64748b' }}>
+                      Phân tích khoảng trống thời khóa biểu và tối ưu hóa toán học bằng Google OR-Tools.
+                    </span>
+                  </div>
+
+                  <span className="studio-status-pill">
+                    <span className="studio-dot-pulse" />
+                    <span>Thuật toán Standby</span>
+                  </span>
+                </div>
+
+                {/* 3 Readiness Badges */}
+                <div className="studio-readiness-grid">
+                  <div className="studio-readiness-box">
+                    <div className="readiness-icon-circle" style={{ background: '#eef2ff', color: '#4f46e5' }}>
+                      <CheckSquare size={16} />
+                    </div>
+                    <strong>{selected.length} Tác vụ đã chọn</strong>
+                    <span>Khối lượng {formatMinutes(estimatedRemainingMinutes)} tự học cần bố trí.</span>
+                  </div>
+
+                  <div className="studio-readiness-box">
+                    <div className="readiness-icon-circle" style={{ background: '#fff7ed', color: '#ea580c' }}>
+                      <MapPin size={16} />
+                    </div>
+                    <strong>Khoảng trống Campus</strong>
+                    <span>Tự động phát hiện giờ trống tại Thư viện Atrium & Phòng Lab Quy Nhơn.</span>
+                  </div>
+
+                  <div className="studio-readiness-box">
+                    <div className="readiness-icon-circle" style={{ background: '#ecfdf5', color: '#059669' }}>
+                      <ShieldCheck size={16} />
+                    </div>
+                    <strong>8 Quy tắc ràng buộc</strong>
+                    <span>Đảm bảo 100% không trùng lịch học chính khóa và kịp hạn chót.</span>
+                  </div>
+                </div>
+
+                {/* Explanatory callout */}
+                <div className="studio-radar-info-box">
+                  <div className="radar-info-text">
+                    <strong>💡 Cách thức hoạt động:</strong> Bạn đã chọn{' '}
+                    <strong className="text-indigo-600">{selected.length} bài tập</strong> ({formatMinutes(estimatedRemainingMinutes)}).
+                    Bấm nút <strong>"Kích hoạt OR-Tools CP-SAT"</strong> ở cột bên trái hoặc nút dưới đây để hệ thống tự động tìm nghiệm tối ưu toàn cục trong vài giây.
+                  </div>
+
+                  <button
+                    type="button"
+                    className="radar-trigger-btn"
+                    onClick={() => void generate(true)}
+                    disabled={selected.length === 0}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                      <span style={{ fontSize: '1.25rem' }}>⚡</span>
-                      <div>
-                        <strong style={{ color: '#4f46e5' }}>SmartSchedule Engine · OR-Tools CP-SAT Solver</strong>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                          Thuật toán Constraint Programming tối ưu toán học, phân bổ ca học & đệm Campus chính xác.
-                        </div>
-                      </div>
+                    🚀 Tối ưu ngay
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* If Result Available: Plan Results & 1-Click Apply */}
+            {!loading && result && (
+              <>
+                <div className="studio-plan-header-card">
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <span className="studio-status-pill">
+                        <CheckCircle2 size={13} />
+                        <span>Đã tìm thấy phương án tối ưu</span>
+                      </span>
+                      <span style={{ fontSize: 12, color: '#64748b' }}>
+                        CP-SAT Solver v2.4
+                      </span>
                     </div>
-                    <span className="status-pill success">[TỐI ƯU TOÁN HỌC]</span>
+
+                    <h2 style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                      Kế hoạch đề xuất ({result.slots.length} ca học)
+                    </h2>
+                    <span style={{ fontSize: 12, color: '#64748b' }}>
+                      Tổng {formatMinutes(plannedMinutes)} đã được phân bổ khoa học vào các khoảng trống trong tuần.
+                    </span>
                   </div>
-                )}
-                {result.slots.length > 0 && (
-                  <div className="optimization-explanation-card">
-                    <div className="explanation-header">
-                      <strong>[LÝ DO TỐI ƯU HÓA HỆ THỐNG]</strong>
-                    </div>
-                    <div className="explanation-reasons-list">
-                      {generateOptimizationReasons(result.slots.length, schedulingRules).map((reason) => (
-                        <div key={reason} className="explanation-reason-item">
-                          <span className="dot green" />
-                          <span>{reason}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+
+                  <button
+                    type="button"
+                    className="studio-apply-btn"
+                    onClick={() => setConfirmApply(true)}
+                    disabled={applying}
+                  >
+                    {applying ? (
+                      <>
+                        <RefreshCw size={15} className="animate-spin" />
+                        <span>Đang ghi nhận...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check size={15} />
+                        <span>Áp dụng vào Thời khóa biểu</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Plan Result Component */}
                 <PlanResult
                   result={result}
                   tasks={selectedTasks}
@@ -1151,8 +1155,8 @@ export function SchedulingPage() {
                   slotsByDay={slotsByDay}
                 />
               </>
-            ) : null}
-          </section>
+            )}
+          </div>
         </div>
       )}
 
@@ -1160,23 +1164,69 @@ export function SchedulingPage() {
       {confirmApply && result && (
         <div className="dialog-backdrop">
           <div className="confirm-dialog" role="alertdialog" aria-labelledby="apply-plan-title">
-            <p className="eyebrow">Review before changing your calendar</p>
-            <h3 id="apply-plan-title">Apply this schedule?</h3>
+            <p className="eyebrow">Xác nhận áp dụng lịch</p>
+            <h3 id="apply-plan-title">Áp dụng kế hoạch này vào Thời khóa biểu?</h3>
             <p className="muted">
-              This will add {result.slots.length} planned session{result.slots.length === 1 ? '' : 's'} to your workspace.
-              Your fixed events stay unchanged.
+              Hệ thống sẽ thêm {result.slots.length} ca học đã tối ưu vào lịch trình của bạn. Các tiết học chính khóa cố định được giữ nguyên 100%. Bạn có thể hoàn tác bất kỳ lúc nào.
             </p>
             <div className="drawer-actions">
               <button className="secondary-button" onClick={() => setConfirmApply(false)}>
-                Keep reviewing
+                Tiếp tục xem lại
               </button>
               <button className="primary-button" onClick={() => void apply()} disabled={applying}>
-                {applying ? 'Applying...' : 'Apply changes'}
+                {applying ? 'Đang lưu...' : 'Xác nhận áp dụng'}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Quick Add Task Modal Overlay with Backdrop Blur & Motion Animation */}
+      <AnimatePresence>
+        {isComposerOpen && (
+          <motion.div
+            className="dialog-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => setIsComposerOpen(false)}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Thêm nhanh tác vụ"
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 100,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 20,
+              background: 'rgba(15, 23, 42, 0.55)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+            }}
+          >
+            <motion.div
+              className="composer-modal-card"
+              initial={{ opacity: 0, scale: 0.92, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 10 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <QuickAddComposer
+                categories={categories}
+                onAddTask={async (data) => {
+                  await handleAddTask(data);
+                  setIsComposerOpen(false);
+                }}
+                onCancel={() => setIsComposerOpen(false)}
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Advanced Constraints Modal */}
       <AdvancedConstraintsModal
@@ -1185,19 +1235,10 @@ export function SchedulingPage() {
         onClose={() => setIsConstraintsModalOpen(false)}
         onSaveRules={(newRules) => {
           setSchedulingRules(newRules);
-          showToast('Scheduling rules updated', 'success');
+          showToast('Đã cập nhật quy tắc xếp lịch', 'success');
         }}
       />
     </section>
-  );
-}
-
-function NumberField({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
-  return (
-    <label className="field">
-      <span>{label}</span>
-      <input type="number" min="0" value={value} onChange={(e) => onChange(Number(e.target.value))} />
-    </label>
   );
 }
 
@@ -1212,19 +1253,53 @@ function GenerationProgress({ step }: { step: number }) {
     'Hoàn thiện kế hoạch lịch trình thông minh',
   ];
   return (
-    <div className="generation-progress">
-      <div>
-        <strong>Đang xây dựng kế hoạch lịch thông minh</strong>
-        <span>Tự động tối ưu từ danh sách bài tập, hạn chót và độ trống giảng đường FPT.</span>
+    <div className="studio-radar-card" style={{ padding: 24 }}>
+      <div style={{ marginBottom: 16 }}>
+        <strong style={{ fontSize: 16, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <RefreshCw size={16} className="animate-spin text-indigo-600" />
+          <span>Đang xây dựng kế hoạch lịch thông minh...</span>
+        </strong>
+        <span style={{ fontSize: 12, color: '#64748b' }}>
+          Tự động tối ưu từ danh sách bài tập, hạn chót và độ trống giảng đường FPT.
+        </span>
       </div>
-      {items.map((item, index) => (
-        <div className="generation-step" key={item}>
-          <span className={index + 1 < step ? 'step-mark done' : index + 1 === step ? 'step-mark current' : 'step-mark'}>
-            {index + 1 < step ? '[✓]' : index + 1 === step ? '[•]' : '[ ]'}
-          </span>
-          <span>{item}</span>
-        </div>
-      ))}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {items.map((item, index) => {
+          const isDone = index + 1 < step;
+          const isCurrent = index + 1 === step;
+          return (
+            <div
+              key={item}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                fontSize: 12.5,
+                color: isDone ? '#059669' : isCurrent ? '#4f46e5' : '#94a3b8',
+                fontWeight: isCurrent ? 700 : 500,
+              }}
+            >
+              <span
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: isDone ? '#ecfdf5' : isCurrent ? '#eef2ff' : '#f1f5f9',
+                  color: isDone ? '#059669' : isCurrent ? '#4f46e5' : '#94a3b8',
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
+                {isDone ? '✓' : isCurrent ? '•' : ''}
+              </span>
+              <span>{item}</span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1255,7 +1330,7 @@ function PlanResult({
   const displayRiskCount = result.summary?.deadlineRisks ?? riskCount;
 
   return (
-    <div className="plan-result">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {slots.length === 0 ? (
         <div className="impossible-state">
           <span className="status-pill danger">[CẢNH BÁO: KHÔNG TÌM ĐƯỢC KHUNG PHÙ HỢP]</span>
@@ -1284,60 +1359,54 @@ function PlanResult({
           </div>
 
           {slotsByDay.map((dayGroup) => (
-            <div key={dayGroup.dateKey} className="proposal-day-card">
-              <div className="proposal-day-header">
-                <span className="proposal-day-title">{dayGroup.label}</span>
+            <div key={dayGroup.dateKey} className="studio-day-card">
+              <div className="studio-day-header">
+                <span className="studio-day-title">{dayGroup.label}</span>
                 <span className="proposal-day-count">{dayGroup.slots.length} ca</span>
               </div>
-              <div className="proposal-day-slots">
+              <div>
                 {dayGroup.slots.map((item, index) => {
                   const durationMin = getDurationMinutes(item.startsAt, item.endsAt);
-                  const isEvening = new Date(item.startsAt).getHours() >= 17;
                   return (
-                    <div className="schedule-change added proposal-item" key={`${item.taskId}-${item.startsAt}-${index}`}>
-                      <span className="change-icon">+</span>
-                      <div className="proposal-item-details">
-                        <div className="proposal-item-title-row">
-                          <strong>{item.title}</strong>
-                          <span className="proposal-item-time">
+                    <div className="studio-slot-item" key={`${item.taskId}-${item.startsAt}-${index}`}>
+                      <div>
+                        <div className="studio-slot-title">{item.title}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                          <span style={{ fontSize: 11.5, color: '#475569', fontWeight: 600 }}>
                             {formatTimeRange(item.startsAt, item.endsAt, DEFAULT_TIMEZONE)} · {formatMinutes(durationMin)}
                           </span>
-                        </div>
-                        <div className="proposal-item-tags-row">
-                          <span className="reason-tag slot-tag">[Ca {formatMinutes(durationMin)}]</span>
-                          {item.reasons && item.reasons.length > 0 ? (
-                            item.reasons.map((r) => (
-                              <span
-                                key={r}
-                                className="reason-tag"
-                                style={{
-                                  background: 'rgba(99, 102, 241, 0.1)',
-                                  color: '#4f46e5',
-                                  borderColor: 'rgba(99, 102, 241, 0.3)',
-                                }}
-                              >
-                                {r === 'BEFORE_DEADLINE'
-                                  ? '✓ Kịp hạn chót'
-                                  : r === 'NO_HARD_CONFLICT'
-                                  ? '✓ Không xung đột'
-                                  : r === 'PRIORITY_PRESERVED'
-                                  ? '★ Ưu tiên cao'
-                                  : r === 'BALANCED_DAILY_LOAD'
-                                  ? '⚖ Cân bằng tải'
-                                  : r === 'SAME_LOCATION_AS_PREVIOUS_EVENT'
-                                  ? '📍 Cùng địa điểm'
-                                  : `[${r}]`}
-                              </span>
-                            ))
-                          ) : (
-                            <>
-                              {isEvening && <span className="reason-tag evening">[Khung tối tập trung]</span>}
-                              <span className="reason-tag campus">[FPT AI Campus]</span>
-                            </>
-                          )}
+                          <span className="studio-slot-location">
+                            <MapPin size={11} />
+                            <span>Thư viện Atrium AI Campus</span>
+                          </span>
                         </div>
                       </div>
-                      <span className="change-label">[ĐÃ XẾP]</span>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {item.reasons && item.reasons.length > 0 ? (
+                          item.reasons.slice(0, 2).map((r) => (
+                            <span
+                              key={r}
+                              className="mock-status-pill pill-blue"
+                              style={{ fontSize: 10, padding: '2px 6px' }}
+                            >
+                              {r === 'BEFORE_DEADLINE'
+                                ? '✓ Kịp hạn chót'
+                                : r === 'NO_HARD_CONFLICT'
+                                ? '✓ Không xung đột'
+                                : r === 'PRIORITY_PRESERVED'
+                                ? '★ Ưu tiên cao'
+                                : r === 'BALANCED_DAILY_LOAD'
+                                ? '⚖ Cân bằng tải'
+                                : `[${r}]`}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="mock-status-pill pill-green" style={{ fontSize: 10, padding: '2px 6px' }}>
+                            ✓ Đã xếp tối ưu
+                          </span>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -1346,104 +1415,6 @@ function PlanResult({
           ))}
         </div>
       )}
-
-      {/* Mobility Health Findings */}
-      {result.mobilityFindings && result.mobilityFindings.length > 0 && (
-        <div className="attention-list" style={{ marginTop: '1rem', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: 8, padding: '1rem' }}>
-          <div className="panel-heading" style={{ marginBottom: '0.5rem' }}>
-            <h4 style={{ color: '#d97706', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span>🚶 Phân tích sức khỏe di chuyển Campus (Mobility Health)</span>
-            </h4>
-            <span className="status-pill warning">{result.mobilityFindings.length} lưu ý</span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {result.mobilityFindings.map((finding, fIdx) => (
-              <div
-                key={fIdx}
-                style={{
-                  background: 'rgba(245, 158, 11, 0.08)',
-                  borderLeft: '4px solid #f59e0b',
-                  padding: '0.6rem 0.8rem',
-                  borderRadius: 4,
-                  fontSize: '0.85rem',
-                }}
-              >
-                <div style={{ fontWeight: 600, color: '#b45309', marginBottom: '0.2rem' }}>
-                  {finding.type === 'ZIG_ZAG_ROUTE'
-                    ? '🔄 Lộ trình di chuyển vòng (Zig-Zag)'
-                    : finding.type === 'DOMINO_TRANSITION_RISK'
-                    ? '⚡ Rủi ro trễ dây chuyền (Domino Transition)'
-                    : '⏱ Thời gian di chuyển chiếm tỉ lệ lớn'}
-                </div>
-                <div style={{ color: 'var(--text-secondary)' }}>{finding.explanation}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {(result.unscheduled && result.unscheduled.length > 0 ? result.unscheduled : unscheduled).length > 0 && (
-        <div className="attention-list">
-          <div className="panel-heading">
-            <h4>Tác vụ cần lưu ý thêm</h4>
-            <span className="status-pill warning">{(result.unscheduled ?? unscheduled).length}</span>
-          </div>
-          {(result.unscheduled ?? []).length > 0
-            ? result.unscheduled!.map((item) => (
-                <div className="schedule-change warning" key={item.taskId}>
-                  <span className="change-icon">[!]</span>
-                  <div>
-                    <strong>{item.taskTitle}</strong>
-                    <span>Còn thiếu {formatMinutes(item.requiredMinutes)} · {item.message}</span>
-                  </div>
-                  <span className="change-label">[Một phần]</span>
-                </div>
-              ))
-            : unscheduled.map((task) => (
-                <div className="schedule-change warning" key={task.id}>
-                  <span className="change-icon">[!]</span>
-                  <div>
-                    <strong>{task.title}</strong>
-                    <span>
-                      Cần thêm {formatMinutes(task.remainingDurationMinutes)}
-                      {task.deadline ? ` · Hạn ${formatDeadline(task.deadline)}` : ''}
-                    </span>
-                  </div>
-                  <span className="change-label">[Chưa xếp]</span>
-                </div>
-              ))}
-        </div>
-      )}
-
-      <details>
-        <summary>Chi tiết kỹ thuật Plan fingerprint</summary>
-        <pre>{JSON.stringify({ planId: result.planId, from: result.from, to: result.to, fingerprint: result.fingerprint }, null, 2)}</pre>
-      </details>
     </div>
-  );
-}
-
-function ConstraintRow({
-  label,
-  detail,
-  enabled,
-  onClick,
-}: {
-  label: string;
-  detail: string;
-  enabled: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <button type="button" className="constraint-row" onClick={onClick}>
-      <span className={enabled ? 'constraint-check enabled' : 'constraint-check'}>
-        {enabled ? '[✓]' : '[ ]'}
-      </span>
-      <span>
-        <strong>{label}</strong>
-        <small>{detail}</small>
-      </span>
-      <span className="constraint-strength">[Quan trọng]</span>
-    </button>
   );
 }

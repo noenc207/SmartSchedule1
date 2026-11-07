@@ -3,6 +3,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { useAuthStore } from './authStore';
 
 export type CalendarViewType =
+  | 'slotGrid'
   | 'timeGridDay'
   | 'timeGridWeek'
   | 'dayGridMonth'
@@ -66,7 +67,7 @@ export interface PreferenceState {
 }
 
 export const defaultPreferences = {
-  calendarView: 'timeGridWeek' as CalendarViewType,
+  calendarView: 'slotGrid' as CalendarViewType,
   semanticZoomLevel: 'detailed' as SemanticZoomLevel,
   isMiniCalendarVisible: true,
   timeFormat: '24h' as TimeFormat,

@@ -52,6 +52,14 @@ const DEMO_USER_PROFILE: User = {
   tier: getInitialDemoTier(),
 };
 
+export const getInitialDemoUser = (): User => {
+  const storage = getStorage();
+  const tier = getInitialDemoTier();
+  const avatarUrl = (storage && storage.getItem('smartschedule-demo-avatar')) || DEMO_USER_PROFILE.avatarUrl;
+  const displayName = (storage && storage.getItem('smartschedule-demo-name')) || DEMO_USER_PROFILE.displayName;
+  return { ...DEMO_USER_PROFILE, avatarUrl, displayName, tier };
+};
+
 /**
  * Checks whether a JWT token is expired (or will expire within 30 seconds).
  */
@@ -87,8 +95,9 @@ export function getInitialAuthState(): { user: User | null; status: AuthStatus; 
     return { user: null, status: 'INITIALIZING', authInitialized: false };
   }
   if (isDemoMode()) {
+    const demoUser = getInitialDemoUser();
     return {
-      user: { ...DEMO_USER_PROFILE, tier: getInitialDemoTier() },
+      user: demoUser,
       status: 'AUTHENTICATED',
       authInitialized: true,
     };
@@ -242,8 +251,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     setDemoMode(true);
     localStorage.setItem('smartschedule-demo-mode', 'true');
     setStoredTokens('local-demo-token');
-    const tier = getInitialDemoTier();
-    const demoUser = { ...DEMO_USER_PROFILE, tier };
+    const demoUser = getInitialDemoUser();
     setStoredUser(demoUser);
     set({
       user: demoUser,
@@ -285,8 +293,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   bootstrap: async () => {
     if (isDemoMode()) {
       setAccessToken('local-demo-token');
-      const tier = getInitialDemoTier();
-      const demoUser = { ...DEMO_USER_PROFILE, tier };
+      const demoUser = getInitialDemoUser();
       set({ user: demoUser, status: 'AUTHENTICATED', authInitialized: true });
       return;
     }
