@@ -16,6 +16,7 @@ import {
   Activity,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import { useAuthStore } from '../../stores/authStore';
 import type { LoginInput, RegisterInput, SocialProvider } from '../../types/auth';
 import { BrandLogo } from '../../components/BrandLogo';
@@ -100,12 +101,12 @@ function CampusInteractiveShowcase({ mode }: { mode: 'login' | 'register' }) {
   return (
     <aside
       aria-label="Giới thiệu Hệ sinh thái Học tập FPT University Quy Nhơn"
+      className="auth-showcase-aside hidden lg:flex"
       onMouseEnter={() => setIsPaused(true)}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       style={{
         position: 'relative',
-        display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
         padding: '26px 36px',
@@ -858,6 +859,7 @@ export function LoginPage() {
   const location = useLocation();
   const { login, googleAuth, githubAuth, facebookAuth, demoLogin, error, clearError } = useAuth();
   const updateUser = useAuthStore((s) => s.updateUser);
+  const isMobile = useIsMobile(1024);
   const [showPassword, setShowPassword] = useState(false);
   const [socialLoading, setSocialLoading] = useState(false);
   const [socialNotice, setSocialNotice] = useState<string | null>(null);
@@ -1009,39 +1011,10 @@ export function LoginPage() {
 
   if (pendingSocialAuth) {
     return (
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1.15fr 1fr',
-          minHeight: '100vh',
-          maxHeight: '100vh',
-          overflow: 'hidden',
-          background: '#f8fafc',
-        }}
-      >
-        <CampusInteractiveShowcase mode="login" />
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '24px 32px',
-          }}
-        >
-          <main
-            style={{
-              position: 'relative',
-              width: '100%',
-              maxWidth: 440,
-              background: '#ffffff',
-              borderRadius: 24,
-              padding: '28px 32px',
-              border: '1px solid #e2e8f0',
-              boxShadow: '0 20px 50px rgba(15, 23, 42, 0.08)',
-              overflow: 'hidden',
-            }}
-          >
+      <div className="auth-responsive-viewport bg-slate-50">
+        {!isMobile && <CampusInteractiveShowcase mode="login" />}
+        <div className="auth-interactive-panel">
+          <main className="auth-interactive-card" style={{ maxWidth: 440 }}>
             <BorderBeam size={200} duration={10} colorFrom="#ea580c" colorTo="#fbbf24" />
             <BrandLogo />
             <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: '12px 0 4px' }}>
@@ -1071,53 +1044,19 @@ export function LoginPage() {
   }
 
   return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '1.18fr 1fr',
-        minHeight: '100vh',
-        maxHeight: '100vh',
-        overflow: 'hidden',
-        background: 'linear-gradient(135deg, #fff7ed 0%, #f8fafc 50%, #eff6ff 100%)',
-      }}
-    >
+    <div className="auth-responsive-viewport">
       {/* Left Interactive Campus Showcase */}
-      <CampusInteractiveShowcase mode="login" />
+      {!isMobile && <CampusInteractiveShowcase mode="login" />}
 
       {/* Right Auth Studio Panel with Interactive Spotlight */}
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '20px 32px',
-          position: 'relative',
-          overflow: 'hidden',
-        }}
-      >
+      <div className="auth-interactive-panel">
         <AuthSpotlight />
 
         <motion.main
           initial={{ opacity: 0, y: 18, scale: 0.985 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-          style={{
-            position: 'relative',
-            zIndex: 2,
-            width: '100%',
-            maxWidth: 450,
-            background: 'rgba(255, 255, 255, 0.96)',
-            backdropFilter: 'blur(16px)',
-            borderRadius: 24,
-            padding: '26px 30px',
-            border: '1px solid rgba(226, 232, 240, 0.9)',
-            boxShadow: '0 24px 60px -15px rgba(15, 23, 42, 0.1)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 15,
-            overflow: 'hidden',
-          }}
+          className="auth-interactive-card"
         >
           {/* Radiant Orbiting BorderBeam */}
           <BorderBeam size={240} duration={11} colorFrom="#f97316" colorTo="#3b82f6" />
@@ -1375,16 +1314,7 @@ export function LoginPage() {
           </div>
         </motion.main>
 
-        <footer
-          style={{
-            position: 'relative',
-            zIndex: 2,
-            marginTop: 12,
-            fontSize: 11.5,
-            color: '#64748b',
-            fontWeight: 600,
-          }}
-        >
+        <footer className="auth-mobile-footer">
           SmartSchedule · Nền tảng Quản trị Lịch trình Học thuật · FPT University Quy Nhơn
         </footer>
       </div>
@@ -1397,6 +1327,7 @@ export function RegisterPage() {
   const { register, googleAuth, githubAuth, facebookAuth, demoLogin, error, clearError } =
     useAuth();
   const updateUser = useAuthStore((s) => s.updateUser);
+  const isMobile = useIsMobile(1024);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [socialLoading, setSocialLoading] = useState(false);
@@ -1514,39 +1445,10 @@ export function RegisterPage() {
 
   if (pendingSocialAuth) {
     return (
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1.15fr 1fr',
-          minHeight: '100vh',
-          maxHeight: '100vh',
-          overflow: 'hidden',
-          background: '#f8fafc',
-        }}
-      >
-        <CampusInteractiveShowcase mode="register" />
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '24px 32px',
-          }}
-        >
-          <main
-            style={{
-              position: 'relative',
-              width: '100%',
-              maxWidth: 440,
-              background: '#ffffff',
-              borderRadius: 24,
-              padding: '28px 32px',
-              border: '1px solid #e2e8f0',
-              boxShadow: '0 20px 50px rgba(15, 23, 42, 0.08)',
-              overflow: 'hidden',
-            }}
-          >
+      <div className="auth-responsive-viewport bg-slate-50">
+        {!isMobile && <CampusInteractiveShowcase mode="register" />}
+        <div className="auth-interactive-panel">
+          <main className="auth-interactive-card" style={{ maxWidth: 440 }}>
             <BorderBeam size={200} duration={10} colorFrom="#ea580c" colorTo="#fbbf24" />
             <BrandLogo />
             <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: '12px 0 4px' }}>
@@ -1573,51 +1475,18 @@ export function RegisterPage() {
   }
 
   return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '1.18fr 1fr',
-        minHeight: '100vh',
-        maxHeight: '100vh',
-        overflow: 'hidden',
-        background: 'linear-gradient(135deg, #fff7ed 0%, #f8fafc 50%, #eff6ff 100%)',
-      }}
-    >
-      <CampusInteractiveShowcase mode="register" />
+    <div className="auth-responsive-viewport">
+      {!isMobile && <CampusInteractiveShowcase mode="register" />}
 
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '16px 28px',
-          position: 'relative',
-          overflow: 'hidden',
-        }}
-      >
+      <div className="auth-interactive-panel">
         <AuthSpotlight />
 
         <motion.main
           initial={{ opacity: 0, y: 18, scale: 0.985 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-          style={{
-            position: 'relative',
-            zIndex: 2,
-            width: '100%',
-            maxWidth: 470,
-            background: 'rgba(255, 255, 255, 0.96)',
-            backdropFilter: 'blur(16px)',
-            borderRadius: 24,
-            padding: '22px 28px',
-            border: '1px solid rgba(226, 232, 240, 0.9)',
-            boxShadow: '0 24px 60px -15px rgba(15, 23, 42, 0.1)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 12,
-            overflow: 'hidden',
-          }}
+          className="auth-interactive-card"
+          style={{ maxWidth: 470 }}
         >
           <BorderBeam size={240} duration={11} colorFrom="#f97316" colorTo="#3b82f6" />
 
@@ -1709,7 +1578,7 @@ export function RegisterPage() {
             style={{ display: 'flex', flexDirection: 'column', gap: 10 }}
           >
             {/* 2-Column Name & Email */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div className="auth-responsive-fields-grid">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <label
                   htmlFor="reg-name-input"
@@ -1758,7 +1627,7 @@ export function RegisterPage() {
             </div>
 
             {/* 2-Column Password & Confirm Password */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div className="auth-responsive-fields-grid">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <label
                   htmlFor="reg-password-input"
@@ -1879,16 +1748,7 @@ export function RegisterPage() {
           </div>
         </motion.main>
 
-        <footer
-          style={{
-            position: 'relative',
-            zIndex: 2,
-            marginTop: 10,
-            fontSize: 11.5,
-            color: '#64748b',
-            fontWeight: 600,
-          }}
-        >
+        <footer className="auth-mobile-footer">
           SmartSchedule · Nền tảng Quản trị Lịch trình Học thuật · FPT University Quy Nhơn
         </footer>
       </div>
