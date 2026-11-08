@@ -40,69 +40,8 @@ export function DashboardPage() {
   } = useDashboardData();
 
   const effectiveTasks = useMemo(() => {
-    const hasPending = tasks && tasks.some((t) => t.status !== 'COMPLETED');
-    if (hasPending) return tasks;
-    return [
-      ...(tasks || []),
-      {
-        id: 'fb-os-review',
-        scheduleId: activeScheduleId || 's-1',
-        ownerId: 'user-1',
-        categoryId: 'cat-academic',
-        title: 'Operating Systems Review',
-        description: 'Ôn tập quản lý bộ nhớ ảo & tiến trình',
-        estimatedDurationMinutes: 120,
-        remainingDurationMinutes: 120,
-        priority: 'MEDIUM' as const,
-        deadline: '2026-09-26T23:59:00.000Z',
-        status: 'TODO' as const,
-        preferredStartTime: null,
-        preferredEndTime: null,
-        minimumSessionMinutes: 30,
-        maximumSessionMinutes: 120,
-        createdAt: '2026-09-20T00:00:00.000Z',
-        updatedAt: '2026-09-20T00:00:00.000Z',
-      },
-      {
-        id: 'fb-research-paper',
-        scheduleId: activeScheduleId || 's-1',
-        ownerId: 'user-1',
-        categoryId: 'cat-projects',
-        title: 'Research Paper',
-        description: 'Hoàn thiện báo cáo nghiên cứu AI Lab',
-        estimatedDurationMinutes: 90,
-        remainingDurationMinutes: 90,
-        priority: 'HIGH' as const,
-        deadline: '2026-09-27T23:59:00.000Z',
-        status: 'TODO' as const,
-        preferredStartTime: null,
-        preferredEndTime: null,
-        minimumSessionMinutes: 30,
-        maximumSessionMinutes: 120,
-        createdAt: '2026-09-20T00:00:00.000Z',
-        updatedAt: '2026-09-20T00:00:00.000Z',
-      },
-      {
-        id: 'fb-english-practice',
-        scheduleId: activeScheduleId || 's-1',
-        ownerId: 'user-1',
-        categoryId: 'cat-personal',
-        title: 'English Practice',
-        description: 'Luyện nghe & phản xạ học thuật LUK',
-        estimatedDurationMinutes: 60,
-        remainingDurationMinutes: 60,
-        priority: 'MEDIUM' as const,
-        deadline: '2026-09-28T23:59:00.000Z',
-        status: 'TODO' as const,
-        preferredStartTime: null,
-        preferredEndTime: null,
-        minimumSessionMinutes: 30,
-        maximumSessionMinutes: 90,
-        createdAt: '2026-09-20T00:00:00.000Z',
-        updatedAt: '2026-09-20T00:00:00.000Z',
-      },
-    ];
-  }, [tasks, activeScheduleId]);
+    return tasks || [];
+  }, [tasks]);
 
   const selectedDayKey = useMemo(() => {
     return VIETNAMESE_DAYS[activeDate.getDay()] || 'T7';

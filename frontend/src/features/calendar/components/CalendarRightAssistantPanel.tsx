@@ -10,6 +10,7 @@ import {
   Sparkles,
   Maximize2,
   X,
+  CheckCircle2,
 } from 'lucide-react';
 import type { EventItem, Task, Category } from '../../../types/domain';
 import { NlpTaskInput } from '../../tasks/components/NlpTaskInput';
@@ -106,70 +107,9 @@ export function CalendarRightAssistantPanel({
     return { duration: durStr, sub: `Sau ${afterTime}` };
   }, [todayEvents]);
 
-  // Fallback tasks when DB has 0 unscheduled tasks so "Nhiệm vụ chưa lên lịch" always displays full features
-  const fallbackTasks: Task[] = [
-    {
-      id: 'cal-os-review',
-      scheduleId: 's-1',
-      ownerId: 'u-1',
-      categoryId: 'cat-academic',
-      title: 'Operating Systems Review',
-      description: 'Ôn tập quản lý bộ nhớ ảo & tiến trình',
-      estimatedDurationMinutes: 120,
-      remainingDurationMinutes: 120,
-      priority: 'MEDIUM',
-      deadline: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
-      status: 'TODO',
-      preferredStartTime: null,
-      preferredEndTime: null,
-      minimumSessionMinutes: 30,
-      maximumSessionMinutes: 120,
-      createdAt: '2026-11-01T00:00:00.000Z',
-      updatedAt: '2026-11-01T00:00:00.000Z',
-    },
-    {
-      id: 'cal-research-paper',
-      scheduleId: 's-1',
-      ownerId: 'u-1',
-      categoryId: 'cat-projects',
-      title: 'Research Paper',
-      description: 'Hoàn thiện báo cáo nghiên cứu AI Lab',
-      estimatedDurationMinutes: 240,
-      remainingDurationMinutes: 240,
-      priority: 'HIGH',
-      deadline: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-      status: 'TODO',
-      preferredStartTime: null,
-      preferredEndTime: null,
-      minimumSessionMinutes: 30,
-      maximumSessionMinutes: 120,
-      createdAt: '2026-11-01T00:00:00.000Z',
-      updatedAt: '2026-11-01T00:00:00.000Z',
-    },
-    {
-      id: 'cal-english-practice',
-      scheduleId: 's-1',
-      ownerId: 'u-1',
-      categoryId: 'cat-personal',
-      title: 'English Practice',
-      description: 'Luyện nghe & phản xạ học thuật LUK',
-      estimatedDurationMinutes: 120,
-      remainingDurationMinutes: 120,
-      priority: 'LOW',
-      deadline: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
-      status: 'TODO',
-      preferredStartTime: null,
-      preferredEndTime: null,
-      minimumSessionMinutes: 30,
-      maximumSessionMinutes: 90,
-      createdAt: '2026-09-20T00:00:00.000Z',
-      updatedAt: '2026-09-20T00:00:00.000Z',
-    },
-  ];
-
   const rawUnscheduled = tasks.filter((t) => t.status !== 'COMPLETED');
-  const unscheduledTasks = (rawUnscheduled.length > 0 ? rawUnscheduled : fallbackTasks).slice(0, 5);
-  const upcomingDeadlines = unscheduledTasks.filter((t) => t.deadline).slice(0, 3);
+  const unscheduledTasks = rawUnscheduled.slice(0, 8);
+  const upcomingDeadlines = tasks.filter((t) => t.status !== 'COMPLETED' && t.deadline).slice(0, 5);
 
   const monthLabel = `T${activeDate.getMonth() + 1}/${activeDate.getFullYear()}`;
 
@@ -470,43 +410,69 @@ export function CalendarRightAssistantPanel({
               paddingRight: 2,
             }}
           >
-            {unscheduledTasks.map((task) => {
-              const priorityClass =
-                task.priority === 'HIGH' ? 'p-high' : task.priority === 'LOW' ? 'p-low' : 'p-med';
-              const remaining = task.remainingDurationMinutes || task.estimatedDurationMinutes || 60;
-              const diffDays = task.deadline
-                ? Math.ceil((new Date(task.deadline).getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-                : null;
+            {unscheduledTasks.length === 0 ? (
+              <div
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  textAlign: 'center',
+                  padding: '16px 12px',
+                  color: 'var(--text-secondary, #64748b)',
+                  borderRadius: 12,
+                  border: '1px dashed var(--border-color, #e2e8f0)',
+                  background: 'rgba(248, 250, 252, 0.6)',
+                }}
+              >
+                <CheckCircle2 size={24} style={{ color: '#10b981', marginBottom: 6 }} />
+                <strong style={{ fontSize: 12, color: 'var(--text-primary, #1e293b)' }}>
+                  Không có việc tồn đọng
+                </strong>
+                <p style={{ margin: '2px 0 0', fontSize: 11, color: '#64748b' }}>
+                  Nhập bài tập bên dưới để Cóc AI tự xếp lịch
+                </p>
+              </div>
+            ) : (
+              unscheduledTasks.map((task) => {
+                const priorityClass =
+                  task.priority === 'HIGH' ? 'p-high' : task.priority === 'LOW' ? 'p-low' : 'p-med';
+                const remaining = task.remainingDurationMinutes || task.estimatedDurationMinutes || 60;
+                const diffDays = task.deadline
+                  ? Math.ceil((new Date(task.deadline).getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+                  : null;
 
-              return (
-                <div
-                  key={task.id}
-                  className={`academic-task-card ${selectedTask?.id === task.id ? 'is-selected' : ''}`}
-                  data-task-id={task.id}
-                  data-task-title={task.title}
-                  data-task-duration={remaining}
-                  draggable={canEdit}
-                  onClick={() => onSelectTask(selectedTask?.id === task.id ? null : task)}
-                  style={{ padding: '7px 10px', minHeight: 'unset' }}
-                >
-                  <div className={`task-priority-stripe ${priorityClass}`} />
-                  <div className="task-drag-grip" title="Kéo thả vào lịch">
-                    <GripVertical size={13} />
-                  </div>
-                  <div className="task-content-copy">
-                    <strong className="task-title-text" title={task.title} style={{ fontSize: 12 }}>
-                      {task.title}
-                    </strong>
-                    <div className="task-meta-line" style={{ fontSize: 10.5 }}>
-                      <span>
-                        {Math.round(remaining / 60)}h · {task.priority}
-                      </span>
-                      {diffDays !== null && <span> · hạn {diffDays}d</span>}
+                return (
+                  <div
+                    key={task.id}
+                    className={`academic-task-card ${selectedTask?.id === task.id ? 'is-selected' : ''}`}
+                    data-task-id={task.id}
+                    data-task-title={task.title}
+                    data-task-duration={remaining}
+                    draggable={canEdit}
+                    onClick={() => onSelectTask(selectedTask?.id === task.id ? null : task)}
+                    style={{ padding: '7px 10px', minHeight: 'unset' }}
+                  >
+                    <div className={`task-priority-stripe ${priorityClass}`} />
+                    <div className="task-drag-grip" title="Kéo thả vào lịch">
+                      <GripVertical size={13} />
+                    </div>
+                    <div className="task-content-copy">
+                      <strong className="task-title-text" title={task.title} style={{ fontSize: 12 }}>
+                        {task.title}
+                      </strong>
+                      <div className="task-meta-line" style={{ fontSize: 10.5 }}>
+                        <span>
+                          {Math.round(remaining / 60)}h · {task.priority}
+                        </span>
+                        {diffDays !== null && <span> · hạn {diffDays}d</span>}
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
 
           {/* AI Quick Input Form (Pinned at bottom, with right clearance for floating Cóc AI icon) */}
@@ -762,47 +728,68 @@ export function CalendarRightAssistantPanel({
             {/* POP-OUT 3: ĐỀ THI & DEADLINE */}
             {activePopout === 'deadlines' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {upcomingDeadlines.map((task) => {
-                  const deadlineDate = new Date(task.deadline!);
-                  const formattedDay = `${deadlineDate.getDate()}/${deadlineDate.getMonth() + 1}`;
-                  const isHigh = task.priority === 'HIGH';
-                  return (
-                    <div
-                      key={task.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '10px 12px',
-                        borderRadius: 12,
-                        background: '#f8fafc',
-                        border: '1px solid #e2e8f0',
-                      }}
-                    >
-                      <div>
-                        <strong style={{ fontSize: 13, color: '#0f172a', display: 'block' }}>
-                          {task.title}
-                        </strong>
-                        <span style={{ fontSize: 11.5, color: '#64748b' }}>
-                          Hạn nộp: {formattedDay} · 23:59
-                        </span>
-                      </div>
-                      <span
+                {upcomingDeadlines.length === 0 ? (
+                  <div
+                    style={{
+                      textAlign: 'center',
+                      padding: '24px 16px',
+                      color: '#64748b',
+                      background: '#f8fafc',
+                      borderRadius: 14,
+                      border: '1px dashed #cbd5e1',
+                    }}
+                  >
+                    <CheckCircle2 size={28} style={{ color: '#10b981', margin: '0 auto 8px', display: 'block' }} />
+                    <strong style={{ fontSize: 13, color: '#0f172a', display: 'block', marginBottom: 2 }}>
+                      Không có deadline sắp tới
+                    </strong>
+                    <span style={{ fontSize: 11.5 }}>
+                      Bạn đã hoàn thành các nhiệm vụ hoặc chưa đặt hạn chót mới.
+                    </span>
+                  </div>
+                ) : (
+                  upcomingDeadlines.map((task) => {
+                    const deadlineDate = new Date(task.deadline!);
+                    const formattedDay = `${deadlineDate.getDate()}/${deadlineDate.getMonth() + 1}`;
+                    const isHigh = task.priority === 'HIGH';
+                    return (
+                      <div
+                        key={task.id}
                         style={{
-                          padding: '3px 9px',
-                          borderRadius: 999,
-                          background: isHigh ? '#fef2f2' : '#fff7ed',
-                          color: isHigh ? '#dc2626' : '#c2410c',
-                          border: isHigh ? '1px solid #fecaca' : '1px solid #fed7aa',
-                          fontSize: 11,
-                          fontWeight: 700,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '10px 12px',
+                          borderRadius: 12,
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
                         }}
                       >
-                        {isHigh ? 'Khẩn cấp' : 'Quan trọng'}
-                      </span>
-                    </div>
-                  );
-                })}
+                        <div>
+                          <strong style={{ fontSize: 13, color: '#0f172a', display: 'block' }}>
+                            {task.title}
+                          </strong>
+                          <span style={{ fontSize: 11.5, color: '#64748b' }}>
+                            Hạn nộp: {formattedDay} · 23:59
+                          </span>
+                        </div>
+                        <span
+                          style={{
+                            padding: '3px 9px',
+                            borderRadius: 999,
+                            background: isHigh ? '#fef2f2' : '#fff7ed',
+                            color: isHigh ? '#dc2626' : '#c2410c',
+                            border: isHigh ? '1px solid #fecaca' : '1px solid #fed7aa',
+                            fontSize: 11,
+                            fontWeight: 700,
+                          }}
+                        >
+                          {isHigh ? 'Khẩn cấp' : 'Quan trọng'}
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             )}
           </div>

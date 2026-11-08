@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '../../../hooks/useAuth';
 import {
   Calendar,
   AlertTriangle,
@@ -111,18 +112,23 @@ export function MobileDashboard({
   const pendingTasks = tasks.filter((t) => t.status !== 'COMPLETED');
   const completedTasks = tasks.filter((t) => t.status === 'COMPLETED');
 
+  const { user } = useAuth();
+  const studentName = user?.displayName || user?.email?.split('@')[0] || 'bạn';
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Chào buổi sáng' : hour < 18 ? 'Chào buổi chiều' : 'Chào buổi tối';
+
   const summary = kpiSummary || {
-    remainingHours: '8h',
-    dailyAvgHours: '/ 3h/ngày có lịch',
-    studyProgressPct: 68,
-    urgentDeadlineCount: 1,
-    deadlineBadgeText: 'Khẩn cấp',
-    deadlineProgressPct: 48,
-    completedHours: '9h',
-    totalTargetHours: 'tổng 15h',
-    completedPct: 60,
-    weeklyGoalPct: 60,
-    remainingDays: 4,
+    remainingHours: '0h',
+    dailyAvgHours: '/ 0h/ngày có lịch',
+    studyProgressPct: 0,
+    urgentDeadlineCount: 0,
+    deadlineBadgeText: 'Hoàn thành',
+    deadlineProgressPct: 100,
+    completedHours: '0h',
+    totalTargetHours: 'tổng 0h',
+    completedPct: 100,
+    weeklyGoalPct: 100,
+    remainingDays: 0,
   };
 
   // Day events for Timetable tab
@@ -140,7 +146,7 @@ export function MobileDashboard({
           <span className="mobile-weather-badge">25°C ⛅</span>
         </div>
         <h1 className="mobile-hero-greeting">
-          Chào buổi tối, <span className="highlight">Vũ Ngọc Nhi!</span> ☀️
+          {greeting}, <span className="highlight">{studentName}!</span> ☀️
         </h1>
         <p className="mobile-hero-quote">
           “Không có con đường nào là dễ dàng, nhưng luôn có một cách đi thông minh.”

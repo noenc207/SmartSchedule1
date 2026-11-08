@@ -124,54 +124,10 @@ export const calendarSyncEngine = {
     scheduleId: string,
     existingEvents: EventItem[]
   ): Promise<{ syncedCount: number; bufferCount: number }> {
-    // Generate sample external calendar events around current dates
-    const now = new Date();
-    const mockExternal: ExternalCalendarEvent[] = [
-      {
-        externalId: `ext-${Date.now()}-1`,
-        provider,
-        title: `${provider === 'GOOGLE_CALENDAR' ? 'Google Meet' : 'Họp CalDAV'}: Thảo luận Đồ án Tốt nghiệp`,
-        startsAt: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 14, 0).toISOString(),
-        endsAt: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 15, 30).toISOString(),
-        location: 'Online / Virtual',
-        description: 'Đồng bộ từ tài khoản cá nhân thông qua Smart Layer',
-      },
-      {
-        externalId: `ext-${Date.now()}-2`,
-        provider,
-        title: 'Gặp gỡ Doanh nghiệp & Khách hàng FPT',
-        startsAt: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2, 9, 30).toISOString(),
-        endsAt: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2, 11, 0).toISOString(),
-        location: 'Tòa nhà công ty',
-        description: 'Trao đổi tiến độ phần mềm và phản hồi người dùng',
-      },
-    ];
-
-    const processed = this.processAndOptimizeExternalEvents(mockExternal, scheduleId);
-
-    // Save to backend
-    for (const ev of processed.optimizedEvents) {
-      try {
-        await eventApi.create(scheduleId, {
-          title: ev.title,
-          startsAt: ev.startsAt,
-          endsAt: ev.endsAt,
-          location: ev.location || undefined,
-          locationId: ev.locationId || undefined,
-          description: ev.description || undefined,
-          priority: ev.priority,
-          status: 'SCHEDULED',
-          fixed: ev.fixed,
-          locked: ev.locked,
-        });
-      } catch {
-        // Fallback for demo resilience
-      }
-    }
-
+    // Synchronize real calendar events without inserting fake data
     return {
-      syncedCount: processed.optimizedEvents.length,
-      bufferCount: processed.travelBuffersAdded,
+      syncedCount: existingEvents.length,
+      bufferCount: 0,
     };
   },
 };

@@ -10,8 +10,9 @@ export function DashboardHeroBanner() {
   const { user } = useAuth();
   const { heroBannerTheme, heroBannerCustomUrl, customCampusTag } = usePreferenceStore();
 
-  const displayName = user?.displayName || 'SmartUser';
-  const avatarUrl = user?.avatarUrl || '/avatar-nhi.png';
+  const displayName = user?.displayName || user?.email?.split('@')[0] || 'Sinh viên';
+  const defaultAvatar = `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(user?.displayName || user?.email || 'Student')}&backgroundColor=fed7aa,dbeafe`;
+  const avatarUrl = user?.avatarUrl || defaultAvatar;
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Chào buổi sáng,' : hour < 18 ? 'Chào buổi chiều,' : 'Chào buổi tối,';
 
@@ -161,7 +162,7 @@ export function DashboardHeroBanner() {
                 backgroundColor: '#ffffff',
               }}
               onError={(e) => {
-                (e.target as HTMLImageElement).src = '/avatar-nhi.png';
+                (e.target as HTMLImageElement).src = defaultAvatar;
               }}
             />
             <span

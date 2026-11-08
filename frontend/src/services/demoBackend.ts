@@ -885,11 +885,11 @@ export const demoAdapter: AxiosAdapter = async (config) => {
   // User Profile & Auth
   if ((route === '/users/me' || route === '/auth/me') && method === 'GET') {
     const demoTier = (typeof window !== 'undefined' && localStorage.getItem('smartschedule-demo-tier')) || 'PRO';
-    const demoAvatar = (typeof window !== 'undefined' && localStorage.getItem('smartschedule-demo-avatar')) || '/avatar-nhi.png';
-    const demoName = (typeof window !== 'undefined' && localStorage.getItem('smartschedule-demo-name')) || 'Vũ Ngọc Nhi';
+    const demoAvatar = (typeof window !== 'undefined' && localStorage.getItem('smartschedule-demo-avatar')) || 'https://api.dicebear.com/7.x/notionists/svg?seed=FPTStudent&backgroundColor=fed7aa,dbeafe';
+    const demoName = (typeof window !== 'undefined' && localStorage.getItem('smartschedule-demo-name')) || 'Sinh viên FPT';
     data = {
       id: DEMO_USER_ID,
-      email: 'nhi.vn@fpt.edu.vn',
+      email: 'sinhvien@fpt.edu.vn',
       displayName: demoName,
       name: demoName,
       avatarUrl: demoAvatar,
@@ -903,17 +903,17 @@ export const demoAdapter: AxiosAdapter = async (config) => {
     const demoTier = (typeof window !== 'undefined' && localStorage.getItem('smartschedule-demo-tier')) || 'PRO';
     if (typeof window !== 'undefined') {
       if (body.avatarUrl !== undefined) {
-        localStorage.setItem('smartschedule-demo-avatar', body.avatarUrl || '/avatar-nhi.png');
+        localStorage.setItem('smartschedule-demo-avatar', body.avatarUrl || 'https://api.dicebear.com/7.x/notionists/svg?seed=FPTStudent&backgroundColor=fed7aa,dbeafe');
       }
       if (body.name || body.displayName) {
         localStorage.setItem('smartschedule-demo-name', body.name || body.displayName);
       }
     }
-    const currentAvatar = (typeof window !== 'undefined' && localStorage.getItem('smartschedule-demo-avatar')) || body.avatarUrl || '/avatar-nhi.png';
-    const currentName = body.name || body.displayName || (typeof window !== 'undefined' && localStorage.getItem('smartschedule-demo-name')) || 'Vũ Ngọc Nhi';
+    const currentAvatar = (typeof window !== 'undefined' && localStorage.getItem('smartschedule-demo-avatar')) || body.avatarUrl || 'https://api.dicebear.com/7.x/notionists/svg?seed=FPTStudent&backgroundColor=fed7aa,dbeafe';
+    const currentName = body.name || body.displayName || (typeof window !== 'undefined' && localStorage.getItem('smartschedule-demo-name')) || 'Sinh viên FPT';
     data = {
       id: DEMO_USER_ID,
-      email: 'nhi.vn@fpt.edu.vn',
+      email: 'sinhvien@fpt.edu.vn',
       displayName: currentName,
       name: currentName,
       avatarUrl: currentAvatar,

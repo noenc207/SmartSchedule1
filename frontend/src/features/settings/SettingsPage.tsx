@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Check,
@@ -65,14 +65,14 @@ export function SettingsPage() {
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
 
-  const [profileName, setProfileName] = useState(user?.displayName || 'Vũ Ngọc Nhi');
+  const [profileName, setProfileName] = useState(user?.displayName || user?.email?.split('@')[0] || 'Sinh viên');
   const [profileTimezone, setProfileTimezone] = useState(user?.timezone || 'Asia/Ho_Chi_Minh');
   const [profileLocale, setProfileLocale] = useState(user?.locale || 'vi-VN');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   useEffect(() => {
     if (user) {
-      setProfileName(user.displayName);
+      setProfileName(user.displayName || user.email?.split('@')[0] || 'Sinh viên');
       setProfileTimezone(user.timezone || 'Asia/Ho_Chi_Minh');
       setProfileLocale(user.locale || 'vi-VN');
     }
@@ -87,7 +87,16 @@ export function SettingsPage() {
   const [editColor, setEditColor] = useState('');
   const [error, setError] = useState('');
 
-  const currentAvatar = user?.avatarUrl || '/avatar-nhi.png';
+  const defaultAvatar = `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(user?.displayName || user?.email || 'Student')}&backgroundColor=fed7aa,dbeafe`;
+  const currentAvatar = user?.avatarUrl || defaultAvatar;
+
+  const studentRollNo = useMemo(() => {
+    if (user?.email) {
+      const match = user.email.match(/([a-zA-Z]{2}\d{5,7})/i);
+      if (match) return match[1].toUpperCase();
+    }
+    return user?.id ? `FPT-${user.id.slice(0, 6).toUpperCase()}` : 'FPT-STUDENT';
+  }, [user]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,8 +140,8 @@ export function SettingsPage() {
 
   const handleCopyMSSV = () => {
     if (navigator?.clipboard) {
-      navigator.clipboard.writeText('QE160123');
-      showToast('Đã sao chép MSSV: QE160123 vào clipboard!', 'info');
+      navigator.clipboard.writeText(studentRollNo);
+      showToast(`Đã sao chép MSSV: ${studentRollNo} vào clipboard!`, 'info');
     }
   };
 
@@ -269,10 +278,10 @@ export function SettingsPage() {
             >
               <img
                 src={currentAvatar}
-                alt={user?.displayName || 'Vũ Ngọc Nhi'}
+                alt={user?.displayName || 'Sinh viên'}
                 className="settings-hero-avatar"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = '/avatar-nhi.png';
+                  (e.target as HTMLImageElement).src = defaultAvatar;
                 }}
               />
               <span className="settings-avatar-change-pill">
@@ -297,7 +306,7 @@ export function SettingsPage() {
                     border: '1px solid rgba(255, 255, 255, 0.25)',
                   }}
                 >
-                  FPT Student ID · K15
+                  FPT Student ID
                 </span>
                 <span
                   style={{
@@ -319,17 +328,17 @@ export function SettingsPage() {
               </div>
 
               <h1 style={{ fontSize: 26, fontWeight: 800, margin: '0 0 6px 0', letterSpacing: '-0.02em' }}>
-                {user?.displayName || 'Vũ Ngọc Nhi'}
+                {user?.displayName || user?.email?.split('@')[0] || 'Sinh viên'}
               </h1>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', fontSize: 13, opacity: 0.9 }}>
-                <span>MSSV: <strong style={{ color: '#fed7aa', letterSpacing: '0.02em' }}>QE160123</strong></span>
+                <span>MSSV: <strong style={{ color: '#fed7aa', letterSpacing: '0.02em' }}>{studentRollNo}</strong></span>
                 <span>·</span>
                 <span>Kỹ thuật phần mềm AI</span>
                 <span>·</span>
-                <span>{user?.email || 'nhi.vn@fpt.edu.vn'}</span>
+                <span>{user?.email || 'sinhvien@fpt.edu.vn'}</span>
                 <span>·</span>
-                <span>GPA tích lũy: <strong style={{ color: '#86efac' }}>3.65 / 4.0</strong></span>
+                <span>Tài khoản: <strong style={{ color: '#86efac' }}>Đã xác thực</strong></span>
               </div>
             </div>
           </div>
@@ -533,7 +542,7 @@ export function SettingsPage() {
                         border: isSelected ? '2.5px solid #f97316' : '1px solid rgba(0,0,0,0.06)',
                       }}
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = '/avatar-nhi.png';
+                        (e.target as HTMLImageElement).src = '/fpt-icon.png';
                       }}
                     />
                     <strong style={{ fontSize: 13, color: 'var(--text-primary, #0f172a)' }}>{preset.name}</strong>
@@ -1221,8 +1230,8 @@ export function SettingsPage() {
               </svg>
             </div>
 
-            <h3 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 4px 0' }}>{user?.displayName || 'Vũ Ngọc Nhi'}</h3>
-            <p style={{ margin: '0 0 16px 0', fontSize: 13, color: '#64748b' }}>MSSV: QE160123 · K15 Quy Nhơn</p>
+            <h3 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 4px 0' }}>{user?.displayName || user?.email?.split('@')[0] || 'Sinh viên'}</h3>
+            <p style={{ margin: '0 0 16px 0', fontSize: 13, color: '#64748b' }}>MSSV: {studentRollNo} · Quy Nhơn AI Campus</p>
 
             <button
               type="button"

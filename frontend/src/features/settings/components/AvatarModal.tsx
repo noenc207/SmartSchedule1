@@ -14,11 +14,11 @@ export interface AvatarPreset {
 
 export const AVATAR_PRESETS: AvatarPreset[] = [
   {
-    id: 'nhi-original',
-    name: 'Vũ Ngọc Nhi',
-    role: 'Sinh viên K15 (Mặc định)',
-    url: '/avatar-nhi.png',
-    badge: 'K15 AI',
+    id: 'student-default',
+    name: 'Sinh viên FPT',
+    role: 'Avatar Vector Chuẩn',
+    url: 'https://api.dicebear.com/7.x/notionists/svg?seed=FPTStudent&backgroundColor=fed7aa,dbeafe',
+    badge: 'Vector AI',
   },
   {
     id: 'coc-chat',
@@ -65,7 +65,8 @@ interface AvatarModalProps {
 
 export function AvatarModal({ isOpen, onClose, onAvatarUpdated }: AvatarModalProps) {
   const { user, updateUser } = useAuthStore();
-  const currentAvatar = user?.avatarUrl || '/avatar-nhi.png';
+  const defaultAvatar = `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(user?.displayName || user?.email || 'Student')}&backgroundColor=fed7aa,dbeafe`;
+  const currentAvatar = user?.avatarUrl || defaultAvatar;
   const [selectedAvatar, setSelectedAvatar] = useState<string>(currentAvatar);
   const [customUrl, setCustomUrl] = useState<string>('');
   const [isApplying, setIsApplying] = useState(false);
@@ -219,7 +220,7 @@ export function AvatarModal({ isOpen, onClose, onAvatarUpdated }: AvatarModalPro
                   backgroundColor: '#ffffff',
                 }}
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = '/avatar-nhi.png';
+                  (e.target as HTMLImageElement).src = defaultAvatar;
                 }}
               />
               <span
@@ -260,7 +261,7 @@ export function AvatarModal({ isOpen, onClose, onAvatarUpdated }: AvatarModalPro
                 <span style={{ fontSize: 13, color: '#64748b' }}>FPT Quy Nhơn AI Campus</span>
               </div>
               <strong style={{ fontSize: 16, color: 'var(--text-primary, #0f172a)', display: 'block' }}>
-                {user?.displayName || 'Vũ Ngọc Nhi'}
+                {user?.displayName || user?.email?.split('@')[0] || 'Sinh viên'}
               </strong>
               <p style={{ margin: 0, fontSize: 13, color: '#64748b' }}>
                 Ảnh đại diện này sẽ đồng bộ trên toàn bộ Header, Dashboard và Thẻ sinh viên.
@@ -338,7 +339,7 @@ export function AvatarModal({ isOpen, onClose, onAvatarUpdated }: AvatarModalPro
                         border: isSelected ? '2px solid #f97316' : '1px solid rgba(0,0,0,0.06)',
                       }}
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = '/avatar-nhi.png';
+                        (e.target as HTMLImageElement).src = '/fpt-icon.png';
                       }}
                     />
                     <strong style={{ fontSize: 13, color: 'var(--text-primary, #0f172a)', lineHeight: 1.2 }}>

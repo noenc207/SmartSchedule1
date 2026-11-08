@@ -41,7 +41,9 @@ export function UserQuickDropdown({
   const { user, updateUser, logout } = useAuthStore();
   const { timeFormat, setTimeFormat } = usePreferenceStore();
 
-  const currentAvatar = user?.avatarUrl || '/avatar-nhi.png';
+  const currentAvatar =
+    user?.avatarUrl ||
+    `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(user?.displayName || user?.email || 'Student')}&backgroundColor=fed7aa,dbeafe`;
 
   // Click outside to close
   useEffect(() => {
@@ -132,7 +134,7 @@ export function UserQuickDropdown({
                 backgroundColor: '#ffffff',
               }}
               onError={(e) => {
-                (e.target as HTMLImageElement).src = '/avatar-nhi.png';
+                (e.target as HTMLImageElement).src = currentAvatar;
               }}
             />
             <button
@@ -176,7 +178,7 @@ export function UserQuickDropdown({
                   display: 'block',
                 }}
               >
-                {user?.displayName || 'Vũ Ngọc Nhi'}
+                {user?.displayName || user?.email?.split('@')[0] || 'Sinh viên'}
               </strong>
             </div>
             <p
@@ -189,7 +191,7 @@ export function UserQuickDropdown({
                 textOverflow: 'ellipsis',
               }}
             >
-              {user?.email || 'nhi.vn@fpt.edu.vn'}
+              {user?.email || 'sinhvien@fpt.edu.vn'}
             </p>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
               <span
@@ -277,7 +279,7 @@ export function UserQuickDropdown({
                     backgroundColor: '#ffffff',
                   }}
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = '/avatar-nhi.png';
+                    (e.target as HTMLImageElement).src = currentAvatar;
                   }}
                 />
                 {isSelected && (

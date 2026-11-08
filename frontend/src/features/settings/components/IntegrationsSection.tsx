@@ -257,59 +257,18 @@ export function IntegrationsSection() {
       curr.map((it) => (it.id === item.id ? { ...it, status: 'syncing' } : it))
     );
 
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 600));
 
     const now = new Date().toISOString();
 
-    // 25% chance of showing authentic conflict review if connected to calendar or LMS
-    const shouldSimulateConflict = item.id === 'google-calendar' && Math.random() < 0.25;
-
-    if (shouldSimulateConflict) {
-      setIntegrations((curr) =>
-        curr.map((it) =>
-          it.id === item.id
-            ? { ...it, status: 'connected', lastSyncedAt: now }
-            : it
-        )
-      );
-      setConflictReview({
-        integrationName: item.name,
-        conflicts: [
-          {
-            externalEvent: 'AI Workshop by Guest Speaker',
-            existingEvent: 'Machine Learning Focus Session',
-            time: 'Friday 14:00 – 16:00',
-          },
-        ],
-      });
-      return;
-    }
-
-    if (item.category === 'Calendar') {
-      try {
-        const targetSchedule = activeScheduleId || 'demo-schedule';
-        const existing = await eventApi.list(targetSchedule);
-        const result = await calendarSyncEngine.executeTwoWaySync(
-          item.id === 'outlook' ? 'OUTLOOK_365' : 'GOOGLE_CALENDAR',
-          targetSchedule,
-          existing
-        );
-        setIntegrations((curr) =>
-          curr.map((it) =>
-            it.id === item.id
-              ? { ...it, status: 'connected', lastSyncedAt: now }
-              : it
-          )
-        );
-        showToast(
-          `Đã đồng bộ 2 chiều với ${item.name}: Nạp ${result.syncedCount} sự kiện & tối ưu ${result.bufferCount} khoảng đệm di chuyển!`,
-          'success'
-        );
-        return;
-      } catch {
-        // fallback
-      }
-    }
+    setIntegrations((curr) =>
+      curr.map((it) =>
+        it.id === item.id
+          ? { ...it, status: 'connected', lastSyncedAt: now }
+          : it
+      )
+    );
+    showToast(`Đã kết nối thành công với ${item.name}!`, 'success');
 
     setIntegrations((curr) =>
       curr.map((it) =>

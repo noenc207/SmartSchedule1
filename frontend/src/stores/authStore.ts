@@ -42,9 +42,9 @@ const getInitialDemoTier = (): 'FREE' | 'PRO' => {
 
 const DEMO_USER_PROFILE: User = {
   id: 'demo-user',
-  email: 'nhi.vn@fpt.edu.vn',
-  displayName: 'Vũ Ngọc Nhi',
-  avatarUrl: '/avatar-nhi.png',
+  email: 'sinhvien@fpt.edu.vn',
+  displayName: 'Sinh viên FPT',
+  avatarUrl: 'https://api.dicebear.com/7.x/notionists/svg?seed=FPTStudent&backgroundColor=fed7aa,dbeafe',
   enabled: true,
   timezone: 'Asia/Ho_Chi_Minh',
   locale: 'vi',

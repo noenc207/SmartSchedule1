@@ -34,6 +34,7 @@ import {
 } from '../../../components/mobile';
 import { useAuth } from '../../../hooks/useAuth';
 import { useWorkspaceStore } from '../../../stores/workspaceStore';
+import { taskApi } from '../../../services/taskApi';
 import { useDashboardData } from '../../dashboard/hooks/useDashboardData';
 import { DashboardScheduleProposalCard } from '../../dashboard/components/DashboardScheduleProposalCard';
 import { showToast } from '../../../components/Toast';
@@ -88,7 +89,9 @@ export function MobileHomeScreen() {
     setLocalTasks(tasks);
   }, [tasks]);
 
-  const studentName = user?.displayName || 'Vũ Ngọc Nhi';
+  const studentName = user?.displayName || user?.email?.split('@')[0] || 'Sinh viên';
+  const defaultAvatar = `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(user?.displayName || user?.email || 'Student')}&backgroundColor=fed7aa,dbeafe`;
+  const avatarUrl = user?.avatarUrl || defaultAvatar;
 
   // Greeting time
   const greeting = useMemo(() => {
@@ -127,22 +130,54 @@ export function MobileHomeScreen() {
     showToast(`✓ Điểm danh chuyên cần thành công: ${classItem.title}`, 'success');
   };
 
-  const handleInlineAddTask = (e: React.FormEvent) => {
+  const handleInlineAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTaskTitle.trim()) return;
 
-    const newTask: Task = {
-      id: `task-${Date.now()}`,
-      title: newTaskTitle.trim(),
-      status: 'PENDING',
-      priority: 'HIGH',
-      estimatedDurationMinutes: 60,
-      deadline: new Date(Date.now() + 86400000 * 2).toISOString(),
-    } as any;
-
-    setLocalTasks([newTask, ...localTasks]);
+    const title = newTaskTitle.trim();
     setNewTaskTitle('');
-    showToast('Đã thêm bài tập mới!', 'success');
+
+    try {
+      if (activeScheduleId) {
+        const created = await taskApi.create(activeScheduleId, {
+          title,
+          description: null,
+          priority: 'HIGH',
+          estimatedDurationMinutes: 60,
+          remainingDurationMinutes: 60,
+          status: 'PENDING',
+          minimumSessionMinutes: 30,
+          maximumSessionMinutes: 120,
+          deadline: new Date(Date.now() + 86400000 * 2).toISOString(),
+        });
+        setLocalTasks((prev) => [created, ...prev]);
+      } else {
+        const fallbackTask: Task = {
+          id: `task-${Date.now()}`,
+          scheduleId: activeScheduleId || 's-1',
+          ownerId: user?.id || 'u-1',
+          categoryId: 'cat-academic',
+          title,
+          description: null,
+          status: 'PENDING',
+          priority: 'HIGH',
+          estimatedDurationMinutes: 60,
+          remainingDurationMinutes: 60,
+          deadline: new Date(Date.now() + 86400000 * 2).toISOString(),
+          preferredStartTime: null,
+          preferredEndTime: null,
+          minimumSessionMinutes: 30,
+          maximumSessionMinutes: 90,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        setLocalTasks((prev) => [fallbackTask, ...prev]);
+      }
+      showToast('Đã thêm bài tập mới!', 'success');
+      refresh();
+    } catch {
+      showToast('Không thể tạo bài tập vào lúc này', 'error');
+    }
   };
 
   const handleToggleTask = (task: Task) => {
@@ -171,11 +206,11 @@ export function MobileHomeScreen() {
         leftAction={
           <div className="relative w-10 h-10 rounded-full overflow-hidden border-2 border-[var(--m-brand-primary)] shrink-0 shadow-sm mr-1">
             <img
-              src="/avatar-nhi.png"
+              src={avatarUrl}
               alt={studentName}
               className="w-full h-full object-cover"
               onError={(e) => {
-                (e.target as HTMLImageElement).src = '/fpt-icon.png';
+                (e.target as HTMLImageElement).src = defaultAvatar;
               }}
             />
             <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white" />

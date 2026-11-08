@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -48,8 +48,18 @@ export function MobileSettingsScreen() {
     } catch {}
   }, [dark]);
 
-  const studentName = user?.displayName || 'Vũ Ngọc Nhi';
-  const studentEmail = user?.email || 'nhivnqe160123@fpt.edu.vn';
+  const studentName = user?.displayName || user?.email?.split('@')[0] || 'Sinh viên';
+  const studentEmail = user?.email || 'sinhvien@fpt.edu.vn';
+  const defaultAvatar = `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(user?.displayName || user?.email || 'Student')}&backgroundColor=fed7aa,dbeafe`;
+  const currentAvatar = user?.avatarUrl || defaultAvatar;
+
+  const studentRollNo = useMemo(() => {
+    if (user?.email) {
+      const match = user.email.match(/([a-zA-Z]{2}\d{5,7})/i);
+      if (match) return match[1].toUpperCase();
+    }
+    return user?.id ? `FPT-${user.id.slice(0, 6).toUpperCase()}` : 'FPT-STUDENT';
+  }, [user]);
 
   const handleResetData = () => {
     resetDemoData();
@@ -91,19 +101,19 @@ export function MobileSettingsScreen() {
                 <div className="flex items-center gap-3 pt-1">
                   <div className="w-12 h-12 rounded-xl overflow-hidden border-2 border-white/80 shrink-0 shadow-xs cursor-pointer relative" onClick={(e) => { e.stopPropagation(); setIsAvatarModalOpen(true); }} title="Chạm để đổi Avatar">
                     <img
-                      src={user?.avatarUrl || "/avatar-nhi.png"}
+                      src={currentAvatar}
                       alt={studentName}
                       className="w-full h-full object-cover"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = '/fpt-icon.png';
+                        (e.target as HTMLImageElement).src = defaultAvatar;
                       }}
                     />
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="text-sm font-bold text-white truncate">{studentName}</h3>
-                    <p className="text-xs text-white/90 font-mono">MSSV: QE160123</p>
+                    <p className="text-xs text-white/90 font-mono">MSSV: {studentRollNo}</p>
                     <p className="text-[11px] text-white/80 truncate">
-                      Kỹ thuật phần mềm AI · K15
+                      {studentEmail}
                     </p>
                   </div>
                 </div>

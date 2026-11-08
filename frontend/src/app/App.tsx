@@ -125,8 +125,119 @@ function Shell() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
-  const currentPage = navItems.find((item) => location.pathname.startsWith(item.to) && item.to !== '/') ?? navItems[0];
   const { activeScheduleId, setActiveScheduleId } = useWorkspaceStore();
+
+  // Dynamic live stats derived strictly from real user events & tasks
+  const [liveStats, setLiveStats] = useState({
+    todaySlotCount: 0,
+    urgentTaskCount: 0,
+    todayStudyHours: 0,
+    targetHours: 6,
+    academicCount: 0,
+    projectCount: 0,
+    reviewCount: 0,
+    generalCount: 0,
+  });
+
+  useEffect(() => {
+    if (!activeScheduleId) return;
+
+    let isMounted = true;
+    const fetchLiveStats = async () => {
+      try {
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const todayEnd = new Date();
+        todayEnd.setHours(23, 59, 59, 999);
+
+        const [events, taskPage] = await Promise.all([
+          eventApi.list(activeScheduleId, todayStart.toISOString(), todayEnd.toISOString()).catch(() => []),
+          taskApi.list(activeScheduleId).catch(() => ({ content: [] as Task[] })),
+        ]);
+
+        if (!isMounted) return;
+
+        const tasksList = Array.isArray(taskPage?.content) ? taskPage.content : [];
+        const evs = Array.isArray(events) ? events : [];
+
+        const urgent = tasksList.filter((t) => t.status !== 'COMPLETED' && t.priority === 'HIGH').length;
+
+        let todayHours = 0;
+        let academic = 0;
+        let project = 0;
+        let review = 0;
+        let general = 0;
+
+        evs.forEach((ev) => {
+          const s = new Date(ev.startsAt).getTime();
+          const e = new Date(ev.endsAt).getTime();
+          if (Number.isFinite(s) && Number.isFinite(e) && e > s) {
+            todayHours += (e - s) / 3600000;
+          }
+          const t = `${ev.title || ''} ${ev.description || ''}`.toLowerCase();
+          if (t.includes('đồ án') || t.includes('capstone') || t.includes('project')) project++;
+          else if (t.includes('thi') || t.includes('ôn tập') || t.includes('exam')) review++;
+          else if (t.includes('tự học') || t.includes('sinh hoạt') || t.includes('study')) general++;
+          else academic++;
+        });
+
+        tasksList.forEach((tk) => {
+          const t = `${tk.title || ''} ${tk.description || ''}`.toLowerCase();
+          if (t.includes('đồ án') || t.includes('capstone') || t.includes('project')) project++;
+          else if (t.includes('thi') || t.includes('ôn tập') || t.includes('đề')) review++;
+          else if (t.includes('tự học') || t.includes('đọc')) general++;
+        });
+
+        setLiveStats({
+          todaySlotCount: evs.length,
+          urgentTaskCount: urgent,
+          todayStudyHours: Math.round(todayHours * 10) / 10,
+          targetHours: 6,
+          academicCount: academic,
+          projectCount: project,
+          reviewCount: review,
+          generalCount: general,
+        });
+      } catch {
+        // ignore
+      }
+    };
+
+    void fetchLiveStats();
+    return () => {
+      isMounted = false;
+    };
+  }, [activeScheduleId, location.pathname]);
+
+  const dynamicNavItems: NavItem[] = useMemo(() => [
+    { to: '/dashboard', label: 'Trang chủ', icon: Home },
+    {
+      to: '/calendar',
+      label: 'Lịch học',
+      badge: liveStats.todaySlotCount > 0 ? `${liveStats.todaySlotCount} Slot` : undefined,
+      badgeType: 'orange',
+      icon: Calendar,
+    },
+    {
+      to: '/tasks',
+      label: 'Công việc',
+      badge: liveStats.urgentTaskCount > 0 ? `${liveStats.urgentTaskCount} gấp` : undefined,
+      badgeType: 'rose',
+      icon: CheckSquare,
+    },
+    { to: '/scheduling', label: 'Lịch cá nhân', icon: CalendarRange },
+    { to: '/analytics', label: 'Báo cáo', icon: BarChart2 },
+    { to: '/settings', label: 'Cài đặt', icon: Settings },
+  ], [liveStats]);
+
+  const dynamicCategories = useMemo(() => [
+    { id: 'cat-academic', name: 'Học tập trên lớp', color: '#2563eb', count: `${liveStats.academicCount} ca`, hint: 'Lớp học & Lab chính khóa' },
+    { id: 'cat-projects', name: 'Đồ án & Dự án', color: '#7c3aed', count: `${liveStats.projectCount} bài`, hint: 'Deadline đồ án Capstone' },
+    { id: 'cat-review', name: 'Thi & Ôn tập', color: '#0891b2', count: `${liveStats.reviewCount} đề`, hint: 'Lịch thi & Ôn tập cuối kỳ' },
+    { id: 'cat-general', name: 'Sinh hoạt & Tự học', color: '#ea580c', count: `${liveStats.generalCount} ca`, hint: 'Tự học tại Thư viện / Atrium' },
+  ], [liveStats]);
+
+  const currentPage = dynamicNavItems.find((item) => location.pathname.startsWith(item.to) && item.to !== '/') ?? dynamicNavItems[0];
 
   // Category filter state for interactive sidebar
   const [categoryFilterState, setCategoryFilterState] = useState<Record<string, boolean>>({
@@ -274,7 +385,7 @@ function Shell() {
 
         {/* Sidebar Navigation */}
         <nav aria-label="Primary navigation" className="mock-sidebar-nav">
-          {navItems.map((item) => {
+          {dynamicNavItems.map((item) => {
             const Icon = item.icon;
             return (
               <NavLink
@@ -322,12 +433,19 @@ function Shell() {
             <div className="sidebar-coc-tracker">
               <div className="sidebar-coc-tracker-labels">
                 <span className="tracker-text">Tự học hôm nay</span>
-                <strong className="tracker-val">2.5h / 6h</strong>
+                <strong className="tracker-val">{liveStats.todayStudyHours}h / {liveStats.targetHours}h</strong>
               </div>
               <div className="sidebar-coc-bar">
-                <div className="sidebar-coc-fill" style={{ width: '42%' }} />
+                <div
+                  className="sidebar-coc-fill"
+                  style={{ width: `${Math.min(100, Math.round((liveStats.todayStudyHours / liveStats.targetHours) * 100))}%` }}
+                />
               </div>
-              <span className="tracker-sub">Đạt 42% chỉ tiêu tập trung</span>
+              <span className="tracker-sub">
+                {liveStats.todayStudyHours > 0
+                  ? `Đạt ${Math.min(100, Math.round((liveStats.todayStudyHours / liveStats.targetHours) * 100))}% chỉ tiêu tập trung`
+                  : 'Chưa có ca học/tự học hôm nay'}
+              </span>
             </div>
 
             <button
@@ -360,7 +478,7 @@ function Shell() {
               </button>
             </div>
             <div className="mock-sidebar-cat-list">
-              {DEFAULT_CATEGORIES.map((cat) => {
+              {dynamicCategories.map((cat) => {
                 const isEnabled = categoryFilterState[cat.id] ?? true;
 
                 return (
@@ -520,12 +638,12 @@ function Shell() {
               {dark ? <Sun size={18} /> : <Moon size={18} />}
             </button>
 
-            {/* Student Profile Vũ Ngọc Nhi - Sinh viên K15 with quick customization dropdown */}
+            {/* Student Profile with quick customization dropdown */}
             <div className="mock-student-profile-container" style={{ position: 'relative' }}>
               <div
                 className={`mock-student-profile ${isUserMenuOpen ? 'active' : ''}`}
                 onClick={() => setIsUserMenuOpen((prev) => !prev)}
-                title={`Tùy biến hồ sơ: ${user?.displayName || 'Vũ Ngọc Nhi'}`}
+                title={`Tùy biến hồ sơ: ${user?.displayName || user?.email?.split('@')[0] || 'Sinh viên'}`}
                 role="button"
                 tabIndex={0}
                 aria-expanded={isUserMenuOpen}
@@ -534,18 +652,18 @@ function Shell() {
               >
                 <div className="mock-student-avatar-wrap">
                   <img
-                    src={user?.avatarUrl || '/avatar-nhi.png'}
-                    alt={user?.displayName || 'Vũ Ngọc Nhi'}
+                    src={user?.avatarUrl || `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(user?.displayName || user?.email || 'Student')}&backgroundColor=fed7aa,dbeafe`}
+                    alt={user?.displayName || user?.email || 'Sinh viên'}
                     className="mock-student-avatar-img"
                     onError={(e) => {
-                      (e.target as HTMLImageElement).src = '/avatar-nhi.png';
+                      (e.target as HTMLImageElement).src = '/fpt-icon.png';
                     }}
                   />
                 </div>
                 <div className="mock-student-meta">
-                  <strong className="mock-student-name">{user?.displayName || 'Vũ Ngọc Nhi'}</strong>
+                  <strong className="mock-student-name">{user?.displayName || user?.email?.split('@')[0] || 'Sinh viên'}</strong>
                   <span className="mock-student-sub">
-                    Sinh viên K15
+                    {user?.email || 'FPT University'}
                   </span>
                 </div>
                 <ChevronDown
