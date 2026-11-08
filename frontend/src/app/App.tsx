@@ -170,8 +170,22 @@ function Shell() {
     try { localStorage.setItem('smartschedule-theme', dark ? 'dark' : 'light'); } catch { /* browser storage can be unavailable */ }
   }, [dark]);
   useEffect(() => {
-    void scheduleApi.list().then((items) => {
-      if (!activeScheduleId && items[0]) setActiveScheduleId(items[0].id);
+    void scheduleApi.list().then(async (items) => {
+      if (items.length > 0) {
+        if (!activeScheduleId) setActiveScheduleId(items[0].id);
+      } else {
+        try {
+          const created = await scheduleApi.create({
+            name: 'Lịch học Chính khóa & Tự học',
+            description: 'Thời khóa biểu cá nhân & kế hoạch tự học tại campus',
+            timezone: 'Asia/Ho_Chi_Minh',
+            visibility: 'PRIVATE',
+          });
+          setActiveScheduleId(created.id);
+        } catch {
+          // ignore
+        }
+      }
     }).catch(() => undefined);
   }, [activeScheduleId, setActiveScheduleId]);
   useEffect(() => {

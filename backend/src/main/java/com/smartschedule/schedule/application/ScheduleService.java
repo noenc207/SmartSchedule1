@@ -46,7 +46,7 @@ public class ScheduleService {
         return toResponse(schedule);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<ScheduleSummaryResponse> list() {
         UUID userId = currentUser.requireUser().getId();
         Map<UUID, ScheduleRoleInfo> byId = new LinkedHashMap<>();
@@ -63,6 +63,17 @@ public class ScheduleService {
             ScheduleRoleInfo current = byId.get(schedule.getId());
             if (current == null) {
                 byId.put(schedule.getId(), new ScheduleRoleInfo(schedule, member.getRole(), false));
+            }
+        }
+
+        if (byId.isEmpty()) {
+            User owner = currentUser.requireUser();
+            Schedule defaultSchedule = new Schedule(owner, "Lịch học Chính khóa & Tự học",
+                    "Thời khóa biểu cá nhân & kế hoạch tự học tại campus", "Asia/Ho_Chi_Minh", "PRIVATE");
+            defaultSchedule = schedules.save(defaultSchedule);
+            if (defaultSchedule != null) {
+                activity.record(defaultSchedule.getId(), owner.getId(), "CREATE_SCHEDULE");
+                byId.put(defaultSchedule.getId(), new ScheduleRoleInfo(defaultSchedule, "OWNER", true));
             }
         }
 
